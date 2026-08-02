@@ -6,56 +6,84 @@
 <title>Taller — Etapa 1</title>
 <link rel="stylesheet" href="/estatico/estilos.css">
 <style>
-  .taller { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px 0 60px;
+  .taller { display: grid; grid-template-columns: 290px 1fr; gap: 20px; padding: 18px 0 60px;
             align-items: start; }
   .columna { display: grid; gap: 16px; }
 
-  /* Árbol de ramas */
-  #arbol { max-height: 62vh; overflow: auto; }
-  .nodo { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center;
-          padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: .86rem;
-          border: 1px solid transparent; }
-  .nodo:hover { background: var(--panel-2); }
-  .nodo.sel { background: var(--panel-2); border-color: var(--acento); }
-  .nodo .etapa { font-weight: 600; }
-  .nodo .detalle { color: var(--texto-2); font-size: .76rem; font-family: var(--mono); }
+  /* ---------- recorrido de etapas ---------- */
+  .recorrido { display: flex; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+  .etapa-chip {
+    flex: 1 1 0; min-width: 118px; position: relative; text-align: center; cursor: pointer;
+    padding: 12px 8px 10px; border-top: 3px solid var(--borde); background: transparent;
+    color: var(--texto-2); font: inherit; transition: all .18s ease;
+  }
+  .etapa-chip:disabled { cursor: not-allowed; opacity: .4; }
+  .etapa-chip .n { font-family: var(--mono); font-size: .7rem; opacity: .7; }
+  .etapa-chip .t { display: block; font-size: .86rem; font-weight: 600; margin: 2px 0; }
+  .etapa-chip .d { display: block; font-size: .72rem; font-family: var(--mono); }
+  .etapa-chip.hecha { border-top-color: var(--ok); color: var(--texto); }
+  .etapa-chip.hecha .d { color: var(--ok); }
+  .etapa-chip.vista { background: var(--panel-2); border-top-color: var(--acento-2); }
+  .etapa-chip.siguiente { border-top-color: var(--acento); color: var(--acento); }
+  .etapa-chip.siguiente .d { color: var(--acento); }
 
-  /* Formulario de parámetros */
-  .campo { margin-bottom: 14px; }
-  .campo label { display: block; font-size: .84rem; margin-bottom: 5px; font-weight: 600; }
-  .campo .ayuda { font-size: .78rem; color: var(--texto-2); margin-top: 4px; }
-  .campo input[type=number], .campo input[type=text] {
-    width: 100%; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--borde);
-    background: var(--fondo-2); color: var(--texto); font: inherit; font-family: var(--mono);
-    font-size: .9rem; }
+  /* ---------- ramas ---------- */
+  #ramas { max-height: 54vh; overflow: auto; display: grid; gap: 6px; }
+  .rama {
+    display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+    padding: 9px 10px; border-radius: 9px; cursor: pointer; font-size: .84rem;
+    border: 1px solid var(--borde); background: var(--fondo-2);
+  }
+  .rama:hover { border-color: var(--acento); }
+  .rama.activa { border-color: var(--acento-2); background: var(--panel-2); }
+  .rama .titulo { font-weight: 600; }
+  .rama .via { color: var(--texto-2); font-size: .74rem; font-family: var(--mono);
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rama .oficial { color: #ffc86b; font-size: .7rem; }
+  .borrar { background: none; border: none; color: var(--texto-2); cursor: pointer;
+            font-size: 1.05rem; line-height: 1; padding: 3px 6px; border-radius: 6px; }
+  .borrar:hover { background: rgba(255,92,122,.16); color: var(--peligro); }
+
+  /* ---------- formulario ---------- */
+  .campo { margin-bottom: 13px; }
+  .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
+  .campo .ayuda { font-size: .77rem; color: var(--texto-2); margin-top: 4px; }
+  .campo input[type=number] { width: 100%; padding: 8px 11px; border-radius: 8px;
+    border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
+    font: inherit; font-family: var(--mono); font-size: .9rem; }
   .campo input:focus { outline: none; border-color: var(--acento); }
   .interruptor { display: flex; align-items: center; gap: 10px; cursor: pointer; }
   .interruptor input { width: 18px; height: 18px; accent-color: var(--acento); }
-  .opciones { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opciones { display: flex; flex-wrap: wrap; gap: 7px; }
   .opciones label { display: flex; align-items: center; gap: 6px; padding: 5px 10px;
     background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 999px;
-    font-size: .8rem; cursor: pointer; font-weight: 500; }
+    font-size: .79rem; cursor: pointer; font-weight: 500; }
   .opciones label:has(input:checked) { border-color: var(--acento); background: #17263f; }
   .opciones input { accent-color: var(--acento); }
+  .params-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 18px; }
 
-  .cadena { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .8rem; }
-  .cadena .eslabon { padding: 3px 9px; background: var(--panel-2); border-radius: 6px;
-    font-family: var(--mono); }
-  .cadena .flecha { color: var(--texto-2); }
-
-  .barra-etapas { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
-  .barra-etapas .et { padding: 5px 12px; border-radius: 999px; font-size: .8rem;
-    background: var(--fondo-2); border: 1px solid var(--borde); color: var(--texto-2); }
-  .barra-etapas .et.hecha { border-color: var(--ok); color: var(--ok); }
-  .barra-etapas .et.actual { border-color: var(--acento); color: var(--texto); background: var(--panel-2); }
-
-  canvas { width: 100%; display: block; border-radius: 8px; background: var(--fondo-2); }
-  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  /* ---------- inspección ---------- */
+  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 9px; }
   .resumen-grid .celda { background: var(--fondo-2); border: 1px solid var(--borde);
-    border-radius: 9px; padding: 10px 12px; }
-  .resumen-grid .celda .v { font-family: var(--mono); font-size: 1.25rem; color: var(--acento-2); }
-  .resumen-grid .celda .r { font-size: .74rem; color: var(--texto-2); text-transform: uppercase;
+    border-radius: 9px; padding: 9px 11px; }
+  .resumen-grid .celda .v { font-family: var(--mono); font-size: 1.2rem; color: var(--acento-2); }
+  .resumen-grid .celda .r { font-size: .71rem; color: var(--texto-2); text-transform: uppercase;
     letter-spacing: .05em; }
+  canvas { width: 100%; display: block; border-radius: 8px; background: var(--fondo-2); }
+  .mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 12px; }
+  .mini .caja { background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 9px;
+                padding: 9px; }
+  .mini .caja h5 { margin: 0 0 6px; font-size: .74rem; color: var(--texto-2); font-weight: 600;
+                   font-family: var(--mono); }
+  .pildoras { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pildora { font-family: var(--mono); font-size: .71rem; padding: 3px 8px; border-radius: 6px;
+             background: var(--fondo-2); border: 1px solid var(--borde); color: var(--texto-2); }
+  .pildora.baja { opacity: .5; text-decoration: line-through; }
+  select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--borde);
+    background: var(--fondo-2); color: var(--texto); font: inherit; font-size: .86rem; }
+  .fila-sup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .fila-sup h3, .fila-sup h4 { margin: 0; }
+  .esp { flex: 1; }
 
   @media (max-width: 940px) { .taller { grid-template-columns: 1fr; } }
 </style>
@@ -76,40 +104,71 @@
   <div id="alerta-datos"></div>
 
   <div class="taller">
-    <!-- ------------------- columna izquierda: el árbol ------------------- -->
+    <!-- ============ izquierda: ramas ============ -->
     <aside class="columna">
       <div class="tarjeta">
-        <h3 style="margin-bottom:10px">Ramas</h3>
-        <p class="tenue" style="font-size:.8rem;margin-bottom:12px">
-          Cada nodo es una etapa con su configuración. Cambiar un parámetro abre una rama nueva y
-          reutiliza todo lo anterior.
+        <div class="fila-sup">
+          <h3 style="font-size:1rem">Ramas</h3>
+          <span class="esp"></span>
+          <span class="tenue mono" id="cuenta-ramas" style="font-size:.75rem"></span>
+        </div>
+        <div id="ramas"></div>
+        <button class="boton" id="btn-nueva" style="width:100%;margin-top:12px;justify-content:center">
+          + Rama desde cero
+        </button>
+        <p class="tenue" style="font-size:.75rem;margin:12px 0 0">
+          Cada rama es un camino completo de configuración. Las que comparten el tramo inicial
+          reutilizan lo ya calculado.
         </p>
-        <div id="arbol"><p class="tenue" style="font-size:.85rem">Sin ejecuciones todavía.</p></div>
-        <button class="boton" id="btn-reiniciar" style="width:100%;margin-top:12px;justify-content:center">
-          Empezar una rama nueva
+      </div>
+
+      <div class="tarjeta" id="panel-oficial">
+        <h3 style="font-size:.92rem;margin-bottom:6px">Configuración oficial</h3>
+        <p class="tenue" style="font-size:.78rem;margin-bottom:10px">
+          La de la tesis, fijada por decisiones documentadas (ADR-0008).
+        </p>
+        <div class="mono tenue" style="font-size:.74rem;line-height:1.75">
+          limpieza sí · 42 hojas<br>ventana 50 · paso 1<br>dedup 0,95 · máx 15<br>candidatos 1 %
+        </div>
+        <button class="boton" id="btn-oficial" style="width:100%;margin-top:12px;justify-content:center">
+          Ejecutar la oficial
         </button>
       </div>
     </aside>
 
-    <!-- ------------------- columna derecha: trabajo ------------------- -->
+    <!-- ============ derecha: trabajo ============ -->
     <main class="columna">
       <div class="tarjeta">
-        <div class="barra-etapas" id="barra-etapas"></div>
-        <h2 id="titulo-etapa" style="margin:10px 0 6px">Datos</h2>
-        <p class="tenue" id="desc-etapa" style="font-size:.93rem"></p>
-        <div class="cadena" id="cadena"></div>
-        <hr style="border:none;border-top:1px solid var(--borde);margin:16px 0">
-        <div id="formulario"></div>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
-          <button class="boton primario" id="btn-ejecutar">Ejecutar etapa</button>
-          <span id="estado-ejecucion" class="tenue" style="font-size:.87rem"></span>
-        </div>
+        <div class="recorrido" id="recorrido"></div>
       </div>
 
-      <div class="tarjeta" id="panel-resultado" style="display:none">
-        <h3>Resultado</h3>
-        <div class="resumen-grid" id="resumen"></div>
-        <div id="visual" style="margin-top:18px"></div>
+      <!-- inspección de la etapa vista -->
+      <div class="tarjeta" id="panel-inspeccion" style="display:none">
+        <div class="fila-sup">
+          <h3 id="insp-titulo">Inspección</h3>
+          <span class="chip listo" id="insp-tiempo"></span>
+          <span class="esp"></span>
+          <span class="mono tenue" id="insp-clave" style="font-size:.74rem"></span>
+        </div>
+        <p class="tenue" id="insp-params" style="font-size:.83rem;font-family:var(--mono)"></p>
+        <div class="resumen-grid" id="insp-resumen"></div>
+        <div id="insp-visual" style="margin-top:18px"></div>
+      </div>
+
+      <!-- ejecutar la siguiente etapa -->
+      <div class="tarjeta" id="panel-ejecutar">
+        <div class="fila-sup">
+          <h3 id="ejec-titulo">Ejecutar</h3>
+          <span class="esp"></span>
+          <span id="ejec-modo" class="chip"></span>
+        </div>
+        <p class="tenue" id="ejec-desc" style="font-size:.9rem"></p>
+        <div class="params-grid" id="formulario"></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <button class="boton primario" id="btn-ejecutar">Ejecutar</button>
+          <button class="boton" id="btn-restablecer">Restablecer valores</button>
+          <span id="estado-ejecucion" class="tenue" style="font-size:.87rem"></span>
+        </div>
       </div>
     </main>
   </div>

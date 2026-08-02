@@ -107,9 +107,19 @@ def get_nodo(clave: str):
     return nodo
 
 
+@app.delete("/api/nodo/{clave}")
+def delete_nodo(clave: str):
+    """Borra el nodo, todo lo que cuelga de él y sus resultados en disco."""
+    if almacen.obtener(_con, clave) is None:
+        raise HTTPException(404, "Nodo inexistente")
+    return almacen.borrar(_con, clave)
+
+
 @app.get("/api/nodo/{clave}/datos")
-def get_datos(clave: str, limite: int = 200):
-    """Datos para graficar, según la etapa del nodo. Siempre acotados: esto va al navegador."""
+def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
+    """Datos para inspeccionar una etapa. Siempre acotados: esto viaja al navegador."""
+    import numpy as np
+
     nodo = almacen.obtener(_con, clave)
     if nodo is None:
         raise HTTPException(404, "Nodo inexistente")
@@ -118,42 +128,87 @@ def get_datos(clave: str, limite: int = 200):
 
     salida = almacen.cargar_resultado(clave)
     etapa = nodo["etapa"]
+    grupo = "SheetName"
 
+    # ---- Datos: la serie temporal real de una hoja -------------------------------------
     if etapa == "datos":
-        muestra = salida.head(limite)
+        hojas = salida[grupo].drop_duplicates().tolist()
+        elegida = hoja if hoja in hojas else hojas[0]
+        sub = salida[salida[grupo] == elegida]
+        señales = [c for c in sub.columns if c not in (grupo, "segment")]
+        paso = max(1, len(sub) // limite)  # submuestreo para no mandar miles de puntos
+        sub = sub.iloc[::paso]
         return {
-            "tipo": "series",
-            "columnas": [c for c in salida.columns if c != "SheetName"],
-            "filas": json.loads(muestra.to_json(orient="records")),
-            "por_hoja": salida.groupby("SheetName").size().sort_values(ascending=False)
-                              .head(15).to_dict(),
+            "tipo": "serie",
+            "hojas": hojas,
+            "hoja": elegida,
+            "senales": señales,
+            "valores": [[None if pd_isna(v) else float(v) for v in fila]
+                        for fila in sub[señales].to_numpy()],
+            "por_hoja": salida.groupby(grupo).size().sort_values(ascending=False).head(20).to_dict(),
         }
 
+    # ---- Ventaneo: ventanas de ejemplo dibujables --------------------------------------
     if etapa == "ventaneo":
-        meta = salida["meta"]
+        ventanas, meta = salida["ventanas"], salida["meta"]
+        n = len(ventanas)
+        indices = [0, n // 4, n // 2, (3 * n) // 4][:max(1, min(4, n))] if n else []
+        ejemplos = []
+        for i in indices:
+            ejemplos.append({
+                "pos": int(i),
+                "hoja": str(meta.loc[i, grupo]),
+                "inicio": int(meta.loc[i, "start"]),
+                "valores": ventanas.values[i].tolist(),
+            })
         return {
             "tipo": "ventanas",
-            "por_hoja": meta.groupby("SheetName").size().sort_values(ascending=False)
-                            .head(15).to_dict(),
-            "ejemplo": salida["ventanas"].values[0].tolist() if len(salida["ventanas"]) else [],
-            "senales": list(salida["ventanas"].signal_columns),
+            "senales": list(ventanas.signal_columns),
+            "ejemplos": ejemplos,
+            "por_hoja": meta.groupby(grupo).size().sort_values(ascending=False).head(20).to_dict(),
+            "tamano": int(ventanas.values.shape[1]) if n else 0,
         }
 
-    if etapa in ("features", "filtrado"):
-        tabla = salida.get("filtradas", salida.get("features"))
-        cols = [c for c in tabla.columns if c != "SheetName"]
-        return {"tipo": "features", "columnas": cols[:limite], "total": len(cols)}
+    # ---- Características: qué se calculó, por familia ----------------------------------
+    if etapa == "features":
+        tabla = salida["features"]
+        cols = [c for c in tabla.columns if c != grupo]
+        por_senal: dict[str, list[str]] = {}
+        for c in cols:
+            señal = c.split("__")[0] if "__" in c else "otras"
+            por_senal.setdefault(señal, []).append(c.split("__")[-1])
+        return {"tipo": "features", "total": len(cols), "por_senal": por_senal}
 
+    # ---- Filtrado: cuáles sobrevivieron y cuáles no ------------------------------------
+    if etapa == "filtrado":
+        antes = {c for c in salida["features"].columns if c != grupo}
+        despues = {c for c in salida["filtradas"].columns if c != grupo}
+        return {
+            "tipo": "filtrado",
+            "conservadas": sorted(despues),
+            "descartadas": sorted(antes - despues),
+        }
+
+    # ---- Detección: distribución de puntajes y las ventanas más extremas ---------------
     if etapa == "deteccion":
         sc = salida["scores"]
+        meta = salida["meta"]
+        top = {}
+        for c in sc.columns:
+            idx = sc[c].nlargest(8).index
+            top[c] = [{"pos": int(p), "hoja": str(meta.loc[p, grupo]),
+                       "inicio": int(meta.loc[p, "start"]), "score": float(sc.loc[p, c])}
+                      for p in idx]
         return {
             "tipo": "scores",
             "detectores": list(sc.columns),
-            # Histograma por detector, normalizado a percentiles para que sean comparables en pantalla
+            # Percentiles: cada detector tiene su escala, no son comparables entre sí.
             "percentiles": {c: [float(sc[c].quantile(q / 100)) for q in range(0, 101, 5)]
                             for c in sc.columns},
+            "top": top,
         }
 
+    # ---- Eventos: el entregable --------------------------------------------------------
     if etapa == "eventos":
         tabla = salida["eventos"]
         return {
@@ -163,6 +218,12 @@ def get_datos(clave: str, limite: int = 200):
         }
 
     return {"tipo": "desconocido"}
+
+
+def pd_isna(v) -> bool:
+    import pandas as pd
+
+    return bool(pd.isna(v))
 
 
 @app.get("/api/nodo/{clave}/evento/{event_id}")
@@ -195,7 +256,11 @@ def get_evento(clave: str, event_id: int):
     for p in posiciones:
         desde = int(meta.loc[p, "start"] - fila["start"])
         bloque = ventanas.values[p]
-        acum[desde:desde + bloque.shape[0], :] = bloque
+        # Una ventana que arranca cerca del final se extiende más allá del tramo del evento
+        # (sobre todo con el límite de ventanas por evento activo): se recorta al rango.
+        hasta = min(desde + bloque.shape[0], largo)
+        if hasta > desde:
+            acum[desde:hasta, :] = bloque[:hasta - desde, :]
 
     return {
         "evento": json.loads(fila.to_json()),

@@ -162,6 +162,38 @@ def listar(con) -> list[dict]:
     return [_fila_a_dict(f) for f in filas]
 
 
+def descendientes(con, clave: str) -> list[str]:
+    """Todas las claves que cuelgan de `clave`, en profundidad (sin incluirla)."""
+    salida: list[str] = []
+    pendientes = [clave]
+    while pendientes:
+        actual = pendientes.pop()
+        hijos = [f["clave"] for f in
+                 con.execute("SELECT clave FROM nodos WHERE padre=?", (actual,)).fetchall()]
+        salida.extend(hijos)
+        pendientes.extend(hijos)
+    return salida
+
+
+def borrar(con, clave: str) -> dict:
+    """Borra un nodo, todo lo que cuelga de él y sus resultados en disco.
+
+    Se borra en cascada a propósito: un nodo hijo sin su padre no se puede reconstruir ni interpretar,
+    así que dejarlo huérfano solo ensuciaría el árbol.
+    """
+    claves = [clave, *descendientes(con, clave)]
+    liberado = 0
+    for k in claves:
+        ruta = ruta_cache(k)
+        if ruta.exists():
+            liberado += ruta.stat().st_size
+            ruta.unlink()
+    with _lock:
+        con.executemany("DELETE FROM nodos WHERE clave=?", [(k,) for k in claves])
+        con.commit()
+    return {"borrados": len(claves), "bytes_liberados": liberado}
+
+
 def cadena_hasta(con, clave: str) -> list[dict]:
     """Los nodos desde la raíz hasta `clave`, en orden. Es la configuración completa de una rama."""
     cadena: list[dict] = []

@@ -106,11 +106,27 @@ El taller reproduce los resultados oficiales de la tesis. Con los valores por de
 Y apagando la limpieza reproduce el camino del borrador previo documentado en el hallazgo H1 de la
 tesis: 22.966 ventanas, 6.923 tras dedup, 45 características.
 
+## Cómo se navega el taller
+
+El punto que más confunde de una herramienta así es mezclar *mirar* con *cambiar*. Acá están separados:
+
+- **El recorrido** (arriba) muestra las 6 etapas de la rama actual: cuáles están hechas, con qué
+  configuración y cuál sigue. Se hace clic en cualquier etapa ya hecha para **inspeccionarla**.
+- **La inspección** muestra los datos reales de esa etapa: la telemetría de una hoja, las ventanas
+  dibujadas, qué características sobrevivieron al filtro, la distribución de puntajes de cada detector,
+  la tabla de eventos (y al hacer clic en uno, sus tres señales).
+- **El panel de ejecución** siempre apunta a la etapa *siguiente* a la que estás mirando, y avisa qué
+  va a pasar: *continúa la rama actual* o *abre una rama nueva*.
+- **Las ramas** (izquierda) listan cada camino completo, marcan cuál es la configuración oficial de la
+  tesis y se pueden **borrar en cascada** (el nodo, todo lo que cuelga y sus resultados en disco).
+
+El botón **Ejecutar la oficial** corre las 6 etapas con la configuración firmada de la tesis, para
+tener siempre una referencia contra la cual comparar.
+
 ## Estado
 
-Primera versión funcional. La cadena completa (datos → ventaneo → características → filtrado →
-detección → eventos) anda de punta a punta con ramas y caché.
+La cadena completa (datos → ventaneo → características → filtrado → detección → eventos) anda de punta
+a punta, con ramas, caché, borrado e inspección por etapa.
 
-Pendiente: estabilidad Jaccard y feature-shift como etapas, exportación del Excel entregable desde el
-taller, comparación lado a lado de dos ramas, y más contenido didáctico (animación de la ventana
-deslizándose sobre la señal, y el detalle de un evento con sus tres señales).
+Pendiente: estabilidad Jaccard y feature-shift como etapas, exportar el Excel entregable desde el
+taller, comparar dos ramas lado a lado, y la animación de la ventana deslizándose sobre la señal.
