@@ -453,10 +453,13 @@ function verFiltrado(d) {
 
 function verScores(d) {
   const vis = $('#insp-visual');
-  vis.innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Distribución de puntajes</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:8px">Percentil 0 → 100. Cada curva está
-    escalada a su propio máximo: <strong>las escalas de los detectores no son comparables entre
-    sí</strong>.</p><div id="caja-perc"></div>
+  vis.innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo se reparten los puntajes</h4>
+    <p class="tenue" style="font-size:.8rem;margin-bottom:8px">De izquierda a derecha, los tramos
+    ordenados del menos raro al más raro. Lo que interesa es la forma: una curva que se dispara al
+    final indica que ese método separa con claridad unos pocos tramos del resto; una recta indica que
+    reparte puntajes parejos y no distingue mucho. <strong>Las curvas no se pueden comparar entre sí en
+    altura</strong> — cada método usa su propia escala, así que cada una está ajustada a su máximo.</p>
+    <div id="caja-perc"></div>
     <h4 style="font-size:.88rem;margin:18px 0 8px">Ventanas más extremas por detector</h4>
     <div class="mini">${d.detectores.map((det, i) => `
       <div class="caja"><h5 style="color:${COLORES[i % 5]}">${det}</h5>
@@ -476,6 +479,14 @@ function verEventos(d) {
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem">clic en una fila para ver sus señales</span></div>
+    <div class="aviso info" style="font-size:.82rem;margin-bottom:12px">
+      <strong>Cómo leer la prioridad.</strong> «4/5» quiere decir que cuatro de los cinco métodos
+      marcaron <em>al menos un tramo</em> dentro de ese evento — no que los cuatro coincidieran en el
+      mismo tramo. Un evento largo tiene más chances de juntar métodos distintos, así que la prioridad
+      alta y el evento largo tienden a ir de la mano. La columna «por qué» indica qué características
+      se desviaron y cuánto: el número está en desvíos respecto de lo normal, así que +9 es muchísimo
+      y +2 es notorio pero no extremo.
+    </div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
       `<th>${({ n_detectores: 'prioridad', n_ventanas: 'ventanas', SheetName: 'hoja',
                 event_id: 'id', start: 'desde', end: 'hasta',

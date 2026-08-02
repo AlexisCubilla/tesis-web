@@ -123,21 +123,55 @@
       </div>
 
       <div class="tarjeta" id="panel-oficial">
-        <h3 style="font-size:.92rem;margin-bottom:6px">Configuración oficial</h3>
+        <h3 style="font-size:.92rem;margin-bottom:6px">La configuración de la tesis</h3>
         <p class="tenue" style="font-size:.78rem;margin-bottom:10px">
-          La de la tesis, fijada por decisiones documentadas (ADR-0008).
+          Estos son los valores con los que se produjeron los resultados que la tesis reporta. No son
+          los «correctos»: son los que los autores y la tutoría eligieron y dejaron justificados por
+          escrito. Sirven de referencia para comparar cualquier otra cosa que pruebes acá.
         </p>
         <div class="mono tenue" style="font-size:.74rem;line-height:1.75">
-          limpieza sí · 42 hojas<br>ventana 50 · paso 1<br>dedup 0,95 · máx 15<br>candidatos 1 %
+          descartar filas inválidas: sí<br>hojas usadas: 42 de 45<br>tramos de 50 mediciones, paso 1<br>
+          descartar casi idénticos: 0,95<br>tope por evento: 15<br>marcar como sospechoso: 1 %
         </div>
         <button class="boton" id="btn-oficial" style="width:100%;margin-top:12px;justify-content:center">
-          Ejecutar la oficial
+          Ejecutar esta configuración
         </button>
+        <p class="tenue" style="font-size:.73rem;margin:10px 0 0">
+          Las ramas que coincidan con estos valores aparecen marcadas con ★.
+        </p>
       </div>
     </aside>
 
     <!-- ============ derecha: trabajo ============ -->
     <main class="columna">
+      <details class="tarjeta" id="guia">
+        <summary style="cursor:pointer;font-weight:650">¿Qué es esto y cómo se usa?</summary>
+        <div style="margin-top:14px;font-size:.9rem" class="tenue">
+          <p><strong style="color:var(--texto)">Qué hace.</strong> Este taller ejecuta, paso a paso, el
+          análisis con el que la tesis busca posibles fallas en la batería de un satélite. Podés cambiar
+          cualquier parámetro y ver cómo cambia el resultado. No es una simulación: corre el mismo
+          código que produce los resultados del trabajo.</p>
+
+          <p><strong style="color:var(--texto)">Cómo se usa.</strong> El pipeline tiene 6 pasos, en la
+          barra de arriba. Se ejecutan en orden: configurás uno, lo corrés, y pasás al siguiente.
+          Cuando un paso ya está hecho podés hacerle clic para <em>mirar</em> lo que produjo, sin
+          cambiar nada.</p>
+
+          <p><strong style="color:var(--texto)">Qué es una rama.</strong> Si volvés a un paso anterior
+          y lo ejecutás con otros valores, se abre un camino paralelo — una <em>rama</em> — sin borrar
+          el anterior. Los dos quedan guardados y se pueden comparar. Lo que ya se calculó y no cambia
+          se reutiliza, así que probar variantes es rápido: cambiar el último paso tarda menos de un
+          segundo, mientras que rehacer todo desde el principio tarda medio minuto.</p>
+
+          <p><strong style="color:var(--texto)">Una advertencia importante.</strong> Los datos no
+          tienen respuestas correctas: nadie marcó nunca qué tramos son realmente anómalos. Así que
+          ningún resultado de acá «acierta» o «falla». Lo que se puede evaluar es si varios métodos
+          distintos coinciden, y si el resultado se sostiene al cambiar la configuración. Las ramas que
+          armes son exploración: los números que la tesis reporta salen de una configuración concreta,
+          la que aparece marcada con ★.</p>
+        </div>
+      </details>
+
       <div class="tarjeta">
         <div class="recorrido" id="recorrido"></div>
       </div>

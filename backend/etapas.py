@@ -64,8 +64,8 @@ def _ejecutar_datos(entrada, params):
     detecta los segmentos contiguos buscando saltos en ese índice; si se pierde, los segmentos salen
     mal **sin dar error**. Por eso el caché usa joblib y no CSV.
 
-    Con `limpiar=False` se reproduce el camino del borrador previo (ver hallazgo H1 de la tesis):
-    no hay columna `segment`, así que el ventaneo agrupa por hoja.
+    Con `limpiar=False` no hay columna `segment`, así que el ventaneo agrupa por hoja. Ese camino
+    reproduce el del trabajo previo a esta reconstrucción (documentado como hallazgo H1 en la tesis).
     """
     from tesis import preprocessing
     from tesis.config import CONFIG
@@ -99,20 +99,30 @@ ETAPA_DATOS = Etapa(
     nombre="datos",
     titulo="Datos",
     descripcion=(
-        "Elige qué hojas del Excel entran al estudio y si se aplica la limpieza (descartar filas con "
-        "datos faltantes o con las tres señales en cero). Apagar la limpieza reproduce el camino del "
-        "borrador previo: es el interruptor del hallazgo H1."
+        "Punto de partida: la telemetría del satélite, una medición cada 10-11 segundos, repartida en "
+        "45 hojas del Excel original (cada hoja es una sesión de descarga distinta). Acá se elige qué "
+        "hojas entran al estudio y si se descartan las filas inválidas."
     ),
     parametros=(
         Parametro(
-            "limpiar", "Aplicar limpieza", "booleano", True,
-            ayuda="Descarta filas inválidas y marca los tramos contiguos. Apagarlo reproduce H1.",
+            "limpiar", "Descartar filas inválidas", "booleano", True,
+            ayuda="Hay 886 filas sin datos o con las tres señales exactamente en cero: son huecos del "
+                  "programa que decodifica la telemetría, no mediciones reales. Al descartarlas, "
+                  "además se marca dónde quedó un corte, para que después ninguna ventana de análisis "
+                  "una dos tramos separados en el tiempo. "
+                  "APAGARLO SIRVE PARA VER ALGO IMPORTANTE: en el trabajo previo a esta "
+                  "reconstrucción no se limpiaba, y eso hacía que uno de los detectores "
+                  "(HDBSCAN-GLOSH) pareciera poco confiable —marcaba ventanas distintas cada vez que "
+                  "se le cambiaba la muestra—. Con los datos limpios resulta estable: aquella "
+                  "conclusión era un efecto de las filas basura. (Hallazgo H1 de la tesis.)",
         ),
         Parametro(
-            "hojas_excluidas", "Hojas excluidas", "multiple",
+            "hojas_excluidas", "Hojas que NO entran", "multiple",
             ("Test1 w batt", "Test2 wo batt", "Anomalous data"),
-            ayuda="Por defecto se excluyen las dos de laboratorio y 'Anomalous data' (anomalía de "
-                  "paneles, no de batería).",
+            ayuda="Las dos primeras son pruebas hechas en el laboratorio, no en vuelo. La tercera se "
+                  "llama 'Anomalous data' y parecía ser el dato ideal para validar, pero al decodificar "
+                  "sus paquetes se vio que corresponde a una anomalía de los paneles solares, no de la "
+                  "batería: es otro problema.",
         ),
     ),
     ejecutar=_ejecutar_datos,
@@ -164,20 +174,34 @@ ETAPA_VENTANEO = Etapa(
     nombre="ventaneo",
     titulo="Ventaneo",
     descripcion=(
-        "Corta la telemetría en ventanas deslizantes. Una anomalía es un comportamiento en el tiempo, "
-        "no un valor suelto. El paso indica cada cuántas muestras avanza la ventana: con paso 1 dos "
-        "ventanas vecinas comparten casi todos sus datos, y de esa redundancia nacen la deduplicación "
-        "y la consolidación en eventos."
+        "Una falla de batería no es un valor suelto fuera de rango: es un comportamiento a lo largo "
+        "del tiempo. Por eso no se analiza fila por fila, sino en tramos de varias mediciones "
+        "consecutivas que se van deslizando sobre la señal, como una lupa que recorre el registro. "
+        "Cada tramo pasa a ser una unidad de análisis."
     ),
     parametros=(
-        Parametro("tamano_ventana", "Tamaño de ventana (muestras)", "entero", 50, 10, 500,
-                  ayuda="50 muestras ≈ 9 minutos. El ciclo de carga/descarga del satélite dura ~490."),
-        Parametro("paso", "Paso (stride)", "entero", 1, 1, 100,
-                  ayuda="Cada cuántas muestras avanza la ventana."),
-        Parametro("deduplicar", "Deduplicar ventanas", "booleano", True,
-                  ayuda="Descarta ventanas casi idénticas por similitud coseno (ADR-0008)."),
-        Parametro("umbral_dedup", "Umbral de deduplicación", "decimal", 0.95, 0.80, 0.999,
-                  ayuda="Más alto = se conservan más ventanas."),
+        Parametro("tamano_ventana", "Mediciones por tramo", "entero", 50, 10, 500,
+                  ayuda="Cuántas mediciones consecutivas mira cada tramo. Con 50 son unos 9 minutos de "
+                        "telemetría. Como referencia: el satélite tarda unos 87 minutos en dar una "
+                        "vuelta a la Tierra (medido en estos mismos datos), y en cada vuelta la batería "
+                        "se carga al sol y se descarga en la sombra. Un tramo de 50 ve cerca del 10 % "
+                        "de ese ciclo."),
+        Parametro("paso", "Cada cuánto avanza el tramo", "entero", 1, 1, 100,
+                  ayuda="Con paso 1, el tramo avanza de a una medición: dos tramos vecinos comparten 49 "
+                        "de sus 50 datos. Eso garantiza que nada se escape entre dos tramos, pero genera "
+                        "mucha repetición — y de ahí salen los dos pasos que siguen. Con paso 5, los "
+                        "tramos se pisan menos y hay menos que analizar."),
+        Parametro("deduplicar", "Descartar tramos casi idénticos", "booleano", True,
+                  ayuda="Compara los tramos entre sí y conserva uno solo de cada grupo de casi "
+                        "iguales. Reduce el volumen alrededor de un 70 %. Tiene un costo conocido: la "
+                        "comparación mira la FORMA de la señal y no su MAGNITUD, así que un tramo con "
+                        "valores anormalmente altos pero de forma parecida a uno normal puede quedar "
+                        "descartado. Es una decisión metodológica tomada por la tutoría de la tesis, "
+                        "con esa limitación documentada."),
+        Parametro("umbral_dedup", "Qué tan parecidos para descartar", "decimal", 0.95, 0.80, 0.999,
+                  ayuda="Va de 0 a 1: 1 significa idénticos. Con 0,95 se descarta un tramo si se parece "
+                        "en un 95 % o más a otro ya conservado. Subirlo (0,97) conserva más tramos; "
+                        "bajarlo descarta más."),
     ),
     ejecutar=_ejecutar_ventaneo,
 )
@@ -210,13 +234,17 @@ ETAPA_FEATURES = Etapa(
     nombre="features",
     titulo="Características",
     descripcion=(
-        "Resume cada ventana en números que describen su comportamiento: cuánto vale y cuánto varía, "
-        "hacia dónde va, cuánto se parece a sí misma y cuál es su ritmo. Es como describir una canción "
-        "por su tempo y su volumen sin reproducirla."
+        "Un tramo son 150 números sueltos (50 mediciones × 3 señales), difíciles de comparar entre sí. "
+        "Acá cada tramo se resume en 24 números por señal que describen su comportamiento: cuánto vale "
+        "y cuánto varía, si sube o baja, qué tan predecible es y qué tan rápido oscila. Es como "
+        "describir una canción por su tempo, su volumen y qué tan aguda es, sin reproducirla."
     ),
     parametros=(
-        Parametro("rezagos_autocorr", "Rezagos de autocorrelación", "entero", 5, 1, 20,
-                  ayuda="Cuántos pasos hacia adelante se compara la señal consigo misma."),
+        Parametro("rezagos_autocorr", "Qué tan lejos se compara la señal consigo misma", "entero",
+                  5, 1, 20,
+                  ayuda="Mide si el valor de ahora permite predecir el de 1, 2, 3… mediciones después. "
+                        "Una señal suave se parece mucho a sí misma; una errática, poco. Con 5 se "
+                        "calculan cinco de esas comparaciones por señal."),
     ),
     ejecutar=_ejecutar_features,
 )
@@ -253,15 +281,22 @@ ETAPA_FILTRADO = Etapa(
     nombre="filtrado",
     titulo="Filtrado",
     descripcion=(
-        "Saca las características que no aportan: las que casi no cambian entre ventanas (no "
-        "distinguen nada) y las que dicen lo mismo que otra. Después estandariza las que quedan, "
-        "para que ninguna pese más solo por estar en unidades más grandes."
+        "De las 72 características calculadas, muchas no sirven para distinguir un tramo de otro. Acá "
+        "se descartan dos tipos: las que dan casi siempre el mismo valor (no informan nada) y las que "
+        "suben y bajan junto con otra (dicen lo mismo dos veces). Las que quedan se llevan a una escala "
+        "común, para que ninguna pese más solo porque sus números son más grandes."
     ),
     parametros=(
-        Parametro("umbral_correlacion", "Umbral de correlación (Spearman)", "decimal", 0.95, 0.5, 0.999,
-                  ayuda="Si dos features correlacionan por encima de esto, se descarta una."),
-        Parametro("percentil_baja_var", "Percentil de baja variabilidad", "decimal", 5.0, 0.0, 50.0,
-                  ayuda="Descarta el percentil inferior por rango intercuartílico. 0 lo desactiva."),
+        Parametro("umbral_correlacion", "Cuándo dos características son redundantes", "decimal",
+                  0.95, 0.5, 0.999,
+                  ayuda="Va de 0 a 1. Si dos características se mueven juntas por encima de este valor, "
+                        "se conserva solo una. Con 0,95 hay que ser casi idénticas; bajarlo descarta "
+                        "más agresivamente."),
+        Parametro("percentil_baja_var", "Cuánto descartar por poco variable", "decimal",
+                  5.0, 0.0, 50.0,
+                  ayuda="Descarta el porcentaje indicado de características, empezando por las que "
+                        "menos varían entre tramos. Con 5 se saca el 5 % más plano. Poner 0 desactiva "
+                        "este filtro."),
     ),
     ejecutar=_ejecutar_filtrado,
 )
@@ -303,15 +338,26 @@ ETAPA_DETECCION = Etapa(
     nombre="deteccion",
     titulo="Detección",
     descripcion=(
-        "Cinco algoritmos con nociones distintas de 'raro' le ponen un puntaje a cada ventana. Ninguno "
-        "decide qué es una anomalía: solo ordenan. Como no hay etiquetas de referencia, el acuerdo "
-        "entre métodos de familias distintas reemplaza a la métrica de acierto."
+        "Acá se busca lo raro. Nadie etiquetó nunca estos datos, así que no hay forma de saber qué "
+        "método acierta: por eso se usan cinco a la vez, cada uno con una idea distinta de qué "
+        "significa 'raro'. Ninguno decide si algo es una anomalía — solo le ponen un puntaje a cada "
+        "tramo y lo ordenan. Que cinco métodos que piensan diferente coincidan en el mismo tramo es lo "
+        "que reemplaza a la respuesta correcta que no existe."
     ),
     parametros=(
-        Parametro("detectores", "Detectores", "multiple", DETECTORES, opciones=DETECTORES,
-                  ayuda="Cuáles de los cinco se ejecutan."),
-        Parametro("arboles_iforest", "Árboles (Isolation Forest)", "entero", 300, 50, 1000),
-        Parametro("min_cluster_hdbscan", "Tamaño mínimo de cluster (HDBSCAN)", "entero", 15, 2, 100),
+        Parametro("detectores", "Qué métodos usar", "multiple", DETECTORES, opciones=DETECTORES,
+                  ayuda="isolation_forest: lo raro se separa del resto con pocos cortes al azar. "
+                        "ecod y copod: lo raro está en los extremos de la distribución. "
+                        "pca: lo raro no se puede reconstruir con el patrón general de los datos. "
+                        "hdbscan_glosh: lo raro está donde hay poca compañía, en zonas vacías. "
+                        "Sacar alguno permite ver cuánto depende el resultado de ese método."),
+        Parametro("arboles_iforest", "Cuántos árboles usa isolation_forest", "entero", 300, 50, 1000,
+                  ayuda="Ese método hace muchos cortes al azar y promedia. Más árboles = resultado más "
+                        "estable, pero más lento. Con 300 alcanza para que no cambie entre corridas."),
+        Parametro("min_cluster_hdbscan", "Grupo mínimo para hdbscan_glosh", "entero", 15, 2, 100,
+                  ayuda="Ese método busca zonas densas de tramos parecidos; este número dice cuántos "
+                        "tramos hacen falta para considerar que hay un grupo. Más chico = grupos más "
+                        "finos y más tramos quedan marcados como aislados."),
     ),
     ejecutar=_ejecutar_deteccion,
 )
@@ -360,17 +406,26 @@ ETAPA_EVENTOS = Etapa(
     nombre="eventos",
     titulo="Eventos candidatos",
     descripcion=(
-        "Toma la fracción superior de puntajes como candidatas y agrupa las que se solapan en el "
-        "tiempo: una misma anomalía aparece marcada en muchas ventanas vecinas y se presenta como un "
-        "solo evento. Esta es la salida que revisa el experto."
+        "El resultado final. De todos los tramos puntuados se toman los más raros, y los que se pisan "
+        "en el tiempo se juntan en un solo EVENTO: una misma anomalía aparece marcada en muchos tramos "
+        "vecinos, y mostrarlos por separado sería repetir veinte veces el mismo hecho. Cada evento "
+        "queda con su momento, cuántos métodos lo señalaron y qué características se desviaron. Esta "
+        "es la lista que después revisa una persona experta."
     ),
     parametros=(
-        Parametro("fraccion_candidatos", "Fracción de candidatos", "decimal", 0.01, 0.001, 0.20,
-                  ayuda="0,01 = el 1% más raro según cada detector. Es un presupuesto de revisión, "
-                        "no una tasa real de anomalías."),
-        Parametro("max_ventanas_evento", "Máx. ventanas por evento", "entero", 15, 0, 200,
-                  ayuda="0 = sin límite. Al cortar, el resto del tramo forma un evento nuevo que se "
-                        "solapa con el anterior."),
+        Parametro("fraccion_candidatos", "Qué proporción se marca como sospechosa", "decimal",
+                  0.01, 0.001, 0.20,
+                  ayuda="0,01 significa que cada método señala el 1 % de tramos con puntaje más alto. "
+                        "OJO: esto NO afirma que el 1 % de los datos sean anomalías. Es un presupuesto "
+                        "de revisión — cuántos casos puede mirar una persona en un rato razonable. "
+                        "Subirlo a 0,05 da más candidatos y, en estos datos, más casos donde varios "
+                        "métodos coinciden."),
+        Parametro("max_ventanas_evento", "Tope de tramos por evento", "entero", 15, 0, 200,
+                  ayuda="Corta los eventos muy largos. Poner 0 los deja crecer sin límite. "
+                        "CUIDADO AL INTERPRETARLO: cuando un evento llega al tope, el resto se "
+                        "convierte en un evento aparte que en realidad es la continuación del anterior "
+                        "y se superpone con él. Eso infla el conteo de eventos y puede hacer parecer "
+                        "que hay más hallazgos de los que hay."),
     ),
     ejecutar=_ejecutar_eventos,
 )
