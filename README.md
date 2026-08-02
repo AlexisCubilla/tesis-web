@@ -63,8 +63,23 @@ que el nombre de la carpeta deja de importar. `RUTA_TESIS` es para instalarlo y 
 contenedor.
 
 `.env.example` documenta todas las variables: dónde guardar el estado local (`DIR_DATOS`), el puerto,
-y los valores de la configuración de referencia de la tesis — de modo que si en el trabajo se firma
-otra configuración, se cambia ahí y el taller se actualiza solo, sin tocar código.
+en qué direcciones escuchar (`HOST`).
+
+### La configuración de referencia sale de la tesis
+
+Los valores con los que el trabajo reporta sus resultados —ventana 50, dedup 0,95, tope 15, 1 % de
+candidatos— **no están escritos en ningún lado de este repo**. Se leen de `src/tesis/config.py`, que
+según las reglas de ese repositorio es la fuente única de verdad de todos los parámetros.
+
+Eso alcanza para tres cosas a la vez, siempre sincronizadas:
+
+- el botón **★ Correr la de la tesis**,
+- la marca **★** de las ramas que coinciden,
+- y **los valores iniciales de los formularios**.
+
+Si en la tesis se firma un cambio por ADR, el taller lo toma solo. Las variables `TESIS_*` del `.env`
+están comentadas por defecto y solo sirven para mostrar como referencia algo distinto de lo que dice la
+tesis — por ejemplo, una configuración que todavía se está discutiendo.
 
 Para ver qué configuración está tomando y si falta algo:
 

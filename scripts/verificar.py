@@ -70,6 +70,16 @@ def main() -> int:
     print()
     print("Configuración de referencia de la tesis")
     print("─" * 62)
+    origen = ajustes.origen_config()
+    print(f"  sale de: {origen['fuente']}")
+    if origen.get("problema"):
+        print(f"  ATENCIÓN: no se pudo leer del paquete ({origen['problema']}).")
+        print("            Los valores de abajo son un respaldo fijo del taller, no los de la tesis.")
+        problemas.append("La configuración de referencia no sale de la tesis sino de un respaldo. "
+                         "Revisá que el paquete `tesis` esté instalado y actualizado.")
+    if origen.get("sobreescritos"):
+        print(f"  pisado por el .env: {origen['sobreescritos']}")
+    print()
     for etapa, params in ajustes.CONFIG_TESIS.items():
         if params:
             print(f"  {etapa:11s} " + " · ".join(f"{k}={v}" for k, v in params.items()))

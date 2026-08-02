@@ -60,6 +60,7 @@ def get_estado():
         # La configuración de referencia se sirve desde el backend para que exista en un solo lugar
         # (`backend/ajustes.py`, ajustable por .env) y no duplicada en el frontend.
         "config_tesis": ajustes.CONFIG_TESIS,
+        "origen_config": ajustes.origen_config(),
         "muestreo_segundos": ajustes.MUESTREO_SEGUNDOS,
     }
 
