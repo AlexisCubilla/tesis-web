@@ -43,7 +43,17 @@
   section { padding: 44px 0; border-top: 1px solid var(--borde); }
   section:first-of-type { border-top: none; }
 
-  @media (max-width: 900px) { .heroe { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) {
+    .heroe { grid-template-columns: 1fr; padding: 34px 0 30px; gap: 26px; }
+    .orbita { max-width: 260px; }
+  }
+  @media (max-width: 560px) {
+    .orbita { max-width: 200px; }
+    .paso { grid-template-columns: 36px 1fr; gap: 11px; padding: 13px 14px; }
+    .paso::before { width: 28px; height: 28px; font-size: .85rem; }
+    .embudo .nivel { grid-template-columns: 105px 1fr 62px; gap: 8px; font-size: .78rem; }
+    section { padding: 30px 0; }
+  }
 </style>
 </head>
 <body>

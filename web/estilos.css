@@ -21,6 +21,36 @@
 
 * { box-sizing: border-box; }
 
+/* ---------------------------------------------------------------------------
+   Transición entre páginas.
+   «El proyecto» y «Taller» son dos documentos, pero tienen que sentirse como una
+   sola aplicación. Con View Transitions el navegador funde una pantalla con la
+   otra y mantiene fijos los elementos que comparten nombre (la barra superior),
+   así el cambio se percibe como navegar dentro del mismo sistema y no como
+   saltar a otro sitio. Donde no está soportado (Firefox hoy), queda el fade de
+   entrada de más abajo, que funciona en todos lados.
+   --------------------------------------------------------------------------- */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root) { animation: salir .18s ease both; }
+::view-transition-new(root) { animation: entrar .3s ease both; }
+
+@keyframes entrar { from { opacity: 0; transform: translateY(10px); } }
+@keyframes salir  { to   { opacity: 0; transform: translateY(-6px); } }
+
+/* Elementos que persisten de una pantalla a la otra: no parpadean ni se mueven. */
+.barra        { view-transition-name: barra; }
+.estrellas    { view-transition-name: fondo; }
+
+/* Respaldo para navegadores sin View Transitions y para la primera carga. */
+.envoltorio { animation: entrar .32s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  .envoltorio, .estrellas { animation: none; }
+  * { transition-duration: .01ms !important; }
+}
+
 body {
   margin: 0;
   background: radial-gradient(ellipse at 20% -10%, #16203a 0%, var(--fondo) 55%) fixed;
@@ -71,10 +101,17 @@ p { margin: 0 0 1em; }
 .barra .marca span.punto { width: 9px; height: 9px; border-radius: 50%; background: var(--acento-2);
   box-shadow: 0 0 12px var(--acento-2); animation: latido 2s ease-in-out infinite; }
 @keyframes latido { 50% { opacity: .35 } }
-.barra nav { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.barra nav { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .barra nav a { padding: 7px 14px; border-radius: 8px; text-decoration: none; color: var(--texto-2);
-  font-size: .92rem; }
-.barra nav a:hover, .barra nav a.activo { background: var(--panel-2); color: var(--texto); }
+  font-size: .92rem; position: relative; transition: color .18s ease, background .18s ease; }
+.barra nav a:hover { color: var(--texto); }
+.barra nav a.activo { background: var(--panel-2); color: var(--texto); }
+/* Subrayado que se desliza de una pestaña a la otra al cambiar de pantalla. */
+.barra nav a.activo::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 2px;
+  background: var(--acento-2); border-radius: 2px;
+  view-transition-name: pestania;
+}
 
 /* --- Botones --- */
 .boton {
@@ -130,7 +167,29 @@ td.num { text-align: right; font-family: var(--mono); }
   padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: .92rem; }
 .aviso.info { border-color: var(--acento); background: rgba(78, 168, 255, .09); }
 
+/* --- Pantallas chicas ------------------------------------------------------ */
 @media (max-width: 860px) {
-  .envoltorio { padding: 0 16px; }
-  .barra { padding: 10px 16px; }
+  .envoltorio { padding: 0 14px; }
+  .barra { padding: 10px 14px; gap: 10px; }
+  .barra .marca { font-size: .92rem; }
+  .barra nav a { padding: 6px 10px; font-size: .86rem; }
+  .tarjeta { padding: 16px 14px; }
+  .rejilla { gap: 14px; }
+  h1 { font-size: 1.75rem; }
+  .metrica .valor { font-size: 1.55rem; }
+}
+
+@media (max-width: 520px) {
+  .envoltorio { padding: 0 10px; }
+  .barra { flex-wrap: wrap; }
+  .barra nav { margin-left: 0; width: 100%; }
+  .barra nav a.activo::after { bottom: -10px; }
+  .tarjeta { padding: 14px 12px; border-radius: 10px; }
+  .boton { padding: 9px 14px; font-size: .88rem; }
+  th, td { padding: 6px 7px; font-size: .82rem; }
+}
+
+/* En pantallas táctiles el hover no aplica: que el foco marque igual. */
+@media (hover: none) {
+  .boton:hover { transform: none; }
 }

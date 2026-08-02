@@ -15,10 +15,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import almacen, etapas, trabajos
+from . import ajustes, almacen, etapas, trabajos
 
-RAIZ = Path(__file__).resolve().parents[1]
-WEB = RAIZ / "web"
+RAIZ = ajustes.RAIZ
+WEB = ajustes.DIR_WEB
 
 app = FastAPI(title="Taller — Etapa 1", version="0.1.0")
 _con = almacen.conectar()
@@ -44,7 +44,7 @@ def get_etapas():
 
 @app.get("/api/estado")
 def get_estado():
-    """Estado general: si están los datos base y con qué commit de la tesis corre."""
+    """Estado general: si están los datos base, con qué versión de la tesis corre y su configuración."""
     try:
         import tesis
 
@@ -55,7 +55,12 @@ def get_estado():
         "datos_listos": almacen.TABLA_CRUDA.exists(),
         "commit_tesis": almacen.commit_tesis(),
         "version_tesis": version,
+        "ruta_tesis": str(ajustes.ruta_tesis()),
         "nodos": len(almacen.listar(_con)),
+        # La configuración de referencia se sirve desde el backend para que exista en un solo lugar
+        # (`backend/ajustes.py`, ajustable por .env) y no duplicada en el frontend.
+        "config_tesis": ajustes.CONFIG_TESIS,
+        "muestreo_segundos": ajustes.MUESTREO_SEGUNDOS,
     }
 
 

@@ -16,14 +16,12 @@ const S = {
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
   form: null,         // {etapa, padre, modo} cuando el formulario está abierto
   sondeo: null,
+  // Configuración de referencia de la tesis y segundos entre mediciones: los sirve el backend desde
+  // `backend/ajustes.py` (ajustable por .env), para que no estén duplicados acá.
+  oficial: {},
+  muestreo: 10.6,
 };
 
-const OFICIAL = {
-  datos: { limpiar: true },
-  ventaneo: { tamano_ventana: 50, paso: 1, deduplicar: true, umbral_dedup: 0.95 },
-  features: {}, filtrado: {}, deteccion: {},
-  eventos: { fraccion_candidatos: 0.01, max_ventanas_evento: 15 },
-};
 const COLORES = ['#4ea8ff', '#7ef0c0', '#ffc86b', '#ff8a5b', '#c58cff'];
 
 const $ = (s) => document.querySelector(s);
@@ -40,7 +38,10 @@ async function iniciar() {
   S.defs = def.etapas; S.cadena = def.cadena;
 
   const est = await api('/api/estado');
+  S.oficial = est.config_tesis || {};
+  S.muestreo = est.muestreo_segundos || 10.6;
   $('#sello').textContent = `tesis @ ${est.commit_tesis}`;
+  $('#sello').title = `Paquete de la tesis instalado desde ${est.ruta_tesis}`;
   if (!est.datos_listos) {
     $('#alerta-datos').innerHTML = `<div class="aviso" style="margin:16px 0">
       <strong>Faltan los datos base.</strong> Generalos una vez con
@@ -74,7 +75,7 @@ function cadenaDe(clave) {
   return c;
 }
 
-const esOficial = (n) => Object.entries(OFICIAL[n.etapa] || {})
+const esOficial = (n) => Object.entries(S.oficial[n.etapa] || {})
   .every(([k, v]) => JSON.stringify(n.parametros[k]) === JSON.stringify(v));
 const ramaOficial = (clave) => cadenaDe(clave).every(esOficial);
 
@@ -415,7 +416,7 @@ async function correrOficial() {
     for (const etapa of S.cadena) {
       const def = S.defs.find((d) => d.nombre === etapa);
       const params = { ...Object.fromEntries(def.parametros.map((p) => [p.nombre, p.defecto])),
-                       ...(OFICIAL[etapa] || {}) };
+                       ...(S.oficial[etapa] || {}) };
       $('#estado-ejecucion').textContent = `Ejecutando ${etapa}…`;
       padre = await lanzar(etapa, padre, params);
     }
@@ -513,7 +514,7 @@ function verVentanas(d) {
   $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo quedó un tramo</h4>
     <p class="tenue" style="font-size:.8rem;margin-bottom:10px">Cuatro tramos tomados de distintas
     partes del conjunto. Cada uno son ${d.tamano} mediciones consecutivas
-    (~${Math.round(d.tamano * 10.6 / 60)} min) y es la unidad que los detectores van a puntuar.</p>
+    (~${Math.round(d.tamano * S.muestreo / 60)} min) y es la unidad que los detectores van a puntuar.</p>
     <div class="mini" id="caja-mini"></div>
     <p class="tenue" style="font-size:.78rem;margin-top:8px">${d.senales.join(' · ')}</p>
     <h4 style="font-size:.88rem;margin:18px 0 6px">Tramos por hoja</h4><div id="caja-hojas"></div>`;

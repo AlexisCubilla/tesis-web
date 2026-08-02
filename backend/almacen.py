@@ -24,11 +24,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-RAIZ = Path(__file__).resolve().parents[1]
-DIR_DATOS = Path(__file__).resolve().parents[1] / "data"
-DIR_CACHE = DIR_DATOS / "cache"
-BASE = DIR_DATOS / "ejecuciones.sqlite"
-TABLA_CRUDA = DIR_DATOS / "crudo.joblib"
+from . import ajustes
+
+RAIZ = ajustes.RAIZ
+DIR_DATOS = ajustes.DIR_DATOS
+DIR_CACHE = ajustes.DIR_CACHE
+BASE = ajustes.BASE_SQLITE
+TABLA_CRUDA = ajustes.TABLA_CRUDA
 
 _lock = threading.Lock()
 
@@ -103,16 +105,14 @@ def commit_tesis() -> str:
     """Commit del repo de la tesis con el que se ejecutó. Queda registrado en cada nodo.
 
     Sirve para saber con qué versión del pipeline se generó cada rama: si el paquete cambia, los
-    resultados viejos siguen identificados con el código que los produjo.
+    resultados viejos siguen identificados con el código que los produjo. La ubicación del repo se
+    deduce del paquete instalado, así que no depende de cómo se llame la carpeta.
     """
     import subprocess
 
     try:
-        import tesis
-
-        repo = Path(tesis.__file__).resolve().parents[2]
         r = subprocess.run(
-            ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
+            ["git", "-C", str(ajustes.ruta_tesis()), "rev-parse", "--short", "HEAD"],
             capture_output=True, text=True, timeout=5,
         )
         return r.stdout.strip() or "desconocido"

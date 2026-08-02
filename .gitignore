@@ -3,8 +3,15 @@ __pycache__/
 *.pyc
 .mise.local.toml
 
-# Estado local del taller: se regenera. La tabla cruda sale del Excel de la tesis (~36 s) y el caché
+# Configuración local: se copia de .env.example y cada uno ajusta la suya.
+.env
+
+# Estado local del taller: se regenera. La tabla cruda sale del Excel de la tesis (~40 s) y el caché
 # de etapas se recalcula solo. El árbol de ejecuciones es exploración local, no registro canónico.
 data/cache/
 data/crudo.joblib
 data/ejecuciones.sqlite
+
+# Red de seguridad por si DIR_DATOS apunta a otra carpeta dentro del repo.
+*.joblib
+*.sqlite

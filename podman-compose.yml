@@ -1,8 +1,11 @@
 # Levanta el taller completo con:  podman compose up
 #
 # Un solo servicio: no hay base de datos que levantar. El árbol de ejecuciones vive en un archivo
-# SQLite dentro de ./data, y los resultados pesados en ./data/cache. Todo el estado es esa carpeta:
-# copiala para respaldar, borrala para empezar de cero.
+# SQLite dentro de la carpeta de datos, y los resultados pesados al lado. Todo el estado es esa
+# carpeta: copiala para respaldar, borrala para empezar de cero.
+#
+# La configuración sale de `.env` (copiá `.env.example`). Lo más importante: RUTA_TESIS, por si tu
+# clon del repo de la tesis tiene otro nombre o está en otro lado.
 
 services:
   taller:
@@ -10,17 +13,24 @@ services:
       context: .
       dockerfile: Containerfile
     image: taller-etapa1:dev
+    env_file:
+      - path: .env
+        required: false
     ports:
-      - "8000:8000"
+      - "${PUERTO:-8000}:8000"
     volumes:
       # El repo de la tesis, montado de solo lectura: el taller lo importa, nunca lo modifica.
-      - ../repo-rebuild:/tesis:ro,z
+      - ${RUTA_TESIS:-../repo-rebuild}:/tesis:ro,z
       # Estado persistente: árbol de ejecuciones, caché de etapas y tabla cruda.
-      - ./data:/app/data:z
+      - ${DIR_DATOS:-./data}:/app/data:z
       # El frontend se monta para poder editarlo sin reconstruir la imagen.
       - ./web:/app/web:z
     environment:
-      # Ruta del Excel dentro del contenedor (el paquete lo busca acá si está definida).
+      # Dentro del contenedor las rutas son fijas: el repo se monta en /tesis y el estado en /app/data,
+      # sin importar cómo se llamen afuera.
+      RUTA_TESIS: /tesis
+      DIR_DATOS: /app/data
+      DIR_WEB: /app/web
       TESIS_BASE_DIR: /tesis/data/raw
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/estado')"]

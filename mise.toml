@@ -2,39 +2,47 @@
 python = "3.11"
 
 [env]
-# El paquete de la tesis vive en el repo hermano. Si lo movés, cambiá esto.
-REPO_TESIS = "../repo-rebuild"
+# Toda la configuración vive en `.env` (ver `.env.example`). Este archivo no la duplica: la carga.
+_.file = { path = ".env", redact = false }
+# Respaldos por si no existe el `.env` todavía.
+RUTA_TESIS = "{{ env.RUTA_TESIS | default(value='../repo-rebuild') }}"
+PUERTO = "{{ env.PUERTO | default(value='8000') }}"
 
 [tasks.venv]
 description = "Crea el entorno virtual en repo-web/.venv"
 run = "python -m venv .venv"
 
 [tasks.install]
-description = "Instala dependencias del taller + el paquete `tesis` desde el repo hermano"
+description = "Instala dependencias del taller + el paquete `tesis` desde $RUTA_TESIS"
 run = """
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements.txt
-./.venv/bin/python -m pip install -e $REPO_TESIS
+echo "Instalando el paquete de la tesis desde: $RUTA_TESIS"
+./.venv/bin/python -m pip install -e "$RUTA_TESIS"
 """
 
 [tasks.datos]
-description = "Precalcula la tabla cruda leyendo el Excel una sola vez (~36 s)"
+description = "Precalcula la tabla cruda leyendo el Excel una sola vez (~40 s)"
 run = "./.venv/bin/python scripts/exportar_crudo.py"
 
 [tasks.dev]
-description = "Levanta el taller en http://localhost:8000 con recarga automática"
-run = "./.venv/bin/python -m uvicorn backend.main:app --reload --port 8000"
+description = "Levanta el taller con recarga automática"
+run = "./.venv/bin/python -m uvicorn backend.main:app --reload --port ${PUERTO:-8000}"
 
 [tasks.servir]
 description = "Levanta el taller sin recarga (uso normal)"
-run = "./.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+run = "./.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PUERTO:-8000}"
 
 [tasks.check]
-description = "Verifica que el paquete de la tesis sea importable y con qué commit"
-run = """
-./.venv/bin/python -c "import tesis, sys; print(sys.executable); print('tesis', tesis.__version__)"
-"""
+description = "Verifica la configuración: dónde está la tesis, con qué commit y si están los datos"
+run = "./.venv/bin/python scripts/verificar.py"
 
 [tasks.limpiar]
 description = "Borra el caché de resultados y el árbol de ejecuciones (no toca los datos crudos)"
-run = "rm -rf data/cache data/ejecuciones.sqlite && echo 'caché y árbol borrados'"
+run = """
+./.venv/bin/python -c "
+from backend import ajustes; import shutil
+shutil.rmtree(ajustes.DIR_CACHE, ignore_errors=True)
+ajustes.BASE_SQLITE.unlink(missing_ok=True)
+print('caché y árbol borrados en', ajustes.DIR_DATOS)"
+"""

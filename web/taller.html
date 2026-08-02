@@ -95,6 +95,21 @@
   .fila-sup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .fila-sup h3, .fila-sup h4 { margin: 0; }
   .esp { flex: 1; }
+
+  /* --- pantallas chicas --- */
+  @media (max-width: 720px) {
+    .cabecera-fase { gap: 12px; }
+    .num-fase { width: 44px; height: 44px; font-size: 1.2rem; }
+    #fase-titulo { font-size: 1.1rem; }
+    .flujo { gap: 8px; }
+    .flujo .caja-f { min-width: 0; flex: 1 1 130px; padding: 8px 12px; }
+    .flujo .caja-f .vl { font-size: .92rem; }
+    .acciones-fase { gap: 8px; }
+    .acciones-fase .boton { flex: 1 1 auto; justify-content: center; }
+    .mini { grid-template-columns: 1fr; }
+    #mapa-caja::after { content: '↔ deslizá para ver todo el mapa'; display: block;
+      font-size: .72rem; color: var(--texto-2); padding-top: 4px; }
+  }
 </style>
 </head>
 <body>

@@ -20,8 +20,10 @@ import sys
 import time
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parents[1]
-DESTINO = RAIZ / "data" / "crudo.joblib"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from backend import ajustes  # noqa: E402  (necesita el sys.path de arriba)
+
+DESTINO = ajustes.TABLA_CRUDA
 
 
 def main() -> int:
@@ -40,7 +42,10 @@ def main() -> int:
         from tesis.config import CONFIG
     except ImportError as e:
         print(f"No se pudo importar el paquete de la tesis: {e}", file=sys.stderr)
-        print("Instalalo con: pip install -e ../repo-rebuild", file=sys.stderr)
+        print(f"Instalalo con:  mise run install   (busca el repo en {ajustes.ruta_tesis()})",
+              file=sys.stderr)
+        print("Si tu clon está en otro lado o tiene otro nombre, poné RUTA_TESIS en el .env",
+              file=sys.stderr)
         return 1
 
     cfg = CONFIG.data

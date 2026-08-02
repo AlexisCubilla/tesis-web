@@ -43,26 +43,58 @@ En la práctica:
 | Tamaño de ventana, paso, dedup | todo desde el ventaneo | ~7-30 s |
 | Limpieza o selección de hojas | toda la cadena | ~30 s |
 
-## Instalación (sin contenedor)
+## Configuración
 
-Requiere [mise](https://mise.jdx.dev) y que el repo de la tesis esté en `../repo-rebuild`.
+Todo lo que depende de la máquina vive en un `.env`. Copiá el ejemplo y ajustá lo que necesites:
 
 ```bash
+cp .env.example .env
+```
+
+La variable que casi seguro vas a querer tocar es **`RUTA_TESIS`**, porque cada uno puede tener el
+repositorio de la tesis clonado con otro nombre o en otro lado:
+
+```ini
+RUTA_TESIS=../repo-rebuild      # o ../tesisMateriales, /home/…/tesis, lo que sea
+```
+
+Una vez que el paquete `tesis` está instalado, el backend **deduce la ruta del propio paquete**, así
+que el nombre de la carpeta deja de importar. `RUTA_TESIS` es para instalarlo y para montarlo en el
+contenedor.
+
+`.env.example` documenta todas las variables: dónde guardar el estado local (`DIR_DATOS`), el puerto,
+y los valores de la configuración de referencia de la tesis — de modo que si en el trabajo se firma
+otra configuración, se cambia ahí y el taller se actualiza solo, sin tocar código.
+
+Para ver qué configuración está tomando y si falta algo:
+
+```bash
+mise run check
+```
+
+## Instalación (sin contenedor)
+
+Requiere [mise](https://mise.jdx.dev).
+
+```bash
+cp .env.example .env  # y ajustá RUTA_TESIS si hace falta
 mise install          # Python 3.11
 mise run venv         # crea .venv
-mise run install      # deps + el paquete `tesis` desde ../repo-rebuild
+mise run install      # deps + el paquete `tesis` desde $RUTA_TESIS
 mise run datos        # lee el Excel una vez y precalcula la tabla cruda (~40 s)
+mise run check        # verifica que esté todo en su lugar
 mise run dev          # http://localhost:8000
 ```
 
 ## Con Podman
 
 ```bash
+cp .env.example .env  # y ajustá RUTA_TESIS si hace falta
 podman compose up
 ```
 
 Levanta un solo servicio. **No hay base de datos que levantar**: el árbol de ejecuciones es un archivo
-SQLite y los resultados van a disco. Todo el estado es la carpeta `data/`.
+SQLite y los resultados van a disco. Todo el estado es la carpeta de datos.
 
 El repo de la tesis se monta de solo lectura en `/tesis`, así que la imagen no queda atada a una
 versión del pipeline: en la interfaz siempre se muestra con qué commit se está ejecutando.
