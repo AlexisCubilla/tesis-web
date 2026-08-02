@@ -24,31 +24,39 @@
 /* ---------------------------------------------------------------------------
    Transición entre páginas.
    «El proyecto» y «Taller» son dos documentos, pero tienen que sentirse como una
-   sola aplicación. Con View Transitions el navegador funde una pantalla con la
-   otra y mantiene fijos los elementos que comparten nombre (la barra superior),
-   así el cambio se percibe como navegar dentro del mismo sistema y no como
-   saltar a otro sitio. Donde no está soportado (Firefox hoy), queda el fade de
-   entrada de más abajo, que funciona en todos lados.
+   sola aplicación. Dos decisiones para que el cambio no se note:
+
+   1. La barra superior y el fondo son IDÉNTICOS en ambas páginas y se declaran
+      con `view-transition-name`, así el navegador los deja quietos en lugar de
+      redibujarlos. Lo único que cambia es cuál pestaña está activa.
+   2. Solo el contenido se funde, sin movimiento y en poco tiempo. Nada de
+      desplazamientos verticales: es lo que hacía que el cambio se sintiera un
+      salto en vez de una transición.
    --------------------------------------------------------------------------- */
 @view-transition { navigation: auto; }
 
-::view-transition-old(root) { animation: salir .18s ease both; }
-::view-transition-new(root) { animation: entrar .3s ease both; }
+/* Fundido corto y parejo. Al durar lo mismo entrada y salida no hay un instante
+   en que las dos capas estén translúcidas a la vez, que es lo que se ve como
+   parpadeo. */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: .16s; animation-timing-function: ease; }
 
-@keyframes entrar { from { opacity: 0; transform: translateY(10px); } }
-@keyframes salir  { to   { opacity: 0; transform: translateY(-6px); } }
+/* Elementos que persisten y no deben animarse. */
+.barra     { view-transition-name: barra; }
+.estrellas { view-transition-name: fondo; }
 
-/* Elementos que persisten de una pantalla a la otra: no parpadean ni se mueven. */
-.barra        { view-transition-name: barra; }
-.estrellas    { view-transition-name: fondo; }
-
-/* Respaldo para navegadores sin View Transitions y para la primera carga. */
-.envoltorio { animation: entrar .32s ease both; }
+/* Respaldo SOLO donde no hay View Transitions (Firefox hoy). Si se aplicara
+   siempre, se sumaría a la transición del navegador y se verían dos animaciones
+   encimadas. */
+@supports not (view-transition-name: none) {
+  .envoltorio { animation: aparecer .2s ease both; }
+  @keyframes aparecer { from { opacity: 0; } }
+}
 
 @media (prefers-reduced-motion: reduce) {
   @view-transition { navigation: none; }
-  .envoltorio, .estrellas { animation: none; }
-  * { transition-duration: .01ms !important; }
+  .envoltorio { animation: none; }
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 
 body {
@@ -60,9 +68,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Campo de estrellas del fondo */
+/* Campo de estrellas del fondo.
+   Sin titileo a propósito: al cambiar de página la animación se reiniciaba desde
+   el principio, y como recorre de 0,35 a 0,7 de opacidad, el fondo entero
+   cambiaba de brillo de golpe. Eso se veía como un parpadeo en cada navegación.
+   Estático queda igual de lindo y la transición es limpia. */
 .estrellas {
-  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .55;
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5;
   background-image:
     radial-gradient(1px 1px at 12% 18%, #fff, transparent),
     radial-gradient(1px 1px at 33% 72%, #cfe3ff, transparent),
@@ -71,9 +83,7 @@ body {
     radial-gradient(2px 2px at 86% 34%, #fff, transparent),
     radial-gradient(1px 1px at 45% 89%, #dbe8ff, transparent),
     radial-gradient(1px 1px at 92% 78%, #fff, transparent);
-  animation: titilar 6s ease-in-out infinite alternate;
 }
-@keyframes titilar { from { opacity: .35 } to { opacity: .7 } }
 
 .envoltorio { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
@@ -99,18 +109,22 @@ p { margin: 0 0 1em; }
 }
 .barra .marca { font-weight: 700; letter-spacing: .02em; display: flex; align-items: center; gap: 9px; }
 .barra .marca span.punto { width: 9px; height: 9px; border-radius: 50%; background: var(--acento-2);
-  box-shadow: 0 0 12px var(--acento-2); animation: latido 2s ease-in-out infinite; }
-@keyframes latido { 50% { opacity: .35 } }
+  box-shadow: 0 0 12px var(--acento-2); animation: latido 3s ease-in-out infinite; }
+/* Pulso deliberadamente leve (1 → 0,72): al navegar la animación se reinicia, y
+   un rango amplio se notaría como un salto en la barra, que justamente queremos
+   que se perciba fija entre pantallas. */
+@keyframes latido { 50% { opacity: .72 } }
 .barra nav { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .barra nav a { padding: 7px 14px; border-radius: 8px; text-decoration: none; color: var(--texto-2);
   font-size: .92rem; position: relative; transition: color .18s ease, background .18s ease; }
 .barra nav a:hover { color: var(--texto); }
 .barra nav a.activo { background: var(--panel-2); color: var(--texto); }
-/* Subrayado que se desliza de una pestaña a la otra al cambiar de pantalla. */
+/* Marca de la pestaña activa. Sin `view-transition-name` a propósito: que se
+   desplace de una pestaña a la otra durante la navegación llamaba la atención
+   más de lo necesario. Cambia junto con el resto, sin animación propia. */
 .barra nav a.activo::after {
   content: ''; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 2px;
   background: var(--acento-2); border-radius: 2px;
-  view-transition-name: pestania;
 }
 
 /* --- Botones --- */
