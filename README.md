@@ -83,8 +83,23 @@ mise run venv         # crea .venv
 mise run install      # deps + el paquete `tesis` desde $RUTA_TESIS
 mise run datos        # lee el Excel una vez y precalcula la tabla cruda (~40 s)
 mise run check        # verifica que esté todo en su lugar
-mise run dev          # http://localhost:8000
+mise run dev          # levanta el taller y muestra en qué direcciones responde
 ```
+
+Al arrancar imprime dónde quedó disponible:
+
+```
+  El taller va a estar disponible en:
+    · en esta máquina        http://localhost:8000
+    · desde la misma red     http://192.168.0.5:8000
+```
+
+Por defecto escucha en todas las direcciones (`HOST=0.0.0.0`), así que se puede abrir desde el celular
+o desde otra computadora de la misma red — útil para mostrarlo. Si preferís que solo se vea desde tu
+máquina, poné `HOST=127.0.0.1` en el `.env`.
+
+> Si no responde desde otro dispositivo aun con `HOST=0.0.0.0`, suele ser el cortafuegos del sistema
+> bloqueando el puerto.
 
 ## Con Podman
 

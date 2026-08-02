@@ -7,6 +7,7 @@ _.file = { path = ".env", redact = false }
 # Respaldos por si no existe el `.env` todavía.
 RUTA_TESIS = "{{ env.RUTA_TESIS | default(value='../repo-rebuild') }}"
 PUERTO = "{{ env.PUERTO | default(value='8000') }}"
+HOST = "{{ env.HOST | default(value='0.0.0.0') }}"
 
 [tasks.venv]
 description = "Crea el entorno virtual en repo-web/.venv"
@@ -27,11 +28,17 @@ run = "./.venv/bin/python scripts/exportar_crudo.py"
 
 [tasks.dev]
 description = "Levanta el taller con recarga automática"
-run = "./.venv/bin/python -m uvicorn backend.main:app --reload --port ${PUERTO:-8000}"
+run = """
+./.venv/bin/python scripts/direcciones.py
+./.venv/bin/python -m uvicorn backend.main:app --reload --host ${HOST:-0.0.0.0} --port ${PUERTO:-8000}
+"""
 
 [tasks.servir]
 description = "Levanta el taller sin recarga (uso normal)"
-run = "./.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PUERTO:-8000}"
+run = """
+./.venv/bin/python scripts/direcciones.py
+./.venv/bin/python -m uvicorn backend.main:app --host ${HOST:-0.0.0.0} --port ${PUERTO:-8000}
+"""
 
 [tasks.check]
 description = "Verifica la configuración: dónde está la tesis, con qué commit y si están los datos"
