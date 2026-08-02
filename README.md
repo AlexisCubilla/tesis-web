@@ -11,21 +11,37 @@ Dos cosas en una:
 - **Un taller** donde se puede cambiar cualquier parámetro del pipeline, ejecutarlo de verdad y
   comparar caminos. Cada cambio abre una **rama** que queda guardada.
 
-> **El registro canónico de la tesis NO vive acá.** El código, las decisiones (ADR) y los resultados
-> oficiales están en el repositorio de la tesis (`../repo-rebuild`). Este repo lo *usa* y lo *explica*;
-> las ramas del taller son exploración, no resultados firmados.
+> **El registro canónico de la tesis NO vive acá.** El código del pipeline, las decisiones (ADR) y los
+> resultados oficiales están en el repositorio de la tesis. Este repo lo *usa* y lo *explica*; las
+> ramas del taller son exploración, no resultados firmados.
+
+## Este repo NO funciona solo
+
+El taller **no contiene el pipeline ni los datos**: los importa. Para levantarlo hace falta tener
+también el repositorio de la tesis, que es privado (pedíselo a los autores) y contiene:
+
+- `src/tesis/` — el pipeline, que este taller instala como dependencia y ejecuta
+- `data/raw/*.xlsx` — la telemetría del satélite, que nunca se copia acá
+- `docs/decisions/` — los ADR, que son la justificación de cada parámetro
+
+Dónde lo tenés clonado se indica con `RUTA_TESIS` en el `.env`; el nombre de la carpeta no importa.
 
 ## Cómo funciona
 
-El backend **no reimplementa nada**: instala el paquete `tesis` del repo hermano y llama a sus
-funciones. Si la web recalculara features o consolidara eventos por su cuenta, con el tiempo mostraría
-números distintos a los de la tesis.
+El backend **no reimplementa nada**: instala el paquete `tesis` y llama a sus funciones. Si la web
+recalculara features o consolidara eventos por su cuenta, con el tiempo mostraría números distintos a
+los de la tesis.
 
 ```
-repo-rebuild/  (la tesis)          repo-web/  (este)
+repo de la tesis  (privado)        tesis-web  (este, público)
   src/tesis/        ──importa──→     backend/etapas.py   envuelve cada etapa
-  data/raw/*.xlsx   ──lee 1 vez──→   data/crudo.joblib   tabla cruda precalculada
+  data/raw/*.xlsx   ──lee 1 vez──→   data/crudo.joblib   tabla cruda, local, no versionada
+  config.py         ──lee──────→     configuración de referencia (★)
 ```
+
+> **Qué se publica y qué no.** Este repositorio contiene solo código y documentación. La telemetría del
+> satélite, los resultados de las corridas y los PDF de la bibliografía **no están acá** y están
+> excluidos por `.gitignore`.
 
 ### Las ramas salen del caché, no de una estructura
 
@@ -55,7 +71,7 @@ La variable que casi seguro vas a querer tocar es **`RUTA_TESIS`**, porque cada 
 repositorio de la tesis clonado con otro nombre o en otro lado:
 
 ```ini
-RUTA_TESIS=../repo-rebuild      # o ../tesisMateriales, /home/…/tesis, lo que sea
+RUTA_TESIS=../repo-rebuild      # o ../mi-clon-de-la-tesis, /home/…/tesis, lo que sea
 ```
 
 Una vez que el paquete `tesis` está instalado, el backend **deduce la ruta del propio paquete**, así
