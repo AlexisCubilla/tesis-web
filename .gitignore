@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.mise.local.toml
+
+# Estado local del taller: se regenera. La tabla cruda sale del Excel de la tesis (~36 s) y el caché
+# de etapas se recalcula solo. El árbol de ejecuciones es exploración local, no registro canónico.
+data/cache/
+data/crudo.joblib
+data/ejecuciones.sqlite

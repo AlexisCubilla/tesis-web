@@ -1,0 +1,136 @@
+/* Taller Etapa 1 — estilos comunes.
+   Tema oscuro tipo "sala de control": el proyecto es telemetría satelital y la estética acompaña. */
+
+:root {
+  --fondo: #080b14;
+  --fondo-2: #0e1424;
+  --panel: #131c30;
+  --panel-2: #1a2540;
+  --borde: #24324f;
+  --texto: #e6edf7;
+  --texto-2: #93a4c0;
+  --acento: #4ea8ff;
+  --acento-2: #7ef0c0;
+  --alerta: #ff8a5b;
+  --peligro: #ff5c7a;
+  --ok: #55d98d;
+  --sombra: 0 8px 32px rgba(0, 0, 0, .45);
+  --radio: 12px;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at 20% -10%, #16203a 0%, var(--fondo) 55%) fixed;
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Campo de estrellas del fondo */
+.estrellas {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .55;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, #fff, transparent),
+    radial-gradient(1px 1px at 33% 72%, #cfe3ff, transparent),
+    radial-gradient(1px 1px at 58% 26%, #fff, transparent),
+    radial-gradient(1px 1px at 71% 61%, #bcd6ff, transparent),
+    radial-gradient(2px 2px at 86% 34%, #fff, transparent),
+    radial-gradient(1px 1px at 45% 89%, #dbe8ff, transparent),
+    radial-gradient(1px 1px at 92% 78%, #fff, transparent);
+  animation: titilar 6s ease-in-out infinite alternate;
+}
+@keyframes titilar { from { opacity: .35 } to { opacity: .7 } }
+
+.envoltorio { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+a { color: var(--acento); }
+
+h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; font-weight: 650; letter-spacing: -.01em; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.4rem, 3vw, 2rem); margin-top: 0; }
+h3 { font-size: 1.1rem; }
+
+p { margin: 0 0 1em; }
+.tenue { color: var(--texto-2); }
+.mono { font-family: var(--mono); font-size: .9em; }
+
+/* --- Barra superior --- */
+.barra {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 24px;
+  background: rgba(8, 11, 20, .82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--borde);
+}
+.barra .marca { font-weight: 700; letter-spacing: .02em; display: flex; align-items: center; gap: 9px; }
+.barra .marca span.punto { width: 9px; height: 9px; border-radius: 50%; background: var(--acento-2);
+  box-shadow: 0 0 12px var(--acento-2); animation: latido 2s ease-in-out infinite; }
+@keyframes latido { 50% { opacity: .35 } }
+.barra nav { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.barra nav a { padding: 7px 14px; border-radius: 8px; text-decoration: none; color: var(--texto-2);
+  font-size: .92rem; }
+.barra nav a:hover, .barra nav a.activo { background: var(--panel-2); color: var(--texto); }
+
+/* --- Botones --- */
+.boton {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px; border-radius: 10px; border: 1px solid var(--borde);
+  background: var(--panel-2); color: var(--texto);
+  font: inherit; font-size: .94rem; cursor: pointer; text-decoration: none;
+  transition: transform .12s ease, background .15s ease, border-color .15s ease;
+}
+.boton:hover { background: #223054; border-color: var(--acento); transform: translateY(-1px); }
+.boton.primario { background: linear-gradient(135deg, var(--acento), #2f7ddb); border-color: transparent;
+  color: #04101f; font-weight: 650; }
+.boton.primario:hover { filter: brightness(1.08); }
+.boton:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* --- Tarjetas / paneles --- */
+.tarjeta {
+  background: linear-gradient(180deg, var(--panel), var(--fondo-2));
+  border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 20px; box-shadow: var(--sombra);
+}
+.rejilla { display: grid; gap: 18px; }
+.rejilla.c2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.rejilla.c3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+/* --- Métricas --- */
+.metrica { text-align: center; }
+.metrica .valor { font-size: 1.9rem; font-weight: 700; color: var(--acento-2);
+  font-family: var(--mono); letter-spacing: -.02em; }
+.metrica .rotulo { font-size: .8rem; color: var(--texto-2); text-transform: uppercase;
+  letter-spacing: .06em; }
+
+/* --- Etiquetas de estado --- */
+.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .76rem;
+  font-weight: 600; letter-spacing: .03em; }
+.chip.pendiente { background: #2a2f45; color: #a9b6d4; }
+.chip.corriendo { background: #2b3d63; color: #8fc4ff; animation: latido 1.2s infinite; }
+.chip.listo     { background: #17402c; color: var(--ok); }
+.chip.error     { background: #451c28; color: var(--peligro); }
+.chip.oficial   { background: #3a2c12; color: #ffc86b; }
+
+/* --- Tablas --- */
+table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
+th { color: var(--texto-2); font-weight: 600; text-transform: uppercase; font-size: .72rem;
+  letter-spacing: .06em; position: sticky; top: 0; background: var(--panel); }
+tbody tr:hover { background: rgba(78, 168, 255, .07); }
+td.num { text-align: right; font-family: var(--mono); }
+.tabla-scroll { overflow: auto; max-height: 460px; border-radius: 10px; border: 1px solid var(--borde); }
+
+/* --- Aviso --- */
+.aviso { border-left: 3px solid var(--alerta); background: rgba(255, 138, 91, .09);
+  padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: .92rem; }
+.aviso.info { border-color: var(--acento); background: rgba(78, 168, 255, .09); }
+
+@media (max-width: 860px) {
+  .envoltorio { padding: 0 16px; }
+  .barra { padding: 10px 16px; }
+}

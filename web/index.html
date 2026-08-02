@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etapa 1 — Anomalías en baterías satelitales</title>
+<link rel="stylesheet" href="/estatico/estilos.css">
+<style>
+  .heroe { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center;
+           padding: 60px 0 50px; }
+  .heroe .kicker { color: var(--acento-2); font-family: var(--mono); font-size: .85rem;
+                   letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+  .heroe p.bajada { font-size: 1.12rem; color: var(--texto-2); max-width: 52ch; }
+  .acciones { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+
+  /* Órbita: el satélite tarda ~87 s en dar una vuelta, un segundo por cada minuto reales */
+  .orbita { position: relative; aspect-ratio: 1; max-width: 380px; margin: 0 auto; }
+  .orbita svg { width: 100%; height: 100%; overflow: visible; }
+  .tierra { filter: drop-shadow(0 0 26px rgba(78, 168, 255, .45)); }
+  #satelite { animation: girar 87s linear infinite; transform-origin: 200px 200px; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  .sombra-tierra { fill: url(#gradSombra); }
+
+  .pasos { counter-reset: paso; display: grid; gap: 14px; }
+  .paso { display: grid; grid-template-columns: 46px 1fr; gap: 16px; align-items: start;
+          padding: 16px 18px; background: var(--panel); border: 1px solid var(--borde);
+          border-radius: var(--radio); transition: border-color .2s, transform .2s; }
+  .paso:hover { border-color: var(--acento); transform: translateX(3px); }
+  .paso::before { counter-increment: paso; content: counter(paso);
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    background: var(--panel-2); color: var(--acento); font-family: var(--mono); font-weight: 700; }
+  .paso h3 { margin: 0 0 4px; }
+  .paso p { margin: 0; color: var(--texto-2); font-size: .93rem; }
+  .paso .cifra { font-family: var(--mono); color: var(--acento-2); font-size: .82rem; }
+
+  .embudo { display: grid; gap: 6px; margin-top: 8px; }
+  .embudo .nivel { display: grid; grid-template-columns: 190px 1fr 90px; align-items: center; gap: 12px;
+                   font-size: .88rem; }
+  .embudo .barra-e { height: 22px; border-radius: 6px;
+    background: linear-gradient(90deg, var(--acento), var(--acento-2)); }
+  .embudo .cant { font-family: var(--mono); text-align: right; color: var(--acento-2); }
+
+  section { padding: 44px 0; border-top: 1px solid var(--borde); }
+  section:first-of-type { border-top: none; }
+
+  @media (max-width: 900px) { .heroe { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="estrellas"></div>
+
+<header class="barra">
+  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <nav>
+    <a href="/" class="activo">El proyecto</a>
+    <a href="/taller">Taller</a>
+  </nav>
+</header>
+
+<div class="envoltorio">
+
+  <div class="heroe">
+    <div>
+      <div class="kicker">Tesis · UNA–FPUNA</div>
+      <h1>Encontrar fallas en la batería de un satélite sin saber cómo se ven</h1>
+      <p class="bajada">
+        Un CubeSat en órbita manda su telemetría a Tierra: voltaje, corriente y temperatura de batería.
+        Nadie marcó nunca cuáles de esos 25.024 registros son anómalos. Esta es la etapa que reduce esa
+        pila a un puñado de tramos sospechosos para que un experto los revise.
+      </p>
+      <div class="acciones">
+        <a class="boton primario" href="/taller">Abrir el taller →</a>
+        <a class="boton" href="#pipeline">Ver cómo funciona</a>
+      </div>
+    </div>
+
+    <div class="orbita">
+      <svg viewBox="0 0 400 400" role="img" aria-label="Satélite orbitando la Tierra">
+        <defs>
+          <radialGradient id="gradTierra" cx="35%" cy="30%">
+            <stop offset="0%" stop-color="#5ba8e8"/><stop offset="60%" stop-color="#1d5c96"/>
+            <stop offset="100%" stop-color="#0b2b4a"/>
+          </radialGradient>
+          <linearGradient id="gradSombra" x1="0" x2="1">
+            <stop offset="0%" stop-color="#000" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#000" stop-opacity=".72"/>
+          </linearGradient>
+        </defs>
+
+        <!-- trayectoria -->
+        <ellipse cx="200" cy="200" rx="165" ry="165" fill="none"
+                 stroke="#2a3c5e" stroke-width="1.5" stroke-dasharray="4 7"/>
+
+        <!-- Tierra -->
+        <circle class="tierra" cx="200" cy="200" r="78" fill="url(#gradTierra)"/>
+        <circle cx="200" cy="200" r="78" class="sombra-tierra"/>
+        <ellipse cx="178" cy="176" rx="26" ry="16" fill="#2e7d55" opacity=".55"/>
+        <ellipse cx="222" cy="222" rx="20" ry="13" fill="#2e7d55" opacity=".45"/>
+
+        <!-- satélite -->
+        <g id="satelite">
+          <g transform="translate(200,35)">
+            <rect x="-9" y="-7" width="18" height="14" rx="3" fill="#dbe7f7"/>
+            <rect x="-26" y="-4" width="15" height="8" rx="1.5" fill="#4ea8ff"/>
+            <rect x="11" y="-4" width="15" height="8" rx="1.5" fill="#4ea8ff"/>
+            <circle cx="0" cy="0" r="15" fill="#7ef0c0" opacity=".16"/>
+          </g>
+        </g>
+      </svg>
+      <p class="tenue mono" style="text-align:center;font-size:.76rem;margin-top:6px">
+        una vuelta ≈ 87 min · medido en los datos
+      </p>
+    </div>
+  </div>
+
+  <section id="problema">
+    <h2>El problema</h2>
+    <div class="rejilla c2">
+      <div class="tarjeta">
+        <h3>La batería es el corazón</h3>
+        <p class="tenue">
+          Los paneles solares cargan la batería mientras el satélite está al sol; la batería alimenta
+          todo cuando entra en la sombra de la Tierra. Ese ciclo se repite cada hora y media. Si la
+          batería se degrada, el satélite muere — y no se puede mandar a nadie a arreglarlo.
+        </p>
+      </div>
+      <div class="tarjeta">
+        <h3>No hay respuestas correctas</h3>
+        <p class="tenue">
+          Nadie etiquetó nunca estos datos. No se puede decir «mi método acierta el 90 %» porque no se
+          sabe cuál era el 100 %. Por eso el trabajo no busca <em>acertar</em>: busca
+          <strong>coincidencia entre métodos distintos</strong> y <strong>resultados que se repitan</strong>
+          al cambiar la muestra.
+        </p>
+      </div>
+    </div>
+
+    <div class="tarjeta" style="margin-top:18px">
+      <h3>Tres etapas, y esta es la primera</h3>
+      <div class="rejilla c3" style="margin-top:14px">
+        <div><span class="chip listo">Etapa 1</span>
+          <p class="tenue" style="margin-top:8px">La máquina propone candidatos. <strong>Este trabajo.</strong></p></div>
+        <div><span class="chip pendiente">Etapa 2</span>
+          <p class="tenue" style="margin-top:8px">El experto revisa y etiqueta. Trabajo futuro.</p></div>
+        <div><span class="chip pendiente">Etapa 3</span>
+          <p class="tenue" style="margin-top:8px">Con esas etiquetas se entrena un clasificador. Trabajo futuro.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="datos">
+    <h2>Los datos</h2>
+    <p class="tenue">
+      Telemetría real del CubeSat <strong>BIRDS-4 / TSURU</strong>. Una medición cada 10–11 segundos,
+      repartida en 45 hojas de un Excel; cada hoja es una sesión de descarga.
+    </p>
+    <div class="rejilla c3">
+      <div class="tarjeta metrica"><div class="valor">25.024</div><div class="rotulo">registros</div></div>
+      <div class="tarjeta metrica"><div class="valor">42<span style="font-size:1rem;color:var(--texto-2)">/45</span></div><div class="rotulo">hojas usadas</div></div>
+      <div class="tarjeta metrica"><div class="valor">3</div><div class="rotulo">señales</div></div>
+    </div>
+    <div class="aviso info" style="margin-top:16px">
+      <strong>Tres hojas quedan afuera.</strong> Dos son pruebas de laboratorio. La tercera se llama
+      <span class="mono">Anomalous data</span> y parecía ser el dato ideal — pero al decodificar los
+      paquetes resultó ser una anomalía de <em>paneles solares</em>, no de batería. Distinto problema.
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <h2>Cómo funciona, paso a paso</h2>
+    <div class="pasos">
+      <div class="paso"><div><h3>Leer y limpiar</h3>
+        <p>Se juntan las 42 hojas y se descartan las filas vacías o en cero: son huecos del
+           decodificador, no telemetría. <span class="cifra">25.024 → 24.138 filas</span></p></div></div>
+      <div class="paso"><div><h3>Cortar en ventanas</h3>
+        <p>Una anomalía es un comportamiento en el tiempo, no un valor suelto. Se analizan tramos de 50
+           mediciones (~9 min) que se deslizan de a una. <span class="cifra">→ 22.080 ventanas</span></p></div></div>
+      <div class="paso"><div><h3>Quitar lo repetido</h3>
+        <p>Dos ventanas vecinas comparten 49 de sus 50 datos. Las casi idénticas se descartan.
+           <span class="cifra">22.080 → 6.102 ventanas</span></p></div></div>
+      <div class="paso"><div><h3>Resumir cada ventana</h3>
+        <p>Cada tramo se describe con 24 números por señal: cuánto vale, cuánto varía, hacia dónde va y
+           cuál es su ritmo. <span class="cifra">→ 72 características</span></p></div></div>
+      <div class="paso"><div><h3>Quedarse con lo que informa</h3>
+        <p>Se descartan las características que casi no cambian y las que dicen lo mismo que otra.
+           <span class="cifra">72 → ~45</span></p></div></div>
+      <div class="paso"><div><h3>Cinco buscadores</h3>
+        <p>Isolation Forest, ECOD, COPOD, PCA y HDBSCAN-GLOSH puntúan cada ventana. Cada uno tiene una
+           idea distinta de «raro»; el acuerdo entre ellos reemplaza a la respuesta correcta que no
+           existe.</p></div></div>
+      <div class="paso"><div><h3>Agrupar en eventos</h3>
+        <p>Una misma anomalía aparece marcada en muchas ventanas solapadas. Se consolidan en un evento
+           con su tramo temporal. <span class="cifra">151 ventanas → 40 eventos</span></p></div></div>
+      <div class="paso"><div><h3>El entregable</h3>
+        <p>Un Excel con una fila por evento: dónde ocurrió, cuántos detectores lo marcan y qué
+           características se desviaron. Eso es lo que revisa el experto.</p></div></div>
+    </div>
+  </section>
+
+  <section id="embudo">
+    <h2>El embudo, en números</h2>
+    <p class="tenue">De toda la telemetría a la lista que una persona puede revisar en una tarde.</p>
+    <div class="tarjeta">
+      <div class="embudo">
+        <div class="nivel"><span>Registros de telemetría</span><div class="barra-e" style="width:100%"></div><span class="cant">25.024</span></div>
+        <div class="nivel"><span>Ventanas analizadas</span><div class="barra-e" style="width:88%"></div><span class="cant">22.080</span></div>
+        <div class="nivel"><span>Tras quitar repetidas</span><div class="barra-e" style="width:24%"></div><span class="cant">6.102</span></div>
+        <div class="nivel"><span>Marcas de los detectores</span><div class="barra-e" style="width:6%"></div><span class="cant">310</span></div>
+        <div class="nivel"><span>Ventanas candidatas</span><div class="barra-e" style="width:3%"></div><span class="cant">151</span></div>
+        <div class="nivel"><span>Eventos para el experto</span><div class="barra-e" style="width:1.2%;min-width:8px"></div><span class="cant">40</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="taller-cta">
+    <h2>Y ahora, probalo vos</h2>
+    <p class="tenue">
+      El taller deja cambiar cualquier parámetro y volver a ejecutar el pipeline de verdad — el mismo
+      código que produce los resultados de la tesis. Cada cambio abre una rama que se guarda, así que se
+      pueden comparar caminos sin perder ninguno.
+    </p>
+    <div class="aviso">
+      <strong>Ojo con lo que ves ahí.</strong> Las ramas del taller son exploración. La configuración
+      oficial de la tesis está fijada por decisiones documentadas (ADR) y aparece siempre marcada como
+      tal. Cambiar un parámetro en el taller no cambia la tesis.
+    </div>
+    <div class="acciones"><a class="boton primario" href="/taller">Abrir el taller →</a></div>
+  </section>
+
+  <footer style="padding:40px 0;border-top:1px solid var(--borde);color:var(--texto-2);font-size:.87rem">
+    <p>Detección y clasificación de anomalías en el consumo de baterías satelitales mediante un enfoque
+       híbrido no supervisado–supervisado · UNA–FPUNA.</p>
+    <p class="mono" style="font-size:.8rem">Material didáctico. El registro canónico —código, decisiones
+       y resultados— vive en el repositorio de la tesis.</p>
+  </footer>
+</div>
+</body>
+</html>

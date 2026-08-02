@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taller — Etapa 1</title>
+<link rel="stylesheet" href="/estatico/estilos.css">
+<style>
+  .taller { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px 0 60px;
+            align-items: start; }
+  .columna { display: grid; gap: 16px; }
+
+  /* Árbol de ramas */
+  #arbol { max-height: 62vh; overflow: auto; }
+  .nodo { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center;
+          padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: .86rem;
+          border: 1px solid transparent; }
+  .nodo:hover { background: var(--panel-2); }
+  .nodo.sel { background: var(--panel-2); border-color: var(--acento); }
+  .nodo .etapa { font-weight: 600; }
+  .nodo .detalle { color: var(--texto-2); font-size: .76rem; font-family: var(--mono); }
+
+  /* Formulario de parámetros */
+  .campo { margin-bottom: 14px; }
+  .campo label { display: block; font-size: .84rem; margin-bottom: 5px; font-weight: 600; }
+  .campo .ayuda { font-size: .78rem; color: var(--texto-2); margin-top: 4px; }
+  .campo input[type=number], .campo input[type=text] {
+    width: 100%; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--borde);
+    background: var(--fondo-2); color: var(--texto); font: inherit; font-family: var(--mono);
+    font-size: .9rem; }
+  .campo input:focus { outline: none; border-color: var(--acento); }
+  .interruptor { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .interruptor input { width: 18px; height: 18px; accent-color: var(--acento); }
+  .opciones { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opciones label { display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+    background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 999px;
+    font-size: .8rem; cursor: pointer; font-weight: 500; }
+  .opciones label:has(input:checked) { border-color: var(--acento); background: #17263f; }
+  .opciones input { accent-color: var(--acento); }
+
+  .cadena { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .8rem; }
+  .cadena .eslabon { padding: 3px 9px; background: var(--panel-2); border-radius: 6px;
+    font-family: var(--mono); }
+  .cadena .flecha { color: var(--texto-2); }
+
+  .barra-etapas { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .barra-etapas .et { padding: 5px 12px; border-radius: 999px; font-size: .8rem;
+    background: var(--fondo-2); border: 1px solid var(--borde); color: var(--texto-2); }
+  .barra-etapas .et.hecha { border-color: var(--ok); color: var(--ok); }
+  .barra-etapas .et.actual { border-color: var(--acento); color: var(--texto); background: var(--panel-2); }
+
+  canvas { width: 100%; display: block; border-radius: 8px; background: var(--fondo-2); }
+  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .resumen-grid .celda { background: var(--fondo-2); border: 1px solid var(--borde);
+    border-radius: 9px; padding: 10px 12px; }
+  .resumen-grid .celda .v { font-family: var(--mono); font-size: 1.25rem; color: var(--acento-2); }
+  .resumen-grid .celda .r { font-size: .74rem; color: var(--texto-2); text-transform: uppercase;
+    letter-spacing: .05em; }
+
+  @media (max-width: 940px) { .taller { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="estrellas"></div>
+
+<header class="barra">
+  <div class="marca"><span class="punto"></span> Taller · Etapa 1</div>
+  <nav>
+    <a href="/">El proyecto</a>
+    <a href="/taller" class="activo">Taller</a>
+    <span id="sello" class="mono tenue" style="font-size:.78rem;margin-left:10px"></span>
+  </nav>
+</header>
+
+<div class="envoltorio">
+  <div id="alerta-datos"></div>
+
+  <div class="taller">
+    <!-- ------------------- columna izquierda: el árbol ------------------- -->
+    <aside class="columna">
+      <div class="tarjeta">
+        <h3 style="margin-bottom:10px">Ramas</h3>
+        <p class="tenue" style="font-size:.8rem;margin-bottom:12px">
+          Cada nodo es una etapa con su configuración. Cambiar un parámetro abre una rama nueva y
+          reutiliza todo lo anterior.
+        </p>
+        <div id="arbol"><p class="tenue" style="font-size:.85rem">Sin ejecuciones todavía.</p></div>
+        <button class="boton" id="btn-reiniciar" style="width:100%;margin-top:12px;justify-content:center">
+          Empezar una rama nueva
+        </button>
+      </div>
+    </aside>
+
+    <!-- ------------------- columna derecha: trabajo ------------------- -->
+    <main class="columna">
+      <div class="tarjeta">
+        <div class="barra-etapas" id="barra-etapas"></div>
+        <h2 id="titulo-etapa" style="margin:10px 0 6px">Datos</h2>
+        <p class="tenue" id="desc-etapa" style="font-size:.93rem"></p>
+        <div class="cadena" id="cadena"></div>
+        <hr style="border:none;border-top:1px solid var(--borde);margin:16px 0">
+        <div id="formulario"></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+          <button class="boton primario" id="btn-ejecutar">Ejecutar etapa</button>
+          <span id="estado-ejecucion" class="tenue" style="font-size:.87rem"></span>
+        </div>
+      </div>
+
+      <div class="tarjeta" id="panel-resultado" style="display:none">
+        <h3>Resultado</h3>
+        <div class="resumen-grid" id="resumen"></div>
+        <div id="visual" style="margin-top:18px"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="/estatico/app.js"></script>
+</body>
+</html>

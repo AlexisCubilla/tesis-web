@@ -1,0 +1,30 @@
+# Levanta el taller completo con:  podman compose up
+#
+# Un solo servicio: no hay base de datos que levantar. El árbol de ejecuciones vive en un archivo
+# SQLite dentro de ./data, y los resultados pesados en ./data/cache. Todo el estado es esa carpeta:
+# copiala para respaldar, borrala para empezar de cero.
+
+services:
+  taller:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: taller-etapa1:dev
+    ports:
+      - "8000:8000"
+    volumes:
+      # El repo de la tesis, montado de solo lectura: el taller lo importa, nunca lo modifica.
+      - ../repo-rebuild:/tesis:ro,z
+      # Estado persistente: árbol de ejecuciones, caché de etapas y tabla cruda.
+      - ./data:/app/data:z
+      # El frontend se monta para poder editarlo sin reconstruir la imagen.
+      - ./web:/app/web:z
+    environment:
+      # Ruta del Excel dentro del contenedor (el paquete lo busca acá si está definida).
+      TESIS_BASE_DIR: /tesis/data/raw
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/estado')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
