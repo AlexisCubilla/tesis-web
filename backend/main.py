@@ -279,6 +279,33 @@ def get_evento(clave: str, event_id: int):
 # Web estática
 # --------------------------------------------------------------------------------------
 
+@app.middleware("http")
+async def revalidar_el_frontend(request, call_next):
+    """Obliga al navegador a preguntar siempre si el HTML/CSS/JS cambió.
+
+    Sin esto, las respuestas del frontend salen con `etag` y `last-modified` pero **sin**
+    `Cache-Control`. Ante esa combinación el navegador aplica «frescura heurística»: decide por su
+    cuenta durante cuánto tiempo el archivo sigue vigente y lo sirve de su caché sin preguntar
+    nada. El resultado es que editar `web/` y recargar dejaba media aplicación vieja — típicamente
+    una pantalla con la versión nueva y la otra con la anterior, que es difícil de diagnosticar
+    porque el servidor sí está entregando el archivo correcto.
+
+    Eso choca de frente con que el frontend se monte en el contenedor justamente para poder
+    editarlo sin reconstruir la imagen.
+
+    `no-cache` no prohíbe guardar: obliga a revalidar. Para `/estatico/*` eso sale gratis, porque
+    StaticFiles contesta 304 vacío ante el `etag`. Las dos rutas de HTML reenvían el cuerpo entero
+    (unos 30 KB entre las dos, contra un servidor que corre en la misma máquina): se prefiere eso
+    antes que volver a tener pantallas desincronizadas.
+
+    La API queda afuera: sus respuestas son dinámicas y ya nadie las cachea.
+    """
+    respuesta = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        respuesta.headers["Cache-Control"] = "no-cache"
+    return respuesta
+
+
 @app.get("/")
 def raiz():
     return FileResponse(WEB / "index.html")

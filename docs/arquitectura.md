@@ -106,6 +106,15 @@ la ventana deslizándose sobre la señal— salen mejor con SVG y Canvas que con
 **Costo aceptado.** Escribir a mano cosas que un framework daría hechas. Con el tamaño de este
 frontend, conviene.
 
+**Consecuencia operativa: el servidor manda `Cache-Control: no-cache` en todo lo que no sea la API.**
+Sin build no hay huellas en los nombres de archivo (`app.4f2a1.js`) que inviten al navegador a
+recargar, así que la frescura queda enteramente en manos de las cabeceras. Starlette manda `etag` y
+`last-modified` pero **no** `Cache-Control`, y ante esa combinación el navegador aplica «frescura
+heurística»: decide por su cuenta cuánto vale su copia y la sirve sin preguntar. Editar `web/` y
+recargar dejaba entonces una pantalla con la versión nueva y la otra con la vieja — un síntoma feo de
+diagnosticar, porque el servidor sí está entregando el archivo correcto. `no-cache` no prohíbe
+guardar: obliga a revalidar.
+
 ---
 
 ## A7 — Separación explícita de lo canónico
