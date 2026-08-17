@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análisis — Etapa 1</title>
+<!-- El tema se resuelve acá, antes de pintar nada: si esperara a `tema.js` (que va al final del
+     cuerpo) quien tiene el oscuro guardado vería un destello blanco en cada carga. -->
+<script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
+<link rel="stylesheet" href="/estatico/estilos.css">
+<style>
+  .envoltorio { max-width: 1320px; }
+  .fila-sup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .fila-sup h3, .fila-sup h4 { margin: 0; }
+  .esp { flex: 1; }
+  select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--borde);
+    background: var(--fondo-2); color: var(--texto); font: inherit; font-size: .86rem; }
+
+  .tarjeta + .tarjeta { margin-top: 16px; }
+  .explica { font-size: .84rem; color: var(--texto-2); margin: 0 0 12px; max-width: 88ch; }
+  .explica strong { color: var(--texto); }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .duo { grid-template-columns: 1fr; } }
+
+  .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 9px;
+            margin-bottom: 14px; }
+  .cifras .celda { background: var(--fondo-2); border: 1px solid var(--borde);
+    border-radius: 9px; padding: 9px 11px; }
+  .cifras .celda .v { font-family: var(--mono); font-size: 1.2rem; color: var(--acento-2); }
+  .cifras .celda .r { font-size: .71rem; color: var(--texto-2); text-transform: uppercase;
+    letter-spacing: .05em; }
+</style>
+</head>
+<body>
+<div class="estrellas"></div>
+
+<header class="barra">
+  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <nav>
+    <a href="/">El proyecto</a>
+    <a href="/taller">Taller</a>
+    <a href="/analisis" class="activo">Análisis</a>
+    <button class="btn-tema" type="button" title="Cambiar de tema">
+      <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/>
+      </svg>
+      <svg class="ico-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/>
+      </svg>
+    </button>
+  </nav>
+</header>
+
+<div class="envoltorio" style="padding-bottom:60px">
+
+  <div class="tarjeta" style="margin:18px 0 16px">
+    <div class="fila-sup">
+      <h2 style="font-size:1.3rem">Análisis de una rama</h2>
+      <span class="esp"></span>
+      <label class="tenue" style="font-size:.8rem" for="sel-rama">Rama</label>
+      <select id="sel-rama"></select>
+    </div>
+    <p class="explica" style="margin-bottom:0">
+      Cuatro cortes que el taller no mostraba. Todos salen de la misma corrida que estés mirando:
+      elegí una rama arriba y cambia todo lo de abajo. <strong>Ninguno de estos gráficos redefine el
+      pipeline</strong> — qué tramo está marcado se lo pregunta al paquete de la tesis, con la misma
+      regla que usa la etapa de eventos.
+    </p>
+  </div>
+
+  <div id="aviso"></div>
+  <div id="tablero" hidden>
+
+    <div class="tarjeta">
+      <h3 style="font-size:1rem">¿En qué coinciden los métodos?</h3>
+      <p class="explica">
+        Es el argumento central del trabajo: como nadie etiquetó estos datos, <strong>el acuerdo entre
+        métodos que piensan distinto reemplaza a la respuesta correcta que no existe</strong>. Hasta
+        ahora eso vivía comprimido en un «4/5» dentro de una celda de la tabla de eventos.
+        A la izquierda, cuántos tramos marcan de a pares; en la diagonal, cuántos marca cada uno por
+        su cuenta. A la derecha, cuántos tramos junta cada nivel de acuerdo.
+      </p>
+      <div class="cifras" id="cifras"></div>
+      <div class="duo">
+        <div id="g-coincidencia"></div>
+        <div id="g-reparto"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h3 style="font-size:1rem">¿Cómo reparte los puntajes cada método?</h3>
+      <p class="explica">
+        Un panel por método, porque <strong>los puntajes no se comparan entre métodos</strong>: cada
+        uno tiene su escala. Lo que sí se compara es la forma. La línea punteada es el corte de
+        candidatos: todo lo que queda a su derecha es lo que ese método marca. Una cola larga y
+        separada significa que distingue con claridad; una campana sin cola, que reparte parejo.
+      </p>
+      <div id="g-puntajes"></div>
+    </div>
+
+    <div class="tarjeta">
+      <h3 style="font-size:1rem">¿Están realmente aislados los candidatos?</h3>
+      <p class="explica">
+        Cada punto es un tramo, proyectado a dos dimensiones para poder verlo. Los marcados por el
+        método elegido van resaltados. Si aparecen en el borde de la nube, el método está encontrando
+        cosas efectivamente atípicas; si caen en el medio del montón, está marcando por algo que esta
+        vista no muestra. <strong>La proyección es solo para mirar</strong>: no alimenta ninguna etapa
+        y ningún número de la tesis depende de ella.
+      </p>
+      <div class="fila-sup">
+        <span class="esp"></span>
+        <label class="tenue" style="font-size:.8rem" for="sel-det">Método</label>
+        <select id="sel-det"></select>
+      </div>
+      <div id="g-dispersion"></div>
+    </div>
+
+    <div class="tarjeta">
+      <h3 style="font-size:1rem">¿Por qué se descartaron esas características?</h3>
+      <p class="explica">
+        La etapa de filtrado dice que se van «las que se mueven junto con otra», pero solo muestra dos
+        listas. Acá se ve: cada celda es cuánto se mueven juntas dos características. Los bloques
+        rojos fuera de la diagonal son familias que repiten información, y de cada una sobrevive una.
+        Las <strong style="color:var(--texto)">conservadas</strong> van en negrita en los rótulos; las
+        descartadas, tenues.
+      </p>
+      <div id="g-correlacion"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/estatico/vendor/echarts.min.js"></script>
+<script src="/estatico/grafico.js"></script>
+<script src="/estatico/analisis.js"></script>
+<script src="/estatico/tema.js" defer></script>
+</body>
+</html>

@@ -7,6 +7,7 @@ paquete de la tesis** (ver `etapas.py`).
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -240,6 +241,131 @@ def pd_isna(v) -> bool:
     return bool(pd.isna(v))
 
 
+@app.get("/api/nodo/{clave}/analisis")
+def get_analisis(clave: str, detector: str | None = None):
+    """Datos para la pantalla de análisis: los cuatro cortes que el taller no mostraba.
+
+    REGLA. Nada de esto redefine el pipeline (ADR A1). La selección de candidatos se le pide al
+    propio paquete de la tesis —`export._detector_candidates`, la misma que usa
+    `build_candidate_table`— justamente para no tener dos reglas de «qué tramo está marcado» que
+    puedan separarse con el tiempo. Lo que se calcula acá es solo cómo mostrarlo: contar
+    intersecciones, armar histogramas, correlacionar columnas y proyectar a dos dimensiones.
+
+    La proyección 2D **es cálculo nuevo y es solo para mirar**: no alimenta ninguna etapa, no se
+    guarda y ningún número de la tesis depende de ella. Se deja dicho para que no se confunda con
+    el PCA que sí es un detector del pipeline.
+    """
+    import numpy as np
+    import pandas as pd
+
+    nodo = almacen.obtener(_con, clave)
+    if nodo is None:
+        raise HTTPException(404, "Nodo inexistente")
+    if nodo["estado"] != "listo" or not nodo["tiene_resultado"]:
+        raise HTTPException(409, "El nodo todavía no tiene resultado")
+
+    salida = almacen.cargar_resultado(clave)
+    if not isinstance(salida, dict) or "scores" not in salida:
+        raise HTTPException(
+            409, "El análisis necesita un paso de detección o posterior: ahí aparecen los puntajes"
+        )
+
+    scores: "pd.DataFrame" = salida["scores"]
+    filtradas: "pd.DataFrame" = salida["filtradas"]
+    detectores = list(scores.columns)
+    n = int(len(scores))
+    grupo = "SheetName"
+
+    # ---- Coincidencia entre detectores -------------------------------------------------
+    # `fraccion_candidatos` es un parámetro de la etapa de eventos; si se está mirando un nodo de
+    # detección todavía no existe, así que se usa el valor de referencia de la tesis.
+    fraccion = float(nodo["parametros"].get("fraccion_candidatos")
+                     or ajustes.CONFIG_TESIS.get("eventos", {}).get("fraccion_candidatos", 0.01))
+
+    from tesis import export
+    from tesis.config import CONFIG
+
+    cfg_det = dataclasses.replace(CONFIG.detection, detectors=tuple(detectores),
+                                  candidate_fraction=fraccion)
+    marcados = export._detector_candidates(scores, cfg_det)  # dict[detector] -> set de posiciones
+
+    matriz = [[len(marcados[a] & marcados[b]) for b in detectores] for a in detectores]
+    cuantos = pd.Series(0, index=scores.index, dtype=int)
+    for d in detectores:
+        cuantos.loc[list(marcados[d])] += 1
+    reparto = {int(k): int(v) for k, v in cuantos[cuantos > 0].value_counts().sort_index().items()}
+
+    # ---- Distribución de puntajes: histograma y caja ------------------------------------
+    puntajes = {}
+    for d in detectores:
+        s = scores[d].to_numpy(dtype=float)
+        s = s[np.isfinite(s)]
+        cuentas, bordes = np.histogram(s, bins=40)
+        q1, med, q3 = (float(np.quantile(s, q)) for q in (0.25, 0.5, 0.75))
+        iqr = q3 - q1
+        bajo, alto = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+        dentro = s[(s >= bajo) & (s <= alto)]
+        puntajes[d] = {
+            "bordes": [float(x) for x in bordes],
+            "cuentas": [int(x) for x in cuentas],
+            "caja": [float(dentro.min()) if dentro.size else float(s.min()), q1, med, q3,
+                     float(dentro.max()) if dentro.size else float(s.max())],
+            "atipicos": int(((s < bajo) | (s > alto)).sum()),
+            "corte": float(np.quantile(s, 1 - fraccion)),
+        }
+
+    # ---- Correlación entre características ----------------------------------------------
+    # Se correlacionan las de ANTES del filtrado, marcando cuáles sobrevivieron: así el mapa
+    # muestra *por qué* se descartó cada una, que es lo que la lista de pastillas no dice.
+    previas: "pd.DataFrame" = salida.get("features", filtradas)
+    cols_prev = [c for c in previas.columns if c != grupo]
+    cols_prev.sort()  # el nombre es «señal__medida», así que ordenar agrupa por señal
+    corr = previas[cols_prev].corr().fillna(0.0)
+    conservadas = {c for c in filtradas.columns if c != grupo}
+
+    # ---- Dispersión 2D de las ventanas ---------------------------------------------------
+    elegido = detector if detector in detectores else detectores[0]
+    cols_filt = [c for c in filtradas.columns if c != grupo]
+    X = filtradas[cols_filt].to_numpy(dtype=float)
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+    centro = X.mean(axis=0)
+    escala = X.std(axis=0)
+    escala[escala == 0] = 1.0
+    Z = (X - centro) / escala
+    # SVD en vez de sklearn: son dos componentes y evita arrastrar una dependencia más para dibujar.
+    U, S, _ = np.linalg.svd(Z, full_matrices=False)
+    proy = U[:, :2] * S[:2]
+    varianza = (S ** 2) / float((S ** 2).sum() or 1.0)
+
+    marcado_elegido = marcados[elegido]
+    meta = salida.get("meta")
+    hojas = (meta[grupo].astype(str).tolist() if meta is not None and grupo in meta
+             else [""] * n)
+
+    return {
+        "detectores": detectores,
+        "detector": elegido,
+        "n_ventanas": n,
+        "fraccion_candidatos": fraccion,
+        "top_k": int(np.ceil(n * fraccion)),
+        "coincidencia": {"orden": detectores, "matriz": matriz, "reparto": reparto},
+        "puntajes": puntajes,
+        "correlacion": {
+            "features": cols_prev,
+            "matriz": [[round(float(v), 4) for v in fila] for fila in corr.to_numpy()],
+            "conservadas": [c in conservadas for c in cols_prev],
+        },
+        "dispersion": {
+            "x": [round(float(v), 4) for v in proy[:, 0]],
+            "y": [round(float(v), 4) for v in proy[:, 1]],
+            "puntaje": [round(float(v), 6) for v in scores[elegido].to_numpy(dtype=float)],
+            "candidato": [bool(i in marcado_elegido) for i in range(n)],
+            "hoja": hojas,
+            "varianza_explicada": [round(float(varianza[0]), 4), round(float(varianza[1]), 4)],
+        },
+    }
+
+
 @app.get("/api/nodo/{clave}/evento/{event_id}")
 def get_evento(clave: str, event_id: int):
     """Las series crudas del tramo de un evento, para dibujarlo."""
@@ -317,6 +443,11 @@ async def revalidar_el_frontend(request, call_next):
 @app.get("/")
 def raiz():
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/analisis")
+def analisis():
+    return FileResponse(WEB / "analisis.html")
 
 
 @app.get("/taller")

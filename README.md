@@ -163,10 +163,13 @@ backend/
 web/
   index.html     página didáctica del proyecto
   taller.html    el banco de trabajo
+  analisis.html  la pantalla de análisis de una rama
   app.js         formularios, árbol de ramas y qué se muestra en cada etapa
-  grafico.js     los gráficos: ejes, valores al pasar el puntero, zoom y tabla
+  analisis.js    los cuatro cortes de la pantalla de análisis
+  grafico.js     el motor de gráficos, único que conoce la librería
   estilos.css    la paleta entera, en variables: un bloque por tema
   tema.js        el interruptor claro/oscuro (claro por defecto)
+  vendor/        ECharts, versionado acá adentro (ver web/vendor/LEEME.md)
 scripts/
   exportar_crudo.py   precalcula la tabla cruda desde el Excel de la tesis
 tests/
@@ -236,6 +239,22 @@ resultados, para tener siempre una referencia contra la cual comparar. Las ramas
 configuración quedan marcadas con ★.
 
 **Borrar** elimina el paso seleccionado, todo lo que cuelga de él y sus resultados en disco.
+
+## La pantalla de Análisis
+
+El taller sirve para *operar*: configurar, ejecutar, ramificar. **Análisis** es para mirar una rama
+ya corrida desde cuatro ángulos que el taller no muestra:
+
+- **En qué coinciden los métodos.** Cuántos tramos marcan de a pares, y cuántos junta cada nivel de
+  acuerdo. Es el argumento central del trabajo y hasta ahora vivía comprimido en un «4/5».
+- **Cómo reparte los puntajes cada método**, un panel por método porque no son comparables entre sí,
+  con el corte de candidatos marcado.
+- **Si los candidatos están realmente aislados**, proyectando los tramos a dos dimensiones. Esa
+  proyección es solo para mirar: no alimenta ninguna etapa.
+- **Por qué se descartaron esas características**, con el mapa de correlación que la etapa de
+  filtrado afirma pero no muestra.
+
+Necesita una rama que llegue por lo menos al paso 5 (detección).
 
 ## Estado
 
