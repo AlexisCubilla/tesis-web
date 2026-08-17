@@ -19,8 +19,10 @@ services:
     ports:
       - "${PUERTO:-8000}:8000"
     volumes:
-      # El repo de la tesis, montado de solo lectura: el taller lo importa, nunca lo modifica.
-      - ${RUTA_TESIS:-../repo-rebuild}:/tesis:ro,z
+      # El repo de la tesis, montado escribible: pip instala el paquete en el arranque y necesita
+      # escribir src/tesis.egg-info (gitignored). El taller en sí escribe sus resultados en /app/data,
+      # nunca acá.
+      - ${RUTA_TESIS:-../repo-rebuild}:/tesis:z
       # Estado persistente: árbol de ejecuciones, caché de etapas y tabla cruda.
       - ${DIR_DATOS:-./data}:/app/data:z
       # El frontend se monta para poder editarlo sin reconstruir la imagen.

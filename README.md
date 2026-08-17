@@ -142,7 +142,8 @@ podman compose up
 Levanta un solo servicio. **No hay base de datos que levantar**: el árbol de ejecuciones es un archivo
 SQLite y los resultados van a disco. Todo el estado es la carpeta de datos.
 
-El repo de la tesis se monta de solo lectura en `/tesis`, así que la imagen no queda atada a una
+El repo de la tesis se monta en `/tesis` (escribible solo para que `pip install -e` genere
+`src/tesis.egg-info`, que está en `.gitignore` de la tesis), así que la imagen no queda atada a una
 versión del pipeline: en la interfaz siempre se muestra con qué commit se está ejecutando.
 
 La primera vez hay que generar la tabla cruda dentro del contenedor:
