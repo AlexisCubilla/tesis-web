@@ -44,6 +44,10 @@ run = """
 description = "Verifica la configuración: dónde está la tesis, con qué commit y si están los datos"
 run = "./.venv/bin/python scripts/verificar.py"
 
+[tasks.test]
+description = "Corre los tests: que el taller siga reproduciendo los números de la tesis (~20 s)"
+run = "./.venv/bin/python -m pytest tests/ -q"
+
 [tasks.limpiar]
 description = "Borra el caché de resultados y el árbol de ejecuciones (no toca los datos crudos)"
 run = """

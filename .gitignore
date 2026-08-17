@@ -15,3 +15,5 @@ data/ejecuciones.sqlite
 # Red de seguridad por si DIR_DATOS apunta a otra carpeta dentro del repo.
 *.joblib
 *.sqlite
+
+.pytest_cache/

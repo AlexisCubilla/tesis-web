@@ -169,6 +169,8 @@ web/
   tema.js        el interruptor claro/oscuro (claro por defecto)
 scripts/
   exportar_crudo.py   precalcula la tabla cruda desde el Excel de la tesis
+tests/
+  test_reproduccion.py  afirma los números de la tabla de verificación
 data/                 estado local (ignorado por git): tabla cruda, caché, SQLite
 docs/arquitectura.md  las decisiones de diseño y por qué
 ```
@@ -187,6 +189,17 @@ El taller reproduce los resultados oficiales de la tesis. Con los valores por de
 
 Y apagando la limpieza reproduce el camino del borrador previo documentado en el hallazgo H1 de la
 tesis: 22.966 ventanas, 6.923 tras dedup, 45 características.
+
+Esa tabla **no se comprueba mirándola**: hay un test que corre la cadena entera y afirma cada número.
+
+```bash
+mise run test
+```
+
+Vale la pena entender contra qué protege. El taller *importa* el paquete `tesis` de un repositorio
+que evoluciona por su cuenta — ese es el diseño, y por eso la interfaz muestra siempre con qué commit
+está corriendo. Un ajuste allá que mueva cualquiera de estos números no daría error: daría **otro
+número, en silencio**. El test lo convierte en un fallo ruidoso.
 
 ## Cómo se navega el taller
 
