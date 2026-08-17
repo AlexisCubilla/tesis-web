@@ -164,6 +164,8 @@ web/
   index.html     página didáctica del proyecto
   taller.html    el banco de trabajo
   app.js         formularios, árbol de ramas y gráficos
+  estilos.css    la paleta entera, en variables: un bloque por tema
+  tema.js        el interruptor claro/oscuro (claro por defecto)
 scripts/
   exportar_crudo.py   precalcula la tabla cruda desde el Excel de la tesis
 data/                 estado local (ignorado por git): tabla cruda, caché, SQLite

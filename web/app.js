@@ -22,14 +22,14 @@ const S = {
   muestreo: 10.6,
 };
 
-const COLORES = ['#4ea8ff', '#7ef0c0', '#ffc86b', '#ff8a5b', '#c58cff'];
-
 const $ = (s) => document.querySelector(s);
 const api = async (ruta, op) => {
   const r = await fetch(ruta, op);
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
   return r.json();
 };
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const paletaSeries = () => [1, 2, 3, 4, 5].map((i) => cssVar(`--serie-${i}`));
 const miles = (v) => typeof v === 'number' ? v.toLocaleString('es') : v;
 
 // ============================================================================ arranque
@@ -55,6 +55,9 @@ async function iniciar() {
   $('#btn-ejecutar').addEventListener('click', ejecutarForm);
   $('#btn-borrar').addEventListener('click', borrarSeleccion);
   addEventListener('resize', dibujarMapa);
+  // El mapa es SVG y toma los colores del tema solo; los <canvas> hay que rehacerlos. Se vuelven a
+  // pedir los datos al backend, que es local y responde de memoria: no vale la pena cachearlos acá.
+  addEventListener('tema-cambiado', cargarVisual);
 }
 
 async function recargar() {
@@ -452,6 +455,7 @@ function lienzo(destino, alto = 200) {
 }
 
 function trazar(ctx, ancho, alto, series, nombres, { margen = 26 } = {}) {
+  const COLORES = paletaSeries();
   ctx.clearRect(0, 0, ancho, alto);
   series.forEach((serie, s) => {
     const val = serie.filter((v) => v != null);
@@ -483,10 +487,10 @@ function barras(destino, mapa) {
   ent.forEach(([k, v], i) => {
     const h = (v / max) * (alto - 40);
     const g = ctx.createLinearGradient(0, alto - h - 22, 0, alto - 22);
-    g.addColorStop(0, '#7ef0c0'); g.addColorStop(1, '#4ea8ff');
+    g.addColorStop(0, cssVar('--acento-2')); g.addColorStop(1, cssVar('--acento'));
     ctx.fillStyle = g; ctx.fillRect(i * w + 2, alto - h - 22, Math.max(2, w - 4), h);
     ctx.save(); ctx.translate(i * w + w / 2, alto - 14); ctx.rotate(-Math.PI / 9);
-    ctx.fillStyle = '#93a4c0'; ctx.font = '9px system-ui'; ctx.textAlign = 'right';
+    ctx.fillStyle = cssVar('--texto-2'); ctx.font = '9px system-ui'; ctx.textAlign = 'right';
     ctx.fillText(k.slice(0, 13), 0, 0); ctx.restore();
   });
 }
@@ -561,7 +565,7 @@ function verScores(d) {
     método tiene su propia escala y cada una está ajustada a su máximo.</p><div id="caja-perc"></div>
     <h4 style="font-size:.88rem;margin:18px 0 8px">Los tramos más extremos según cada método</h4>
     <div class="mini">${d.detectores.map((det, i) => `
-      <div class="caja"><h5 style="color:${COLORES[i % 5]}">${det}</h5>
+      <div class="caja"><h5 style="color:var(--serie-${(i % 5) + 1})">${det}</h5>
       <table style="font-size:.76rem"><tbody>${d.top[det].slice(0, 6).map((t) =>
         `<tr><td>${t.hoja}</td><td class="num">${t.inicio}</td>
          <td class="num" style="color:var(--acento-2)">${t.score.toFixed(2)}</td></tr>`).join('')}

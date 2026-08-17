@@ -1,22 +1,128 @@
 /* Taller Etapa 1 — estilos comunes.
-   Tema oscuro tipo "sala de control": el proyecto es telemetría satelital y la estética acompaña. */
+
+   DOS TEMAS, UNA SOLA PALETA.
+   Todo color vive acá como variable. Ningún archivo (ni `index.html`, ni `taller.html`, ni `app.js`)
+   escribe un `#rrggbb` propio: si lo hiciera, ese color quedaría igual en los dos temas y en uno de
+   los dos se vería mal. Para agregar un color nuevo hay que darle su valor en los dos bloques de
+   abajo, no en el lugar donde se usa.
+
+   El tema claro es el de por defecto y por eso vive en `:root` pelado. El oscuro se activa con
+   `data-tema="oscuro"` en el <html>, que pone un script chico en el <head> de cada página (ver
+   `tema.js` para el porqué de que sea inline y no acá). */
 
 :root {
+  color-scheme: light;
+
+  /* --- superficies --- */
+  --fondo: #eef2f8;
+  --fondo-brillo: #ffffff;   /* centro del degradado del cuerpo */
+  --fondo-2: #f4f7fc;        /* cajas internas, campos de formulario */
+  --panel: #ffffff;
+  --panel-2: #e7eef8;
+  --borde: #d3dcea;
+
+  /* --- texto --- */
+  --texto: #16202f;
+  --texto-2: #59667e;
+
+  /* --- acentos y estados --- */
+  --acento: #1a6fc4;
+  --acento-hondo: #14539b;   /* extremo oscuro del degradado de los botones primarios */
+  --acento-2: #0e8a63;
+  --sobre-acento: #ffffff;   /* texto encima de un fondo de acento pleno */
+  --oro: #a9700a;            /* la ★ de la configuración de la tesis */
+  --alerta: #c2540f;
+  --peligro: #cf3552;
+  --ok: #12794a;
+
+  /* --- matices derivados --- */
+  --barra-fondo: rgba(255, 255, 255, .82);
+  --boton-hover: #dbe6f6;
+  --fila-hover: rgba(26, 111, 196, .07);
+  --opcion-activa: #dce9fa;
+  --aviso-fondo: rgba(194, 84, 15, .1);
+  --aviso-info-fondo: rgba(26, 111, 196, .09);
+
+  /* --- etiquetas de estado --- */
+  --chip-pend-b: #e4e8f0; --chip-pend-t: #5c6b86;
+  --chip-corr-b: #d7e8fd; --chip-corr-t: #12558f;
+  --chip-ok-b:   #d6f2e2; --chip-ok-t:   #12794a;
+  --chip-err-b:  #fbdde3; --chip-err-t:  #b32744;
+  --chip-oro-b:  #fbeccc; --chip-oro-t:  #8a5a06;
+
+  /* --- nodos del mapa de ramas --- */
+  --nodo-listo-b: #dce9fa; --nodo-listo-l: #7aa9dd;
+  --nodo-corr-b:  #bcd8fa;
+  --nodo-err-b:   #fbdde3;
+
+  /* --- escenografía espacial --- */
+  --estrellas-op: 0;                        /* de día no hay estrellas */
+  --orbita-cielo: rgba(198, 218, 244, .5);  /* disco de cielo detrás del globo */
+  --orbita-anillo: #b3c6e0;
+
+  /* --- series de los gráficos (las lee `app.js`, no las repite) --- */
+  --serie-1: #1a6fc4;
+  --serie-2: #0e8a63;
+  --serie-3: #b3760a;
+  --serie-4: #cf5a2a;
+  --serie-5: #7d4bc4;
+
+  --sombra: 0 6px 22px rgba(22, 40, 72, .09);
+  --radio: 12px;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+/* Tema oscuro: «sala de control». El proyecto es telemetría satelital y la estética acompaña. */
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+
   --fondo: #080b14;
+  --fondo-brillo: #16203a;
   --fondo-2: #0e1424;
   --panel: #131c30;
   --panel-2: #1a2540;
   --borde: #24324f;
+
   --texto: #e6edf7;
   --texto-2: #93a4c0;
+
   --acento: #4ea8ff;
+  --acento-hondo: #2f7ddb;
   --acento-2: #7ef0c0;
+  --sobre-acento: #04101f;
+  --oro: #ffc86b;
   --alerta: #ff8a5b;
   --peligro: #ff5c7a;
   --ok: #55d98d;
+
+  --barra-fondo: rgba(8, 11, 20, .82);
+  --boton-hover: #223054;
+  --fila-hover: rgba(78, 168, 255, .07);
+  --opcion-activa: #17263f;
+  --aviso-fondo: rgba(255, 138, 91, .09);
+  --aviso-info-fondo: rgba(78, 168, 255, .09);
+
+  --chip-pend-b: #2a2f45; --chip-pend-t: #a9b6d4;
+  --chip-corr-b: #2b3d63; --chip-corr-t: #8fc4ff;
+  --chip-ok-b:   #17402c; --chip-ok-t:   #55d98d;
+  --chip-err-b:  #451c28; --chip-err-t:  #ff5c7a;
+  --chip-oro-b:  #3a2c12; --chip-oro-t:  #ffc86b;
+
+  --nodo-listo-b: #14304d; --nodo-listo-l: #2f6ea8;
+  --nodo-corr-b:  #23406b;
+  --nodo-err-b:   #3d1725;
+
+  --estrellas-op: .5;
+  --orbita-cielo: rgba(18, 30, 56, .55);
+  --orbita-anillo: #2a3c5e;
+
+  --serie-1: #4ea8ff;
+  --serie-2: #7ef0c0;
+  --serie-3: #ffc86b;
+  --serie-4: #ff8a5b;
+  --serie-5: #c58cff;
+
   --sombra: 0 8px 32px rgba(0, 0, 0, .45);
-  --radio: 12px;
-  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -61,20 +167,24 @@
 
 body {
   margin: 0;
-  background: radial-gradient(ellipse at 20% -10%, #16203a 0%, var(--fondo) 55%) fixed;
+  background: radial-gradient(ellipse at 20% -10%, var(--fondo-brillo) 0%, var(--fondo) 55%) fixed;
   color: var(--texto);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Campo de estrellas del fondo.
+/* Al cambiar de tema, que las superficies grandes se fundan en vez de saltar.
+   Solo el fondo y el borde: animar el color del texto lo hace ver borroso. */
+body, .barra, .tarjeta { transition: background-color .22s ease, border-color .22s ease; }
+
+/* Campo de estrellas del fondo (solo en el tema oscuro: ver `--estrellas-op`).
    Sin titileo a propósito: al cambiar de página la animación se reiniciaba desde
    el principio, y como recorre de 0,35 a 0,7 de opacidad, el fondo entero
-   cambiaba de brillo de golpe. Eso se veía como un parpadeo en cada navegación.
-   Estático queda igual de lindo y la transición es limpia. */
+   cambiaba de brillo de golpe. Eso se veía como un parpadeo en cada navegación. */
 .estrellas {
-  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5;
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  opacity: var(--estrellas-op); transition: opacity .22s ease;
   background-image:
     radial-gradient(1px 1px at 12% 18%, #fff, transparent),
     radial-gradient(1px 1px at 33% 72%, #cfe3ff, transparent),
@@ -103,7 +213,7 @@ p { margin: 0 0 1em; }
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 16px;
   padding: 12px 24px;
-  background: rgba(8, 11, 20, .82);
+  background: var(--barra-fondo);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--borde);
 }
@@ -127,6 +237,26 @@ p { margin: 0 0 1em; }
   background: var(--acento-2); border-radius: 2px;
 }
 
+/* --- Interruptor de tema --- */
+/* Un solo botón que muestra el ícono del tema al que se va a cambiar (sol si estás
+   en oscuro, luna si estás en claro): dice a dónde lleva, no dónde estás. */
+.btn-tema {
+  margin-left: 6px; width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  border: 1px solid var(--borde); border-radius: 9px;
+  background: var(--panel-2); color: var(--texto-2);
+  cursor: pointer; padding: 0;
+  transition: color .18s ease, border-color .18s ease, background .18s ease;
+}
+.btn-tema:hover { color: var(--texto); border-color: var(--acento); }
+.btn-tema svg { width: 17px; height: 17px; display: block; }
+/* Cada ícono se muestra solo en su tema. Los dos están siempre en el DOM para que
+   la barra tenga exactamente el mismo marcado en las dos páginas (ver la nota de
+   `view-transition-name` más arriba). */
+.btn-tema .ico-sol { display: none; }
+:root[data-tema="oscuro"] .btn-tema .ico-sol { display: block; }
+:root[data-tema="oscuro"] .btn-tema .ico-luna { display: none; }
+
 /* --- Botones --- */
 .boton {
   display: inline-flex; align-items: center; gap: 8px;
@@ -135,9 +265,9 @@ p { margin: 0 0 1em; }
   font: inherit; font-size: .94rem; cursor: pointer; text-decoration: none;
   transition: transform .12s ease, background .15s ease, border-color .15s ease;
 }
-.boton:hover { background: #223054; border-color: var(--acento); transform: translateY(-1px); }
-.boton.primario { background: linear-gradient(135deg, var(--acento), #2f7ddb); border-color: transparent;
-  color: #04101f; font-weight: 650; }
+.boton:hover { background: var(--boton-hover); border-color: var(--acento); transform: translateY(-1px); }
+.boton.primario { background: linear-gradient(135deg, var(--acento), var(--acento-hondo));
+  border-color: transparent; color: var(--sobre-acento); font-weight: 650; }
 .boton.primario:hover { filter: brightness(1.08); }
 .boton:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 
@@ -161,25 +291,25 @@ p { margin: 0 0 1em; }
 /* --- Etiquetas de estado --- */
 .chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .76rem;
   font-weight: 600; letter-spacing: .03em; }
-.chip.pendiente { background: #2a2f45; color: #a9b6d4; }
-.chip.corriendo { background: #2b3d63; color: #8fc4ff; animation: latido 1.2s infinite; }
-.chip.listo     { background: #17402c; color: var(--ok); }
-.chip.error     { background: #451c28; color: var(--peligro); }
-.chip.oficial   { background: #3a2c12; color: #ffc86b; }
+.chip.pendiente { background: var(--chip-pend-b); color: var(--chip-pend-t); }
+.chip.corriendo { background: var(--chip-corr-b); color: var(--chip-corr-t); animation: latido 1.2s infinite; }
+.chip.listo     { background: var(--chip-ok-b);   color: var(--chip-ok-t); }
+.chip.error     { background: var(--chip-err-b);  color: var(--chip-err-t); }
+.chip.oficial   { background: var(--chip-oro-b);  color: var(--chip-oro-t); }
 
 /* --- Tablas --- */
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
 th { color: var(--texto-2); font-weight: 600; text-transform: uppercase; font-size: .72rem;
   letter-spacing: .06em; position: sticky; top: 0; background: var(--panel); }
-tbody tr:hover { background: rgba(78, 168, 255, .07); }
+tbody tr:hover { background: var(--fila-hover); }
 td.num { text-align: right; font-family: var(--mono); }
 .tabla-scroll { overflow: auto; max-height: 460px; border-radius: 10px; border: 1px solid var(--borde); }
 
 /* --- Aviso --- */
-.aviso { border-left: 3px solid var(--alerta); background: rgba(255, 138, 91, .09);
+.aviso { border-left: 3px solid var(--alerta); background: var(--aviso-fondo);
   padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: .92rem; }
-.aviso.info { border-color: var(--acento); background: rgba(78, 168, 255, .09); }
+.aviso.info { border-color: var(--acento); background: var(--aviso-info-fondo); }
 
 /* --- Pantallas chicas ------------------------------------------------------ */
 @media (max-width: 860px) {
@@ -198,6 +328,7 @@ td.num { text-align: right; font-family: var(--mono); }
   .barra { flex-wrap: wrap; }
   .barra nav { margin-left: 0; width: 100%; }
   .barra nav a.activo::after { bottom: -10px; }
+  .btn-tema { margin-left: auto; }
   .tarjeta { padding: 14px 12px; border-radius: 10px; }
   .boton { padding: 9px 14px; font-size: .88rem; }
   th, td { padding: 6px 7px; font-size: .82rem; }

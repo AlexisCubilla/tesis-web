@@ -121,3 +121,31 @@ haber una respuesta inmediata.
 
 **Pendiente.** Marcar visualmente cuál rama corresponde a la configuración oficial (ADR-0008: dedup
 0,95, límite 15) para distinguirla de un vistazo.
+
+---
+
+## A8 — Dos temas, una sola paleta
+
+**Decisión.** Todo color del sitio es una variable CSS declarada en `web/estilos.css`, con dos
+bloques: `:root` (tema claro, el de por defecto) y `:root[data-tema="oscuro"]`. Ningún otro archivo
+escribe un color propio. Los `<canvas>`, que se pintan a mano y no heredan CSS, leen las mismas
+variables con `getComputedStyle` en cada dibujo.
+
+**Por qué el claro por defecto.** El sitio se muestra sobre todo de día, proyectado en una defensa o
+recortado en capturas para el documento. Ahí el oscuro pierde. El oscuro queda como preferencia
+explícita, guardada en `localStorage`. A propósito **no** se mira `prefers-color-scheme`: el claro es
+el punto de partida para todos, no el que diga el sistema operativo.
+
+**Trampa documentada (1).** El tema se aplica con un script inline en el `<head>` de cada página, no
+desde `tema.js`. `tema.js` se carga al final del cuerpo, cuando el navegador ya pintó un cuadro: si
+la decisión se tomara ahí, quien tiene el oscuro guardado vería un destello blanco en cada carga.
+
+**Trampa documentada (2).** Como consecuencia de lo anterior, volver con «atrás» dejaba el tema
+viejo: el navegador restaura la página entera desde el bfcache y el script del `<head>` **no** se
+vuelve a ejecutar. Se veía como que el cambio funcionaba en una pantalla y en la otra no. `tema.js`
+escucha `pageshow` con `event.persisted` y reaplica lo guardado, que es lo que manda — no lo que
+quedó en el DOM. Por lo mismo escucha `storage`, para que dos pestañas abiertas no se contradigan.
+
+**Excepción anotada.** El globo terráqueo y el satélite del inicio llevan colores fijos, fuera de la
+paleta. Son el color de un objeto físico —la Tierra es azul de día y de noche—, así que cambiarlos
+con el tema se vería mal. Lo que sí usa variables es el cielo de atrás y el anillo de la órbita.

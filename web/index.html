@@ -1,9 +1,12 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-tema="claro">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etapa 1 — Anomalías en baterías satelitales</title>
+<!-- El tema se resuelve acá, antes de pintar nada: si esperara a `tema.js` (que va al final del
+     cuerpo) quien tiene el oscuro guardado vería un destello blanco en cada carga. -->
+<script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
 <link rel="stylesheet" href="/estatico/estilos.css">
 <style>
   .heroe { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center;
@@ -64,6 +67,17 @@
   <nav>
     <a href="/" class="activo">El proyecto</a>
     <a href="/taller">Taller</a>
+    <button class="btn-tema" type="button" title="Cambiar de tema">
+      <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/>
+      </svg>
+      <svg class="ico-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/>
+      </svg>
+    </button>
   </nav>
 </header>
 
@@ -244,5 +258,6 @@
        y resultados— vive en el repositorio de la tesis.</p>
   </footer>
 </div>
+<script src="/estatico/tema.js" defer></script>
 </body>
 </html>
