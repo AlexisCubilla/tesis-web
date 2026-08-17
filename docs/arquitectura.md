@@ -106,6 +106,14 @@ la ventana deslizándose sobre la señal— salen mejor con SVG y Canvas que con
 **Costo aceptado.** Escribir a mano cosas que un framework daría hechas. Con el tamaño de este
 frontend, conviene.
 
+**Enmienda: una dependencia, congelada en el repositorio.** Los gráficos escritos a mano llegaron a
+su techo, así que se incorporó ECharts. La regla no era «cero dependencias» sino «que dentro de tres
+años esto se abra y funcione», y eso se sostiene porque la librería vive en `web/vendor/` como un
+archivo más del repositorio: sin CDN —que desaparece o se corta sin internet— y sin `npm install`,
+que traería `node_modules` y, tarde o temprano, un paso de compilación. El costo aceptado es el peso
+en el repositorio y que actualizar sea manual. Un solo archivo del frontend, `grafico.js`, conoce la
+librería; el resto pide gráficos por su nombre.
+
 **Consecuencia operativa: el servidor manda `Cache-Control: no-cache` en todo lo que no sea la API.**
 Sin build no hay huellas en los nombres de archivo (`app.4f2a1.js`) que inviten al navegador a
 recargar, así que la frescura queda enteramente en manos de las cabeceras. Starlette manda `etag` y
@@ -177,8 +185,8 @@ por la que el tema claro es el de por defecto.
 
 **Decisión.** Cada gráfico tiene ejes rotulados con su unidad, muestra los valores al pasar el
 puntero, deja acercarse a un tramo arrastrando, se abre en grande y tiene una tabla con los números
-detrás. El motor está en `web/grafico.js`: Canvas y DOM a mano, sin dependencias ni compilación
-(sigue A6).
+detrás. El motor está en `web/grafico.js`, sobre ECharts versionado en `web/vendor/`
+(ver la enmienda del A6).
 
 **Por qué.** Lo que había eran polilíneas sin un solo eje. Servían para reconocer una forma y nada
 más: no se podía leer un valor, ni saber en qué medición ocurría algo, ni mirar de cerca un tramo
@@ -201,10 +209,40 @@ mide la separación entre pares vecinos, también simulando daltonismo. La palet
 naranja y un ámbar a ΔE 1,1 en deuteranopía y 8,5 con visión normal — dos series que no se
 distinguían ni con visión de color completa. Si se tocan esos valores hay que volver a validarlos.
 
-**Lo que se evitó a propósito.** Nada de hacer zoom con la rueda del mouse: rompe el desplazamiento
-de la página, que es lo que la persona estaba haciendo. Se arrastra para elegir un tramo y se vuelve
-con un botón o doble clic. Y en pantallas táctiles el gráfico deja pasar el desplazamiento vertical
-(`touch-action: pan-y`), quedándose solo con el gesto horizontal.
+**Lo que se evitó a propósito.** Nada de hacer zoom con la rueda del mouse sin más: rompe el
+desplazamiento de la página, que es lo que la persona estaba haciendo. Hace falta tener Ctrl
+apretado; para lo demás está la barra de rango y la herramienta de recuadro.
 
-**Pendiente.** Elegir desde la interfaz qué señales entran en cada gráfico. Se descartó por ahora:
-agrega una segunda clase de configuración que compite con la del pipeline, que es la que importa.
+**Qué sobrevivió al cambio de librería.** Las decisiones de arriba son de contenido, no de
+implementación: al pasar de Canvas a mano a ECharts se conservaron enteras. Lo que la librería
+aportó fue terminación —globo, leyenda, barra de rango, exportar imagen, ver los datos en tabla— y
+el catálogo de tipos que hizo posible el A10.
+
+---
+
+## A10 — Una pantalla aparte para analizar, separada de la de operar
+
+**Decisión.** «Análisis» es una tercera pantalla, hermana de «El proyecto» y «Taller». Muestra
+cuatro cortes de la rama que se elija: coincidencia entre detectores, distribución de puntajes,
+dispersión de las ventanas en dos dimensiones y correlación entre características.
+
+**Por qué separada.** El taller es para *operar*: configurar una etapa, ejecutarla, mirar qué
+produjo y ramificar. Analizar es otra cosa —comparar, buscar por qué— y necesita gráficos grandes y
+varios a la vez. Metidos dentro de la vista de fase alargaban una pantalla que ya es larga y
+competían con los botones que hacen avanzar el pipeline.
+
+**Qué agrega que no existía.** Sobre todo la **coincidencia entre métodos**, que es el argumento
+central del trabajo —el acuerdo entre métodos que piensan distinto reemplaza a la respuesta correcta
+que no existe— y hasta ahora vivía comprimido en un «4/5» dentro de una celda. Y el **mapa de
+correlación**, que hace visible por qué la etapa de filtrado descarta lo que descarta, en vez de
+mostrar dos listas de pastillas sin explicación.
+
+**Dónde está el límite con A1.** La regla de «qué tramo está marcado» no se reimplementa: se le
+pide al paquete de la tesis (`export._detector_candidates`, la misma que usa `build_candidate_table`),
+justamente para no tener dos definiciones que se separen con el tiempo. Lo que el backend calcula es
+solo presentación: contar intersecciones, armar histogramas, correlacionar columnas y proyectar.
+
+**La proyección 2D es la excepción, y va anotada.** Es cálculo nuevo, hecho acá y no en la tesis.
+Se acepta porque es **solo para mirar**: no alimenta ninguna etapa, no se guarda y ningún número del
+trabajo depende de ella. La pantalla lo dice con todas las letras, para que nadie la confunda con el
+detector PCA del pipeline, que sí es parte del método.

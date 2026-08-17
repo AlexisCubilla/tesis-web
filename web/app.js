@@ -453,8 +453,8 @@ function verSerie(d) {
     <p class="tenue" style="font-size:.78rem;margin-top:8px">Un panel por señal, cada uno con su propia
     escala y su unidad, y el eje horizontal compartido. Antes iban las tres encimadas y escaladas cada
     una a su rango: se comparaban las formas, pero las alturas no querían decir nada y no había forma
-    de leer un valor. <strong>Arrastrá sobre cualquier panel</strong> para acercarte a un tramo; doble
-    clic vuelve.</p>
+    de leer un valor. Pasá el puntero para ver los tres valores a la vez, y usá la barra de abajo o la
+    lupa de la esquina para acercarte a un tramo.</p>
     <h4 style="font-size:.88rem;margin:18px 0 6px">Mediciones por hoja</h4><div id="caja-hojas"></div>`;
   const dibujar = (dd) => {
     const caja = $('#caja-serie');
