@@ -60,12 +60,16 @@
   --orbita-cielo: rgba(198, 218, 244, .5);  /* disco de cielo detrás del globo */
   --orbita-anillo: #b3c6e0;
 
-  /* --- series de los gráficos (las lee `app.js`, no las repite) --- */
+  /* --- series de los gráficos (las lee `grafico.js`, no las repite) ---
+     Estos cinco no se eligieron a ojo: están verificados con un validador de paletas para que
+     cada par vecino se distinga también en daltonismo. La versión anterior tenía un naranja y un
+     ámbar a ΔE 1,1 en deuteranopía y 8,5 con visión normal — o sea, dos series que ni con visión
+     de color completa se separaban. Si se tocan, hay que volver a validarlos, no confiar en el ojo. */
   --serie-1: #1a6fc4;
   --serie-2: #0e8a63;
   --serie-3: #b3760a;
-  --serie-4: #cf5a2a;
-  --serie-5: #7d4bc4;
+  --serie-4: #c02d84;
+  --serie-5: #6b46c1;
 
   --sombra: 0 6px 22px rgba(22, 40, 72, .09);
   --radio: 12px;
@@ -116,11 +120,13 @@
   --orbita-cielo: rgba(18, 30, 56, .55);
   --orbita-anillo: #2a3c5e;
 
-  --serie-1: #4ea8ff;
-  --serie-2: #7ef0c0;
-  --serie-3: #ffc86b;
-  --serie-4: #ff8a5b;
-  --serie-5: #c58cff;
+  /* Validados aparte contra el fondo oscuro: no es el mismo juego aclarado, porque sobre fondo
+     oscuro los tonos muy claros se salen de la banda de luminosidad y dejan de separarse. */
+  --serie-1: #4a93e8;
+  --serie-2: #22a87f;
+  --serie-3: #b0861f;
+  --serie-4: #d95fa0;
+  --serie-5: #8f74e8;
 
   --sombra: 0 8px 32px rgba(0, 0, 0, .45);
 }

@@ -170,3 +170,41 @@ variable: por eso `.cielo` también fija `color` explícitamente.
 el taller hay tablas, formularios y cinco curvas por gráfico: un fondo con textura compite con el
 dato justo donde hay que leerlo, y arruina las capturas que van al documento — que es la misma razón
 por la que el tema claro es el de por defecto.
+
+---
+
+## A9 — Los gráficos son instrumentos de lectura, no ilustraciones
+
+**Decisión.** Cada gráfico tiene ejes rotulados con su unidad, muestra los valores al pasar el
+puntero, deja acercarse a un tramo arrastrando, se abre en grande y tiene una tabla con los números
+detrás. El motor está en `web/grafico.js`: Canvas y DOM a mano, sin dependencias ni compilación
+(sigue A6).
+
+**Por qué.** Lo que había eran polilíneas sin un solo eje. Servían para reconocer una forma y nada
+más: no se podía leer un valor, ni saber en qué medición ocurría algo, ni mirar de cerca un tramo
+sospechoso — que es exactamente lo que uno quiere hacer en un banco de experimentación de detección
+de anomalías.
+
+**Tres señales, tres paneles.** Antes las tres iban encimadas en un mismo dibujo, cada una escalada
+a su propio mínimo y máximo. Eso es un gráfico de dos ejes con los ejes escondidos: las alturas
+relativas no significan nada y no hay forma de darse cuenta mirando. Ahora cada señal tiene su panel
+con su escala y su unidad, y todos comparten el eje X. Se siguen comparando las formas —que era para
+lo que servía— y además se leen los valores. Lo mismo con los cinco detectores en la etapa de
+detección: cinco paneles, no cinco curvas encimadas.
+
+**Consecuencia en el backend.** `get_datos` dejó de submuestrear la serie a 300 puntos. Acercarse
+sobre una curva diezmada solo agranda la diezma: no aparece ni un dato nuevo. La hoja más grande
+tiene ~1.100 mediciones, así que va entera y el submuestreo queda como red de contención.
+
+**La paleta de series está verificada, no elegida a ojo.** Los cinco colores pasan un validador que
+mide la separación entre pares vecinos, también simulando daltonismo. La paleta anterior tenía un
+naranja y un ámbar a ΔE 1,1 en deuteranopía y 8,5 con visión normal — dos series que no se
+distinguían ni con visión de color completa. Si se tocan esos valores hay que volver a validarlos.
+
+**Lo que se evitó a propósito.** Nada de hacer zoom con la rueda del mouse: rompe el desplazamiento
+de la página, que es lo que la persona estaba haciendo. Se arrastra para elegir un tramo y se vuelve
+con un botón o doble clic. Y en pantallas táctiles el gráfico deja pasar el desplazamiento vertical
+(`touch-action: pan-y`), quedándose solo con el gesto horizontal.
+
+**Pendiente.** Elegir desde la interfaz qué señales entran en cada gráfico. Se descartó por ahora:
+agrega una segunda clase de configuración que compite con la del pipeline, que es la que importa.

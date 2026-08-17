@@ -121,6 +121,10 @@ def delete_nodo(clave: str):
     return almacen.borrar(_con, clave)
 
 
+#: Tope de puntos de una serie temporal antes de empezar a submuestrear. Ver `get_datos`.
+SERIE_COMPLETA = 20_000
+
+
 @app.get("/api/nodo/{clave}/datos")
 def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
     """Datos para inspeccionar una etapa. Siempre acotados: esto viaja al navegador."""
@@ -142,7 +146,11 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
         elegida = hoja if hoja in hojas else hojas[0]
         sub = salida[salida[grupo] == elegida]
         señales = [c for c in sub.columns if c not in (grupo, "segment")]
-        paso = max(1, len(sub) // limite)  # submuestreo para no mandar miles de puntos
+        # El gráfico deja acercarse a un tramo, y acercarse sobre una curva diezmada solo agranda
+        # la diezma: no aparece ni un dato nuevo. Por eso la serie va entera. La hoja más grande
+        # tiene ~1.100 mediciones × 3 señales, unas decenas de KB contra un servidor local; el
+        # submuestreo queda solo como red de contención por si alguna vez hay una hoja enorme.
+        paso = max(1, len(sub) // max(limite, SERIE_COMPLETA))
         sub = sub.iloc[::paso]
         return {
             "tipo": "serie",

@@ -163,7 +163,8 @@ backend/
 web/
   index.html     página didáctica del proyecto
   taller.html    el banco de trabajo
-  app.js         formularios, árbol de ramas y gráficos
+  app.js         formularios, árbol de ramas y qué se muestra en cada etapa
+  grafico.js     los gráficos: ejes, valores al pasar el puntero, zoom y tabla
   estilos.css    la paleta entera, en variables: un bloque por tema
   tema.js        el interruptor claro/oscuro (claro por defecto)
 scripts/
