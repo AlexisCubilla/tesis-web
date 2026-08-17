@@ -65,7 +65,8 @@ window.Grafico = (function () {
       this.raiz.className = 'grafico';
       destino.appendChild(this.raiz);
 
-      if (cfg.titulo || cfg.acciones !== false) {
+      const compacto = !!cfg.compacto;
+      if (!compacto && (cfg.titulo || cfg.acciones !== false)) {
         const b = document.createElement('div');
         b.className = 'grafico-acciones';
         if (cfg.titulo) {
@@ -97,7 +98,8 @@ window.Grafico = (function () {
       this.caja.style.height = (cfg.alto || 300) + 'px';
       this.raiz.appendChild(this.caja);
 
-      if (cfg.pie) {
+
+      if (cfg.pie && !compacto) {
         const p = document.createElement('p');
         p.className = 'grafico-pie';
         p.textContent = cfg.pie;
@@ -105,6 +107,22 @@ window.Grafico = (function () {
       }
 
       this.eco = echarts.init(this.caja, null, { renderer: 'canvas' });
+
+      // El botón va después de `init`: ECharts vacía el contenedor al inicializarse, así que si se
+      // agrega antes desaparece en silencio. En las miniaturas no entra una botonera, pero
+      // agrandar sigue haciendo falta —justamente porque son chicas—, así que va en la esquina.
+      // Al abrirse se muestran como gráfico completo: ahí sí hay lugar para ejes y herramientas.
+      if (compacto && !cfg.enModal) {
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'grafico-btn grafico-lupa';
+        x.textContent = '⤢';
+        x.title = 'Abrir el gráfico en grande';
+        x.setAttribute('aria-label', 'Abrir el gráfico en grande');
+        x.addEventListener('click', () => this._agrandar());
+        this.caja.appendChild(x);
+      }
+
       this.pintar();
       this.ro = new ResizeObserver(() => this.eco.resize());
       this.ro.observe(this.caja);
@@ -114,7 +132,7 @@ window.Grafico = (function () {
     pintar() {
       // `notMerge`: al cambiar de tema hay que reemplazar la opción entera, no fusionarla, o
       // quedan mezclados los colores viejos con los nuevos.
-      this.eco.setOption(this.cfg.opcion(comun(), this.cfg.alto || 300), true);
+      this.eco.setOption(this.cfg.opcion(comun(), this.cfg.alto || 300, !!this.cfg.enModal), true);
     }
 
     /** Abre una copia del mismo gráfico a pantalla casi completa. */
@@ -141,7 +159,7 @@ window.Grafico = (function () {
       document.body.appendChild(dlg);
 
       const grande = new Grafo(hueco, Object.assign({}, this.cfg, {
-        titulo: null, enModal: true,
+        titulo: null, enModal: true, compacto: false,
         alto: Math.max(this.cfg.alto || 300, window.innerHeight - 190),
       }));
       dlg.addEventListener('close', () => { grande.destruir(); dlg.remove(); });
@@ -230,10 +248,12 @@ window.Grafico = (function () {
     const altoPanel = cfg.altoPanel || (compacto ? 70 : 110);
     const alto = paneles.length * altoPanel + (compacto ? 34 : 78);
 
-    const opcion = (c, altoReal) => {
+    const opcion = (c, altoReal, enModal) => {
       const A = altoReal || alto;
-      const arriba = compacto ? 16 : 30;
-      const abajo = compacto ? 20 : 62;   // sitio para la barra de rango
+      // Dentro del modal hay lugar de sobra: la miniatura se muestra como gráfico completo.
+      const comp = compacto && !enModal;
+      const arriba = comp ? 16 : 30;
+      const abajo = comp ? 20 : 62;   // sitio para la barra de rango
       const util = A - arriba - abajo;
       const paso = util / paneles.length;
 
@@ -280,7 +300,7 @@ window.Grafico = (function () {
           axisPointer: { type: 'cross', crossStyle: { color: c.tenue }, lineStyle: { color: c.tenue } },
         }),
       };
-      if (!compacto) {
+      if (!comp) {
         o.toolbox = herramientas(c, tablaDePaneles(paneles, n, fx, cfg.xNombre || 'x'));
         o.dataZoom = [
           // Sin zoom con la rueda salvo que se tenga Ctrl apretado: si no, el gráfico se queda
@@ -297,10 +317,11 @@ window.Grafico = (function () {
       return o;
     };
 
-    const pie = compacto ? null
-      : `${n} ${cfg.sustantivo || 'puntos'}. Para acercarte a un tramo: arrastrá los extremos de la `
-        + `barra de abajo, o usá la lupa de la esquina y encerrá el tramo en un recuadro.`;
-    return new Grafo(destino, { titulo: cfg.titulo, alto, opcion, pie, acciones: !compacto });
+    // El pie y el título se arman siempre: el marco los oculta mientras es miniatura y los
+    // muestra al abrirse en grande.
+    const pie = `${n} ${cfg.sustantivo || 'puntos'}. Para acercarte a un tramo: arrastrá los `
+      + 'extremos de la barra de abajo, o usá la lupa de la esquina y encerrá el tramo en un recuadro.';
+    return new Grafo(destino, { titulo: cfg.titulo, alto, opcion, pie, compacto });
   }
 
   /* ================================================================== barras horizontales

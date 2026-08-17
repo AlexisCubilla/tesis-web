@@ -344,6 +344,12 @@ td.num { text-align: right; font-family: var(--mono); }
   background: var(--panel); color: var(--texto); box-shadow: var(--sombra); }
 .grafico-modal::backdrop { background: rgba(0, 0, 0, .55); }
 
+/* Lupa de las miniaturas: discreta, pero siempre visible — en pantalla táctil no hay hover
+   que la revele. */
+.grafico-lupa { position: absolute; top: 5px; right: 5px; z-index: 2; padding: 1px 6px;
+  font-size: .8rem; line-height: 1.35; opacity: .55; background: var(--panel); }
+.grafico-lupa:hover, .grafico-lupa:focus-visible { opacity: 1; }
+
 /* La tabla que arma la vista «Datos». */
 .grafico-tabla { max-height: 60vh; }
 .grafico-tabla table { width: 100%; }

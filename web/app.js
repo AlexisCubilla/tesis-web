@@ -494,7 +494,9 @@ function verVentanas(d) {
     Grafico.lineas(caja, {
       compacto: true,
       altoPanel: 52,
+      titulo: `${ej.hoja} · desde la medición ${ej.inicio}`,
       xNombre: 'posición',
+      sustantivo: 'mediciones del tramo',
       paneles: d.senales.map((s, i) => ({ nombre: s, valores: ej.valores.map((f) => f[i]) })),
     });
   });
