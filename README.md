@@ -250,7 +250,15 @@ configuración quedan marcadas con ★.
 ## La pantalla de Análisis
 
 El taller sirve para *operar*: configurar, ejecutar, ramificar. **Análisis** es para mirar una rama
-ya corrida desde cuatro ángulos que el taller no muestra:
+ya corrida desde cuatro ángulos que el taller no muestra.
+
+Se entra con el botón **«Analizar esta rama»** de la vista de fase, desde cualquier paso de detección
+o de eventos. Se elige sobre el mapa, que es donde una rama se ve como lo que es —una bifurcación—
+en vez de como una línea de texto en un desplegable. La dirección queda con la rama (`?nodo=…`), así
+que el enlace se puede guardar o compartir. Arriba de todo se ve siempre la cadena completa de esa
+rama, con lo que se aparta de la configuración de la tesis resaltado.
+
+Los cuatro ángulos:
 
 - **En qué coinciden los métodos.** Cuántos tramos marcan de a pares, y cuántos junta cada nivel de
   acuerdo. Es el argumento central del trabajo y hasta ahora vivía comprimido en un «4/5».

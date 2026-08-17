@@ -14,12 +14,18 @@ const api = async (ruta) => {
 const V = Grafico.paleta;
 const miles = (v) => Number(v).toLocaleString('es');
 
-const S = { nodos: [], clave: null, datos: null, detector: null };
+const S = { nodos: [], clave: null, datos: null, detector: null, oficial: {}, titulos: {} };
 
 // ============================================================================ arranque
 async function iniciar() {
   try {
-    S.nodos = (await api('/api/arbol')).nodos;
+    const [arbol, estado, etapas] = await Promise.all([
+      api('/api/arbol'), api('/api/estado'), api('/api/etapas'),
+    ]);
+    S.nodos = arbol.nodos;
+    // La configuración de referencia es la vara contra la que se describe cada rama.
+    S.oficial = estado.config_tesis || {};
+    S.titulos = Object.fromEntries(etapas.etapas.map((e) => [e.nombre, e.titulo]));
   } catch (e) {
     return avisar(`No se pudo leer el árbol de ejecuciones: ${e.message}`);
   }
@@ -37,7 +43,7 @@ async function iniciar() {
   for (const n of utiles) {
     const o = document.createElement('option');
     o.value = n.clave;
-    o.textContent = `${etiqueta(n)} · paso ${n.etapa} · ${n.clave.slice(0, 8)}`;
+    o.textContent = nombreDeRama(n);
     sel.appendChild(o);
   }
   sel.addEventListener('change', () => cargar(sel.value));
@@ -45,17 +51,76 @@ async function iniciar() {
     S.detector = e.target.value;
     cargar(S.clave, S.detector);
   });
-  cargar(utiles[0].clave);
+
+  // Se entra desde el taller con la rama ya elegida: `?nodo=…`. Se elige sobre el mapa, que es
+  // donde una rama se ve como lo que es —una bifurcación— y no como una línea de texto.
+  const pedido = new URLSearchParams(location.search).get('nodo');
+  const inicial = utiles.find((n) => n.clave === pedido) || utiles[0];
+  if (pedido && !utiles.some((n) => n.clave === pedido)) {
+    avisar('Esa rama ya no existe o todavía no llegó a la detección; se muestra otra.', 'info');
+  }
+  sel.value = inicial.clave;
+  cargar(inicial.clave);
 }
 
-/** Un rótulo corto y humano para la rama, con los parámetros que la distinguen. */
-function etiqueta(n) {
-  const p = n.parametros || {};
-  const trozos = [];
-  if (p.detectores) trozos.push(`${p.detectores.length} métodos`);
-  if (p.fraccion_candidatos != null) trozos.push(`${(p.fraccion_candidatos * 100).toFixed(1)} %`);
-  if (p.max_ventanas_evento) trozos.push(`tope ${p.max_ventanas_evento}`);
-  return trozos.join(' · ') || n.etapa;
+// ---------------------------------------------------------------- identificar la rama
+const nodoDe = (clave) => S.nodos.find((n) => n.clave === clave);
+
+/** La cadena completa de pasos que llevan a este nodo. */
+function cadenaDe(clave) {
+  const c = [];
+  let n = nodoDe(clave);
+  while (n) { c.unshift(n); n = nodoDe(n.padre); }
+  return c;
+}
+
+const NUM = (v) => Number(v).toLocaleString('es', { maximumFractionDigits: 4 });
+
+/** Nombre corto de un parámetro con su valor, para caber en una etiqueta. */
+const CORTO = {
+  limpiar: (v) => (v ? 'con limpieza' : 'sin limpieza'),
+  hojas_excluidas: (v) => `${v.length} hojas fuera`,
+  tamano_ventana: (v) => `ventana ${v}`,
+  paso: (v) => `paso ${v}`,
+  deduplicar: (v) => (v ? 'con dedup' : 'sin dedup'),
+  umbral_dedup: (v) => `dedup ${NUM(v)}`,
+  rezagos_autocorr: (v) => `${v} rezagos`,
+  umbral_correlacion: (v) => `corr ${NUM(v)}`,
+  percentil_baja_var: (v) => `var ${NUM(v)} %`,
+  detectores: (v) => `${v.length} métodos`,
+  arboles_iforest: (v) => `${v} árboles`,
+  min_cluster_hdbscan: (v) => `grupo ${v}`,
+  fraccion_candidatos: (v) => `${NUM(v * 100)} %`,
+  max_ventanas_evento: (v) => (v ? `tope ${v}` : 'sin tope'),
+};
+const rotulo = (k, v) => (CORTO[k] ? CORTO[k](v) : `${k.replace(/_/g, ' ')} ${v}`);
+const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Qué tiene esta rama que no tenga la configuración de la tesis, mirando la cadena entera. */
+function diferencias(clave) {
+  const dif = [];
+  for (const m of cadenaDe(clave)) {
+    const ref = S.oficial[m.etapa] || {};
+    for (const [k, v] of Object.entries(m.parametros || {})) {
+      if (k in ref && !igual(v, ref[k])) dif.push({ etapa: m.etapa, k, v });
+    }
+  }
+  return dif;
+}
+
+/** Cómo se llama una rama.
+ *
+ *  Antes se armaba con los parámetros del ÚLTIMO paso, y una rama es la cadena entera: cinco de
+ *  las seis ramas de una corrida normal terminaban con la misma etiqueta, distinguibles solo por
+ *  el hash. Describirla por lo que la aparta de la referencia no empata nunca: la clave de un nodo
+ *  es el hash de toda su cadena, así que dos ramas con los mismos parámetros en todos los pasos
+ *  serían la misma rama.
+ */
+function nombreDeRama(n) {
+  const dif = diferencias(n.clave);
+  const hasta = `hasta ${(S.titulos[n.etapa] || n.etapa).toLowerCase()}`;
+  if (!dif.length) return `★ la de la tesis · ${hasta}`;
+  return `${dif.map((d) => rotulo(d.k, d.v)).join(' · ')} · ${hasta}`;
 }
 
 function avisar(texto, clase = '') {
@@ -69,6 +134,9 @@ function avisar(texto, clase = '') {
 
 async function cargar(clave, detector) {
   S.clave = clave;
+  // Que la dirección refleje lo que se está mirando: así se puede recargar o compartir el enlace.
+  history.replaceState(null, '', `/analisis?nodo=${clave}`);
+  tiraDeLaCadena(clave);
   $('#aviso').replaceChildren();
   const cargando = document.createElement('p');
   cargando.className = 'tenue';
@@ -84,6 +152,51 @@ async function cargar(clave, detector) {
   $('#aviso').replaceChildren();
   $('#tablero').hidden = false;
   pintar();
+}
+
+/** Los pasos de la rama, en orden, con lo que se apartó de la referencia resaltado.
+ *
+ *  El desplegable dice cuál elegiste; esto dice qué estás mirando sin volver a abrirlo, que es
+ *  media pantalla más abajo donde uno se pierde.
+ */
+function tiraDeLaCadena(clave) {
+  const cont = $('#cadena');
+  cont.replaceChildren();
+  const dif = diferencias(clave);
+  const distintos = new Set(dif.map((d) => `${d.etapa}.${d.k}`));
+
+  for (const m of cadenaDe(clave)) {
+    const ref = S.oficial[m.etapa] || {};
+    const paso = document.createElement('div');
+    paso.className = 'paso-cadena' + (dif.some((d) => d.etapa === m.etapa) ? ' cambiado' : '');
+
+    const t = document.createElement('div');
+    t.className = 'paso-t';
+    t.textContent = S.titulos[m.etapa] || m.etapa;
+    paso.appendChild(t);
+
+    const vals = document.createElement('div');
+    vals.className = 'paso-v';
+    for (const [k, v] of Object.entries(m.parametros || {})) {
+      if (!(k in ref)) continue;
+      const e = document.createElement('span');
+      e.className = distintos.has(`${m.etapa}.${k}`) ? 'distinto' : '';
+      e.textContent = rotulo(k, v);
+      if (e.className) e.title = `en la tesis: ${rotulo(k, ref[k])}`;
+      vals.appendChild(e);
+    }
+    paso.appendChild(vals);
+    cont.appendChild(paso);
+  }
+
+  const resumen = $('#resumen-rama');
+  resumen.replaceChildren();
+  const chip = document.createElement('span');
+  chip.className = `chip ${dif.length ? 'pendiente' : 'oficial'}`;
+  chip.textContent = dif.length
+    ? `${dif.length} parámetro${dif.length > 1 ? 's' : ''} distinto${dif.length > 1 ? 's' : ''} de la tesis`
+    : '★ configuración de la tesis';
+  resumen.appendChild(chip);
 }
 
 function pintar() {

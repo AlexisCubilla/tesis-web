@@ -29,6 +29,19 @@
   .cifras .celda .v { font-family: var(--mono); font-size: 1.2rem; color: var(--acento-2); }
   .cifras .celda .r { font-size: .71rem; color: var(--texto-2); text-transform: uppercase;
     letter-spacing: .05em; }
+
+  /* La cadena de la rama: un paso por columna, con lo que se aparta de la referencia resaltado. */
+  .cadena { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .paso-cadena { flex: 1 1 150px; background: var(--fondo-2); border: 1px solid var(--borde);
+    border-radius: 9px; padding: 7px 10px; }
+  .paso-cadena.cambiado { border-color: var(--acento); }
+  .paso-t { font-size: .68rem; color: var(--texto-2); text-transform: uppercase;
+    letter-spacing: .06em; margin-bottom: 3px; }
+  .paso-v { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: .74rem;
+    font-family: var(--mono); color: var(--texto-2); }
+  .paso-v .distinto { color: var(--acento); font-weight: 700; }
+  /* Separador entre valores: sin esto «con dedup» y «dedup 0,95» se leen como una sola cosa. */
+  .paso-v span:not(:last-child)::after { content: ' ·'; color: var(--texto-2); font-weight: 400; }
 </style>
 </head>
 <body>
@@ -60,14 +73,16 @@
     <div class="fila-sup">
       <h2 style="font-size:1.3rem">Análisis de una rama</h2>
       <span class="esp"></span>
+      <span id="resumen-rama"></span>
       <label class="tenue" style="font-size:.8rem" for="sel-rama">Rama</label>
       <select id="sel-rama"></select>
     </div>
+    <div class="cadena" id="cadena"></div>
     <p class="explica" style="margin-bottom:0">
-      Cuatro cortes que el taller no mostraba. Todos salen de la misma corrida que estés mirando:
-      elegí una rama arriba y cambia todo lo de abajo. <strong>Ninguno de estos gráficos redefine el
-      pipeline</strong> — qué tramo está marcado se lo pregunta al paquete de la tesis, con la misma
-      regla que usa la etapa de eventos.
+      Cuatro cortes que el taller no mostraba, sobre la rama de arriba. Lo habitual es llegar acá con
+      el botón «Analizar esta rama» del taller, eligiéndola sobre el mapa. <strong>Ninguno de estos
+      gráficos redefine el pipeline</strong> — qué tramo está marcado se lo pregunta al paquete de la
+      tesis, con la misma regla que usa la etapa de eventos.
     </p>
   </div>
 

@@ -271,9 +271,14 @@ function pintarFase() {
   const sig = etapaSiguiente();
   const defSig = sig && S.defs.find((d) => d.nombre === sig);
   const yaHecho = sig && hijosDe(S.sel).length;
+  // El análisis se abre DESDE acá, con la rama ya elegida. Elegirla del otro lado obligaba a
+  // reconocerla en un desplegable, y ahí una rama es apenas un texto; en el mapa, en cambio, ya se
+  // está viendo dónde se bifurcó y de dónde viene.
+  const analizable = n.estado === 'listo' && ['deteccion', 'eventos'].includes(n.etapa);
   $('#fase-acciones').innerHTML = `
     ${sig ? `<button class="boton primario" id="a-seguir">Paso ${i + 2}: ${defSig.titulo} →</button>` : ''}
     <button class="boton" id="a-ramificar">Repetir este paso con otros valores</button>
+    ${analizable ? `<a class="boton" id="a-analizar" href="/analisis?nodo=${n.clave}">Analizar esta rama →</a>` : ''}
     <span class="tenue" style="font-size:.82rem">
       ${sig ? (yaHecho ? 'Ya hay pasos más adelante; si cambiás algo, se abre una rama.'
                        : 'Continúa esta rama.') : 'Este es el último paso del pipeline.'}
