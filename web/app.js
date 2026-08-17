@@ -512,19 +512,171 @@ function verFeatures(d) {
     ${Object.entries(d.por_senal).map(([senal, fs]) => `
       <div style="margin-top:12px"><div class="mono tenue" style="font-size:.8rem;margin-bottom:6px">
         ${senal} <span style="color:var(--acento-2)">${fs.length}</span></div>
-      <div class="pildoras">${fs.map((f) => `<span class="pildora">${f}</span>`).join('')}</div></div>`).join('')}`;
+      <div class="pildoras">${fs.map((f) => `<span class="pildora">${f}</span>`).join('')}</div></div>`).join('')}
+    <h4 style="font-size:.88rem;margin:20px 0 4px">Y cómo se reparten esos números</h4>
+    <p class="tenue" style="font-size:.8rem;margin-bottom:6px">Cada caja abarca la mitad central de
+    los tramos, y la línea de adentro es la mediana. <strong>El eje está en desvíos estándar</strong>,
+    porque en sus unidades originales no se podrían poner juntas: una está en volts, otra en
+    miliamperios y otra es una energía de seis cifras. Así el eje quiere decir una sola cosa para las
+    ${d.total} y lo que se compara es la forma: las de cola larga son las que van a servir para
+    encontrar tramos raros.</p>
+    <div id="caja-feats"></div>`;
+  cajasDeFeatures($('#caja-feats'), d.cajas);
+}
+
+/** Caja y bigotes de las 72 características, coloreadas por señal. */
+function cajasDeFeatures(destino, cajas) {
+  const senal = (n) => (n.includes('__') ? n.split('__')[0] : 'otras');
+  const senales = [...new Set(cajas.map((c) => senal(c.nombre)))];
+  const corto = (n) => n.replace('__', ' · ');
+  const alto = cajas.length * 15 + 70;
+  Grafico.medida(destino, {
+    titulo: 'Distribución de cada característica',
+    alto,
+    opcion: (c) => ({
+      animation: false,
+      textStyle: c.textStyle,
+      grid: { left: 200, right: 26, top: 26, bottom: 34 },
+      tooltip: Object.assign({}, c.tooltip, {
+        trigger: 'item',
+        formatter: (p) => {
+          const k = cajas[p.dataIndex];
+          return `<b>${corto(k.nombre)}</b><br>` +
+            `<span style="color:${c.tenue}">mediana ${k.caja[2]} · cuartiles ${k.caja[1]} a ${k.caja[3]}` +
+            `<br>${k.atipicos} tramos fuera de los bigotes</span>`;
+        },
+      }),
+      xAxis: Object.assign({}, c.eje, { type: 'value', name: 'desvíos estándar',
+        nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: c.tenue } }),
+      yAxis: Object.assign({}, c.eje, { type: 'category', data: cajas.map((k) => corto(k.nombre)),
+        inverse: true, axisTick: { show: false }, splitLine: { show: false },
+        axisLabel: { color: c.tenue, fontSize: 9, interval: 0 } }),
+      // Una sola serie con el color puesto caja por caja. Con una serie por señal habría que
+      // dejar en `null` las cajas ajenas, y ECharts no acepta nulos en un boxplot: revienta al
+      // construir la opción y la etapa entera queda sin vista.
+      series: [{
+        type: 'boxplot', boxWidth: [4, 11],
+        data: cajas.map((k) => ({
+          value: k.caja,
+          itemStyle: { color: Grafico.paleta.varCss('--fondo-2'), borderWidth: 1.4,
+                       borderColor: Grafico.paleta.serie(senales.indexOf(senal(k.nombre))) },
+        })),
+      }],
+    }),
+    pie: `${cajas.length} características, una por fila y coloreadas por señal (` +
+         senales.map((sn, i) => `${sn}`).join(' · ') +
+         '). Los bigotes llegan hasta 1,5 veces el rango intercuartílico; lo que queda afuera son ' +
+         'los tramos extremos, que es justamente lo que se busca.',
+  });
 }
 
 function verFiltrado(d) {
-  $('#fase-visual').innerHTML = `<div class="rejilla c2">
-      <div><h4 style="font-size:.9rem;color:var(--ok)">Se quedan (${d.conservadas.length})</h4>
-        <div class="pildoras">${d.conservadas.map((f) =>
-          `<span class="pildora">${f.replace('__', ' · ')}</span>`).join('')}</div></div>
-      <div><h4 style="font-size:.9rem;color:var(--texto-2)">Se descartan (${d.descartadas.length})</h4>
-        <div class="pildoras">${d.descartadas.map((f) =>
-          `<span class="pildora baja">${f.replace('__', ' · ')}</span>`).join('')}</div></div></div>
-    <p class="tenue" style="font-size:.78rem;margin-top:12px">Se van las que dan casi siempre el mismo
-    valor (no distinguen un tramo de otro) y las que se mueven junto con otra (repiten información).</p>`;
+  const cuenta = (m) => d.motivo.filter((x) => x === m).length;
+  $('#fase-visual').innerHTML = `<div class="resumen-grid" style="margin-top:0">
+      <div class="celda"><div class="v">${cuenta('poca variación')}</div><div class="r">se van por poca variación</div></div>
+      <div class="celda"><div class="v">${cuenta('repite a otra')}</div><div class="r">se van por repetir a otra</div></div>
+    </div>
+    <h4 style="font-size:.88rem;margin:20px 0 4px">Por qué se cae cada una</h4>
+    <p class="tenue" style="font-size:.8rem;margin-bottom:6px">El filtro mira el <strong>rango
+    intercuartílico</strong>: cuánto se mueve la característica entre el tramo típico bajo y el típico
+    alto. Las que casi no se mueven no distinguen nada. La línea punteada es el corte real — el
+    percentil ${d.percentil} de todas — y a su izquierda quedan las descartadas por eso. Ojo con el
+    orden: los dos filtros van en cadena, así que lo que se cae por acá ni siquiera llega a
+    compararse con las demás.</p>
+    <div id="caja-iqr"></div>
+    <h4 style="font-size:.88rem;margin:22px 0 4px">Y cuáles repiten a otra</h4>
+    <p class="tenue" style="font-size:.8rem;margin-bottom:6px">Cada celda es cuánto se mueven juntas
+    dos características. Donde hay un bloque intenso fuera de la diagonal, esas dicen lo mismo: de
+    cada grupo con correlación ${d.umbral_correlacion} o más sobrevive una sola. Los rótulos en
+    negrita son las conservadas.</p>
+    <div id="caja-corr"></div>`;
+  iqrDeFeatures($('#caja-iqr'), d);
+  correlacionDeFeatures($('#caja-corr'), d);
+}
+
+const COLOR_MOTIVO = { 'conservada': 0, 'poca variación': 4, 'repite a otra': 2 };
+
+/** Rango intercuartílico por característica, ordenado, con el corte real marcado. */
+function iqrDeFeatures(destino, d) {
+  const corto = (n) => n.replace('__', ' · ');
+  // Ordenadas por IQR: así las descartadas quedan juntas y el corte se ve como una frontera.
+  const orden = d.features.map((n, i) => i).sort((a, b) => d.iqr[a] - d.iqr[b]);
+  const nombres = orden.map((i) => corto(d.features[i]));
+  const alto = orden.length * 15 + 80;
+  Grafico.medida(destino, {
+    titulo: 'Cuánto se mueve cada característica',
+    alto,
+    opcion: (c) => ({
+      animation: false,
+      textStyle: c.textStyle,
+      grid: { left: 200, right: 30, top: 12, bottom: 46 },
+      tooltip: Object.assign({}, c.tooltip, { trigger: 'item',
+        formatter: (p) => {
+          const i = orden[p.dataIndex];
+          return `<b>${Grafico.paleta.fmt(d.iqr[i], 5)}</b> de rango intercuartílico<br>` +
+                 `<span style="color:${c.tenue}">${corto(d.features[i])} · ${d.motivo[i]}</span>`;
+        } }),
+      // Escala logarítmica: los rangos van de milésimas a millones y en lineal se aplastan todos
+      // contra el cero, que es donde justamente hay que mirar.
+      xAxis: Object.assign({}, c.eje, { type: 'log', name: 'rango intercuartílico (escala log)',
+        nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: c.tenue } }),
+      yAxis: Object.assign({}, c.eje, { type: 'category', data: nombres, inverse: true,
+        axisTick: { show: false },
+        // Guías tenues en vez de barras: en un eje logarítmico una barra codifica un largo desde
+        // cero, y el cero no existe ahí, así que el largo no querría decir nada. El punto codifica
+        // posición, que es lo único legítimo en esta escala.
+        splitLine: { show: true, lineStyle: { color: c.borde, opacity: .35 } },
+        axisLabel: { color: c.tenue, fontSize: 9, interval: 0 } }),
+      series: [{
+        type: 'scatter', symbolSize: 9,
+        data: orden.map((i) => ({
+          value: Math.max(d.iqr[i], 1e-9),
+          itemStyle: { color: Grafico.paleta.serie(COLOR_MOTIVO[d.motivo[i]] ?? 0) },
+        })),
+        markLine: d.corte_percentil ? {
+          silent: true, symbol: 'none',
+          label: { formatter: `corte · percentil ${d.percentil}`, color: c.tenue, fontSize: 10 },
+          lineStyle: { color: c.tenue, type: 'dashed' },
+          data: [{ xAxis: d.corte_percentil }],
+        } : undefined,
+      }],
+    }),
+    pie: 'Azul: conservada · violeta: descartada por poca variación · ámbar: descartada por repetir a otra.',
+  });
+}
+
+/** Mapa de correlación de las 72, con las conservadas destacadas en el rótulo. */
+function correlacionDeFeatures(destino, d) {
+  const f = d.features;
+  const corto = (n) => n.replace('__', ' · ');
+  const celdas = [];
+  d.correlacion.forEach((fila, i) => fila.forEach((v, j) => celdas.push([j, i, v])));
+  Grafico.medida(destino, {
+    alto: Math.max(420, Math.min(780, f.length * 9 + 150)),
+    opcion: (c) => ({
+      animation: false,
+      textStyle: c.textStyle,
+      grid: { left: 200, right: 18, top: 34, bottom: 12 },
+      tooltip: Object.assign({}, c.tooltip, {
+        formatter: (p) => `<b>${Grafico.paleta.fmt(p.data[2], 2)}</b> de correlación<br>` +
+          `<span style="color:${c.tenue}">${corto(f[p.data[1]])}<br>${corto(f[p.data[0]])}</span>`,
+      }),
+      // Divergente: dos tonos con un neutro en el cero, porque la correlación tiene signo.
+      visualMap: { min: -1, max: 1, calculable: true, orient: 'horizontal', left: 'center', top: 0,
+        itemWidth: 12, precision: 2, textStyle: { color: c.tenue, fontSize: 10 },
+        inRange: { color: [Grafico.paleta.serie(0), Grafico.paleta.varCss('--fondo-2'),
+                           Grafico.paleta.serie(3)] } },
+      xAxis: { type: 'category', data: f, axisTick: { show: false },
+               axisLine: { lineStyle: { color: c.borde } }, axisLabel: { show: false } },
+      yAxis: { type: 'category', data: f, inverse: true, axisTick: { show: false },
+        axisLine: { lineStyle: { color: c.borde } },
+        axisLabel: { fontSize: 9, interval: 0,
+          formatter: (v, i) => (d.motivo[i] === 'conservada' ? `{ok|${corto(v)}}` : `{no|${corto(v)}}`),
+          rich: { ok: { color: c.tinta, fontWeight: 600, fontSize: 9 },
+                  no: { color: c.tenue, opacity: .55, fontSize: 9 } } } },
+      series: [{ type: 'heatmap', data: celdas, progressive: 2000 }],
+    }),
+  });
 }
 
 function verScores(d) {
@@ -567,6 +719,7 @@ function verEventos(d) {
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem">clic en una fila para ver sus señales</span></div>
+    <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
       `<th>${rot[c] || c}</th>`).join('')}</tr></thead>
     <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer">${cols.map((c) => {
@@ -576,8 +729,81 @@ function verEventos(d) {
       return typeof v === 'number' ? `<td class="num">${v}</td>` : `<td>${v}</td>`;
     }).join('')}</tr>`).join('')}</tbody></table></div>
     <div id="detalle-evento" style="margin-top:16px"></div>`;
+  lineaDeEventos($('#caja-linea'), d, filas);
   document.querySelectorAll('#fase-visual tr[data-ev]').forEach((tr) =>
     tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev))));
+}
+
+/** Dónde cae cada evento a lo largo del registro de su hoja.
+ *
+ *  La tabla dice cuántos eventos hay y con qué fuerza, pero no dónde. Y «dónde» es lo primero que
+ *  se quiere mirar: si se amontonan en una hoja, si caen al principio de la sesión, si hay hojas
+ *  enteras sin nada. Cada hoja es una pista gris con el largo de su registro, y encima los eventos.
+ */
+function lineaDeEventos(destino, d, filas) {
+  const pistas = d.pistas || [];
+  if (!pistas.length || !filas.length) return;
+
+  const conEventos = new Set(filas.map((f) => f.SheetName));
+  const usadas = pistas.filter((p) => conEventos.has(p.hoja));
+  const vacias = pistas.length - usadas.length;
+  const fila = new Map(usadas.map((p, i) => [p.hoja, i]));
+  const maxDet = Math.max(...filas.map((f) => f.n_detectores), 1);
+  const alto = usadas.length * 26 + 76;
+
+  Grafico.medida(destino, {
+    titulo: 'Dónde cae cada evento',
+    alto,
+    opcion: (c) => {
+      const pista = (params, api) => {
+        const y = api.coord([0, api.value(0)])[1];
+        const x0 = api.coord([api.value(1), api.value(0)])[0];
+        const x1 = api.coord([api.value(2), api.value(0)])[0];
+        return { type: 'rect', shape: { x: x0, y: y - 3, width: Math.max(1, x1 - x0), height: 6 },
+                 style: { fill: c.borde } };
+      };
+      const evento = (params, api) => {
+        const y = api.coord([0, api.value(0)])[1];
+        const x0 = api.coord([api.value(1), api.value(0)])[0];
+        const x1 = api.coord([api.value(2), api.value(0)])[0];
+        const n = api.value(3);
+        return { type: 'rect',
+                 shape: { x: x0, y: y - 9, width: Math.max(3, x1 - x0), height: 18, r: 3 },
+                 style: { fill: Grafico.paleta.serie(n >= 4 ? 1 : 0),
+                          opacity: .35 + .65 * (n / maxDet) } };
+      };
+      return {
+        animation: false,
+        textStyle: c.textStyle,
+        grid: { left: 130, right: 26, top: 12, bottom: 46 },
+        tooltip: Object.assign({}, c.tooltip, {
+          formatter: (p) => (p.seriesIndex === 0 ? null
+            : `<b>Evento ${p.value[4]}</b> · ${p.value[3]} de 5 métodos<br>` +
+              `<span style="color:${c.tenue}">${usadas[p.value[0]].hoja} · mediciones ` +
+              `${p.value[1]}–${p.value[2]}</span>`),
+        }),
+        xAxis: Object.assign({}, c.eje, { type: 'value', min: 0,
+          name: 'medición dentro de la hoja', nameLocation: 'middle', nameGap: 26,
+          nameTextStyle: { color: c.tenue } }),
+        yAxis: Object.assign({}, c.eje, { type: 'category',
+          data: usadas.map((p) => p.hoja), inverse: true,
+          axisTick: { show: false }, splitLine: { show: false },
+          axisLabel: { color: c.tenue, fontSize: 10 } }),
+        series: [
+          { type: 'custom', renderItem: pista, silent: true,
+            encode: { x: [1, 2], y: 0 },
+            data: usadas.map((p, i) => [i, p.desde, p.hasta]) },
+          { type: 'custom', renderItem: evento,
+            encode: { x: [1, 2], y: 0 },
+            data: filas.filter((f) => fila.has(f.SheetName))
+                       .map((f) => [fila.get(f.SheetName), f.start, f.end, f.n_detectores, f.event_id]) },
+        ],
+      };
+    },
+    pie: `${filas.length} eventos repartidos en ${usadas.length} hojas` +
+         (vacias ? `; las otras ${vacias} hojas no tienen ninguno.` : '.') +
+         ' Cuanto más intenso el bloque, más métodos coinciden.',
+  });
 }
 
 async function verEvento(id) {

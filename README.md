@@ -221,9 +221,16 @@ configuración.
 
 **La vista de fase** es el centro de la pantalla. Al hacer clic en un círculo se abre el paso completo:
 qué entró y qué salió (`24.138 mediciones → 6.102 tramos`), con qué parámetros, los números clave y la
-visualización de sus datos — la telemetría de una hoja, los tramos dibujados, qué características
-sobrevivieron al filtro, la distribución de puntajes de cada método, la tabla de eventos (y al hacer
-clic en un evento, sus tres señales).
+visualización de sus datos. Cada etapa muestra lo suyo:
+
+| Paso | Qué se ve |
+|---|---|
+| Datos | la telemetría de una hoja, señal por señal, y cuántas mediciones tiene cada hoja |
+| Ventaneo | cuatro tramos de ejemplo dibujados, y cuántos tramos salieron de cada hoja |
+| Características | el catálogo de las 72, y cómo se reparte cada una en desvíos estándar |
+| Filtrado | cuánto se mueve cada característica con el corte real marcado, y el mapa de correlación que explica cuáles repiten a otra |
+| Detección | la distribución de puntajes de cada método, en su propio panel |
+| Eventos | dónde cae cada evento a lo largo del registro de su hoja, y la tabla del entregable (al hacer clic en una fila, sus tres señales) |
 
 **Las dos formas de avanzar** están dichas con todas las letras, sin nada implícito:
 

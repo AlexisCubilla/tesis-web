@@ -192,16 +192,60 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
         for c in cols:
             señal = c.split("__")[0] if "__" in c else "otras"
             por_senal.setdefault(señal, []).append(c.split("__")[-1])
-        return {"tipo": "features", "total": len(cols), "por_senal": por_senal}
+        return {
+            "tipo": "features",
+            "total": len(cols),
+            "por_senal": por_senal,
+            # La forma de cada distribución, en desvíos estándar. Estandarizar no es maquillaje:
+            # es lo que hace que el eje tenga UN significado para las 72 —«a cuántos desvíos de su
+            # media»— en vez de mezclar volts, miliamperios y grados en la misma regla.
+            "cajas": _cajas_estandarizadas(tabla[sorted(cols)]),
+        }
 
-    # ---- Filtrado: cuáles sobrevivieron y cuáles no ------------------------------------
+    # ---- Filtrado: cuáles sobrevivieron, cuáles no y por qué ---------------------------
     if etapa == "filtrado":
-        antes = {c for c in salida["features"].columns if c != grupo}
+        previas = salida["features"]
+        cols = sorted(c for c in previas.columns if c != grupo)
         despues = {c for c in salida["filtradas"].columns if c != grupo}
+
+        from tesis import filtering
+        from tesis.config import CONFIG
+
+        cfg = dataclasses.replace(
+            CONFIG.filtering,
+            correlation_threshold=float(nodo["parametros"].get("umbral_correlacion",
+                                                               CONFIG.filtering.correlation_threshold)),
+            lowvar_percentile=float(nodo["parametros"].get("percentil_baja_var",
+                                                           CONFIG.filtering.lowvar_percentile)),
+        )
+        # El motivo del descarte se saca corriendo el primer filtro por separado, con las mismas
+        # funciones del paquete de la tesis. Importa distinguirlos: los dos filtros van en cadena,
+        # así que lo que se cae por IQR ni siquiera llega a evaluarse por correlación.
+        tras_iqr = {c for c in filtering.filter_low_variance(previas, cfg).columns if c != grupo}
+        motivo = {c: ("conservada" if c in despues
+                      else "poca variación" if c not in tras_iqr
+                      else "repite a otra") for c in cols}
+
+        X = previas[cols]
+        iqr = (X.quantile(0.75) - X.quantile(0.25)).astype(float)
+        corte_pct = (float(np.nanpercentile(iqr.to_numpy(), cfg.lowvar_percentile))
+                     if cfg.lowvar_percentile and cfg.lowvar_percentile > 0 else None)
+        corr = X.corr(method=cfg.correlation_method).fillna(0.0)
+
         return {
             "tipo": "filtrado",
             "conservadas": sorted(despues),
-            "descartadas": sorted(antes - despues),
+            "descartadas": sorted(set(cols) - despues),
+            "features": cols,
+            "motivo": [motivo[c] for c in cols],
+            # El filtro mira el rango intercuartílico, no la varianza. Se manda el mismo número que
+            # mira, para que el corte dibujado sea el corte real.
+            "iqr": [round(float(iqr[c]), 6) for c in cols],
+            "corte_iqr_min": float(cfg.iqr_min),
+            "corte_percentil": corte_pct,
+            "percentil": float(cfg.lowvar_percentile),
+            "umbral_correlacion": float(cfg.correlation_threshold),
+            "correlacion": [[round(float(v), 4) for v in fila] for fila in corr.to_numpy()],
         }
 
     # ---- Detección: distribución de puntajes y las ventanas más extremas ---------------
@@ -226,10 +270,21 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
     # ---- Eventos: el entregable --------------------------------------------------------
     if etapa == "eventos":
         tabla = salida["eventos"]
+        meta = salida.get("meta")
+        # Para la línea de tiempo hace falta el largo del registro de cada hoja, que no está en la
+        # tabla de eventos: sale de dónde empieza la última ventana más el tamaño de la ventana.
+        pistas = []
+        if meta is not None and grupo in meta:
+            largo_ventana = int(salida.get("tamano_ventana") or 0)
+            for hoja, sub in meta.groupby(grupo):
+                pistas.append({"hoja": str(hoja), "desde": int(sub["start"].min()),
+                               "hasta": int(sub["start"].max()) + largo_ventana})
+            pistas.sort(key=lambda p: p["hasta"] - p["desde"], reverse=True)
         return {
             "tipo": "eventos",
             "columnas": list(tabla.columns),
             "filas": json.loads(tabla.head(limite).to_json(orient="records")),
+            "pistas": pistas,
         }
 
     return {"tipo": "desconocido"}
@@ -239,6 +294,38 @@ def pd_isna(v) -> bool:
     import pandas as pd
 
     return bool(pd.isna(v))
+
+
+def _cajas_estandarizadas(X) -> list[dict]:
+    """Caja y bigotes de cada columna, en desvíos estándar respecto de su propia media.
+
+    Sin estandarizar no se pueden poner juntas: una característica está en volts, otra en
+    miliamperios y otra es una energía espectral de seis cifras, así que el eje no querría decir
+    nada. Estandarizadas, el eje significa una sola cosa para todas —a cuántos desvíos de su media
+    cae el valor— y lo que se compara es la forma: cuál tiene cola larga y cuál no.
+    """
+    import numpy as np
+
+    salida = []
+    for col in X.columns:
+        v = X[col].to_numpy(dtype=float)
+        v = v[np.isfinite(v)]
+        if v.size == 0:
+            continue
+        sd = float(v.std()) or 1.0
+        z = (v - float(v.mean())) / sd
+        q1, med, q3 = (float(np.quantile(z, q)) for q in (0.25, 0.5, 0.75))
+        rango = q3 - q1
+        bajo, alto = q1 - 1.5 * rango, q3 + 1.5 * rango
+        dentro = z[(z >= bajo) & (z <= alto)]
+        salida.append({
+            "nombre": col,
+            "caja": [round(float(dentro.min()) if dentro.size else float(z.min()), 3),
+                     round(q1, 3), round(med, 3), round(q3, 3),
+                     round(float(dentro.max()) if dentro.size else float(z.max()), 3)],
+            "atipicos": int(((z < bajo) | (z > alto)).sum()),
+        })
+    return salida
 
 
 @app.get("/api/nodo/{clave}/analisis")
