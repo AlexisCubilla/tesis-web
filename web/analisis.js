@@ -211,9 +211,10 @@ function puntajes(d) {
   Grafico.medida($('#g-puntajes'), {
     titulo: 'Distribución de puntajes, un panel por método',
     alto,
-    opcion: (c) => {
+    opcion: (c, altoReal) => {
+      const A = altoReal || alto;
       const grid = [], xAxis = [], yAxis = [], series = [];
-      const paso = (alto - 40) / dets.length;
+      const paso = (A - 40) / dets.length;
       dets.forEach((nombre, i) => {
         const p = d.puntajes[nombre];
         const centros = p.cuentas.map((_, k) => (p.bordes[k] + p.bordes[k + 1]) / 2);

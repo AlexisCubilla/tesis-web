@@ -334,6 +334,20 @@ td.num { text-align: right; font-family: var(--mono); }
 .grafico-caja > div > div[style*="position: absolute"] textarea,
 .grafico-caja table { background: var(--panel) !important; color: var(--texto) !important; }
 
+/* Botón propio del marco del gráfico (los de ECharts van dibujados dentro del lienzo). */
+.grafico-btn { font: inherit; font-size: .76rem; padding: 4px 10px; border-radius: 7px;
+  border: 1px solid var(--borde); background: var(--panel-2); color: var(--texto-2);
+  cursor: pointer; white-space: nowrap; }
+.grafico-btn:hover { color: var(--texto); border-color: var(--acento); }
+
+.grafico-modal { border: none; border-radius: 12px; padding: 14px 16px; width: min(1400px, 95vw);
+  background: var(--panel); color: var(--texto); box-shadow: var(--sombra); }
+.grafico-modal::backdrop { background: rgba(0, 0, 0, .55); }
+
+/* La tabla que arma la vista «Datos». */
+.grafico-tabla { max-height: 60vh; }
+.grafico-tabla table { width: 100%; }
+
 /* --- Pantallas chicas ------------------------------------------------------ */
 @media (max-width: 860px) {
   .envoltorio { padding: 0 14px; }

@@ -74,6 +74,20 @@ window.Grafico = (function () {
           t.textContent = cfg.titulo;          // textContent: los nombres vienen del backend
           b.appendChild(t);
         }
+        const esp = document.createElement('span');
+        esp.className = 'esp';
+        b.appendChild(esp);
+        // Los iconos de ECharts van dentro del lienzo y son chicos; agrandar es una acción
+        // frecuente y merece un botón con su nombre escrito.
+        if (cfg.acciones !== false && !cfg.enModal) {
+          const x = document.createElement('button');
+          x.type = 'button';
+          x.className = 'grafico-btn';
+          x.textContent = '⤢ Agrandar';
+          x.title = 'Abrir el gráfico en grande';
+          x.addEventListener('click', () => this._agrandar());
+          b.appendChild(x);
+        }
         this.barra = b;
         this.raiz.appendChild(b);
       }
@@ -100,7 +114,41 @@ window.Grafico = (function () {
     pintar() {
       // `notMerge`: al cambiar de tema hay que reemplazar la opción entera, no fusionarla, o
       // quedan mezclados los colores viejos con los nuevos.
-      this.eco.setOption(this.cfg.opcion(comun()), true);
+      this.eco.setOption(this.cfg.opcion(comun(), this.cfg.alto || 300), true);
+    }
+
+    /** Abre una copia del mismo gráfico a pantalla casi completa. */
+    _agrandar() {
+      const dlg = document.createElement('dialog');
+      dlg.className = 'grafico-modal';
+
+      const cab = document.createElement('div');
+      cab.className = 'grafico-acciones';
+      const t = document.createElement('h5');
+      t.className = 'grafico-titulo';
+      t.textContent = this.cfg.titulo || 'Gráfico';
+      const esp = document.createElement('span');
+      esp.className = 'esp';
+      const cerrar = document.createElement('button');
+      cerrar.type = 'button';
+      cerrar.className = 'grafico-btn';
+      cerrar.textContent = '✕ Cerrar';
+      cerrar.addEventListener('click', () => dlg.close());
+      cab.append(t, esp, cerrar);
+
+      const hueco = document.createElement('div');
+      dlg.append(cab, hueco);
+      document.body.appendChild(dlg);
+
+      const grande = new Grafo(hueco, Object.assign({}, this.cfg, {
+        titulo: null, enModal: true,
+        alto: Math.max(this.cfg.alto || 300, window.innerHeight - 190),
+      }));
+      dlg.addEventListener('close', () => { grande.destruir(); dlg.remove(); });
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+      dlg.showModal();
+      // El <dialog> recién tiene tamaño después de abrirse.
+      requestAnimationFrame(() => grande.eco.resize());
     }
 
     destruir() {
@@ -113,7 +161,7 @@ window.Grafico = (function () {
   /* ------------------------------------------------------------------ herramientas
      `dataZoom` de caja (arrastrar un rectángulo), volver al rango completo, ver los datos en una
      tabla y guardar la imagen. Lo que antes estaba escrito a mano, con mejor terminación. */
-  function herramientas(c) {
+  function herramientas(c, tabla) {
     return {
       right: 6, top: 0, itemSize: 13, itemGap: 9,
       iconStyle: { borderColor: c.tenue },
@@ -123,10 +171,53 @@ window.Grafico = (function () {
         restore: { title: 'Ver todo' },
         dataView: { title: 'Ver los datos', lang: ['Datos', 'Cerrar', 'Actualizar'], readOnly: true,
                     backgroundColor: varCss('--panel'), textColor: c.tinta,
-                    buttonColor: varCss('--acento') },
+                    buttonColor: varCss('--acento'),
+                    // Sin `optionToContent`, ECharts vuelca una serie abajo de la otra y el índice
+                    // de medición se repite una vez por señal: 246 líneas para 79 mediciones. Lo
+                    // que hace falta es una fila por medición y una columna por señal.
+                    optionToContent: tabla },
         saveAsImage: { title: 'Guardar imagen', name: 'grafico', pixelRatio: 2,
                        backgroundColor: varCss('--panel') },
       },
+    };
+  }
+
+
+  /* ------------------------------------------------------------------ tabla de datos
+     Una fila por punto del eje X y una columna por panel. Es lo que hay que construir a mano:
+     ECharts, librado a su criterio, escribe una serie abajo de la otra, así que el índice de
+     medición aparece repetido una vez por señal y la tabla deja de poder leerse de corrido. */
+  const escapar = (t) => String(t).replace(/[&<>"]/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+  function tablaDePaneles(paneles, n, fx, xNombre) {
+    const TOPE = 2000;
+    return (opt) => {
+      // Se respeta el acercamiento: `dataZoom` guarda el rango visible en porcentaje.
+      let i0 = 0, i1 = n - 1;
+      const dz = (opt.dataZoom || []).find((z) => z.start != null);
+      if (dz && n > 1) {
+        i0 = Math.max(0, Math.round((dz.start / 100) * (n - 1)));
+        i1 = Math.min(n - 1, Math.round((dz.end / 100) * (n - 1)));
+      }
+      const paso = Math.max(1, Math.ceil((i1 - i0 + 1) / TOPE));
+
+      const enc = [xNombre, ...paneles.map((p) => {
+        const { nombre, unidad } = partirNombre(p.nombre);
+        return unidad ? `${nombre} (${unidad})` : nombre;
+      })];
+      const filas = [];
+      for (let i = i0; i <= i1; i += paso) {
+        filas.push('<tr><td>' + escapar(fx(i)) + '</td>' +
+          paneles.map((p) => '<td class="num">' + escapar(fmt(p.valores[i], 4)) + '</td>').join('') +
+          '</tr>');
+      }
+      const aviso = paso > 1
+        ? `<p class="grafico-pie">Se lista 1 de cada ${paso} filas (${filas.length} de ${i1 - i0 + 1}). Acercá el gráfico para verlas todas.</p>`
+        : '';
+      return '<div class="grafico-tabla tabla-scroll"><table><thead><tr>'
+        + enc.map((h) => '<th>' + escapar(h) + '</th>').join('')
+        + '</tr></thead><tbody>' + filas.join('') + '</tbody></table></div>' + aviso;
     };
   }
 
@@ -139,10 +230,11 @@ window.Grafico = (function () {
     const altoPanel = cfg.altoPanel || (compacto ? 70 : 110);
     const alto = paneles.length * altoPanel + (compacto ? 34 : 78);
 
-    const opcion = (c) => {
+    const opcion = (c, altoReal) => {
+      const A = altoReal || alto;
       const arriba = compacto ? 16 : 30;
       const abajo = compacto ? 20 : 62;   // sitio para la barra de rango
-      const util = alto - arriba - abajo;
+      const util = A - arriba - abajo;
       const paso = util / paneles.length;
 
       const grid = [], xAxis = [], yAxis = [], series = [];
@@ -189,7 +281,7 @@ window.Grafico = (function () {
         }),
       };
       if (!compacto) {
-        o.toolbox = herramientas(c);
+        o.toolbox = herramientas(c, tablaDePaneles(paneles, n, fx, cfg.xNombre || 'x'));
         o.dataZoom = [
           // Sin zoom con la rueda salvo que se tenga Ctrl apretado: si no, el gráfico se queda
           // con el desplazamiento de la página, que es lo que la persona estaba haciendo.
