@@ -9,20 +9,259 @@
 <script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
 <link rel="stylesheet" href="/estatico/estilos.css">
 <style>
+  /* ===========================================================================
+     El cielo del héroe.
+
+     El fondo de universo vive SOLO acá, en la primera pantalla del inicio. No se
+     extiende al resto de la página ni al taller: ahí hay tablas, formularios y
+     cinco curvas por gráfico, y un fondo con textura compite con el dato justo
+     donde hay que leerlo — además de imprimir mal en las capturas que van al
+     documento, que es la razón por la que el tema claro es el de por defecto.
+
+     Dentro del cielo manda la paleta oscura, sea cual sea el tema de la página.
+     No es una excepción a la regla de que los colores viven en un solo lugar: se
+     REDEFINEN las mismas variables, acotadas a este bloque. Así el h1, la bajada
+     y los botones siguen escritos con `var(--texto)` y compañía, sin enterarse de
+     que están sobre el espacio.
+     =========================================================================== */
+  .cielo {
+    position: relative; overflow: hidden;
+    /* Redefinir `--texto` no alcanza para los títulos: `body` resuelve
+       `color: var(--texto)` una sola vez y los hijos heredan el color YA
+       calculado, no la variable. Por eso el color se vuelve a fijar acá. */
+    color: var(--texto);
+
+    --texto: #eaf1fb;
+    --texto-2: #a9bdd9;
+    --acento: #6cb8ff;
+    --acento-hondo: #2f7ddb;
+    --acento-2: #7ef0c0;
+    --sobre-acento: #04101f;
+    --borde: rgba(152, 186, 235, .22);
+    --panel-2: rgba(126, 165, 225, .16);
+    --boton-hover: rgba(126, 165, 225, .3);
+    --sombra: 0 10px 34px rgba(0, 0, 0, .45);
+    /* El disco de cielo que lleva la órbita ya no hace falta: está sobre el espacio. */
+    --orbita-cielo: transparent;
+    --orbita-anillo: #46618c;
+  }
+
+  .cielo .capa { position: absolute; inset: 0; pointer-events: none; }
+
+  /* Todas las capas del espacio van juntas dentro de `.espacio` para poder
+     desvanecerlas de una sola vez con una máscara, dejando el texto intacto.
+
+     La máscara es mejor que superponer un degradado hacia el color de la página:
+     ese degradado, sobre un fondo oscuro, deja una banda gris que se ve como
+     niebla sucia. Desvaneciendo el espacio en cambio aparece el fondo real de la
+     página, sea el tema que sea, y el corte no existe. En el tema oscuro directamente
+     no se ve la costura. Los últimos 150 px son la zona de disolución, y el héroe
+     reserva abajo un espacio parecido para no meter texto ahí adentro. */
+  .espacio {
+    background: radial-gradient(120% 92% at 72% 10%,
+                #172d52 0%, #0c1a35 40%, #060d1d 76%, #04080f 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent 100%);
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent 100%);
+  }
+
+  /* Nubes de gas: manchas grandes y difusas. Son lo que evita que el fondo se vea
+     como un negro plano con puntos encima. */
+  .nebulosa {
+    background:
+      radial-gradient(42% 52% at 80% 16%, rgba(72, 132, 255, .22), transparent 70%),
+      radial-gradient(34% 44% at 20% 76%, rgba(126, 240, 192, .10), transparent 70%),
+      radial-gradient(30% 38% at 52% 44%, rgba(150, 104, 255, .14), transparent 70%);
+    filter: blur(10px);
+  }
+
+  /* La banda de la vía láctea, cruzada en diagonal. */
+  .via-lactea {
+    background: linear-gradient(101deg, transparent 34%, rgba(130, 165, 235, .07) 42%,
+                rgba(190, 210, 255, .14) 49%, rgba(150, 180, 245, .09) 56%, transparent 65%);
+    filter: blur(16px);
+  }
+
+  /* Estrellas en dos capas. La densa va quieta; solo titila el puñado de medianas,
+     y con poco recorrido: animar el campo entero hace que al volver a esta página
+     se reinicie la animación y el fondo cambie de brillo de golpe, que fue el
+     motivo por el que las estrellas del resto del sitio quedaron estáticas. */
+  .polvo {
+    background-image:
+    radial-gradient(0.84px 0.84px at 3.1% 3.7%, rgba(255,255,255,0.58), transparent),
+    radial-gradient(1.05px 1.05px at 13.9% 7.6%, rgba(255,255,255,0.37), transparent),
+    radial-gradient(0.85px 0.85px at 18.9% 8.8%, rgba(255,255,255,0.37), transparent),
+    radial-gradient(0.91px 0.91px at 31.2% 15.9%, rgba(255,255,255,0.39), transparent),
+    radial-gradient(1.0px 1.0px at 42.0% 18.1%, rgba(255,255,255,0.55), transparent),
+    radial-gradient(0.94px 0.94px at 53.9% 1.8%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1.21px 1.21px at 56.2% 3.1%, rgba(255,255,255,0.46), transparent),
+    radial-gradient(0.99px 0.99px at 65.6% 11.5%, rgba(255,255,255,0.57), transparent),
+    radial-gradient(0.9px 0.9px at 77.7% 2.1%, rgba(255,255,255,0.37), transparent),
+    radial-gradient(1.09px 1.09px at 87.8% 8.7%, rgba(255,255,255,0.46), transparent),
+    radial-gradient(1.15px 1.15px at 95.1% 6.4%, rgba(255,255,255,0.63), transparent),
+    radial-gradient(1.24px 1.24px at 2.5% 31.3%, rgba(255,255,255,0.53), transparent),
+    radial-gradient(0.86px 0.86px at 15.5% 26.2%, rgba(255,255,255,0.69), transparent),
+    radial-gradient(1.04px 1.04px at 22.1% 34.6%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1.09px 1.09px at 28.0% 33.0%, rgba(255,255,255,0.62), transparent),
+    radial-gradient(1.1px 1.1px at 44.0% 26.6%, rgba(255,255,255,0.59), transparent),
+    radial-gradient(1.27px 1.27px at 50.7% 29.2%, rgba(255,255,255,0.64), transparent),
+    radial-gradient(1.15px 1.15px at 58.9% 33.0%, rgba(255,255,255,0.37), transparent),
+    radial-gradient(0.94px 0.94px at 69.4% 38.9%, rgba(255,255,255,0.64), transparent),
+    radial-gradient(1.03px 1.03px at 76.3% 33.0%, rgba(255,255,255,0.36), transparent),
+    radial-gradient(1.18px 1.18px at 83.6% 23.1%, rgba(255,255,255,0.37), transparent),
+    radial-gradient(1.24px 1.24px at 92.4% 25.5%, rgba(255,255,255,0.49), transparent),
+    radial-gradient(1.24px 1.24px at 1.1% 49.1%, rgba(255,255,255,0.54), transparent),
+    radial-gradient(1.01px 1.01px at 16.2% 56.6%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(0.88px 0.88px at 21.6% 56.9%, rgba(255,255,255,0.69), transparent),
+    radial-gradient(1.04px 1.04px at 29.2% 45.2%, rgba(255,255,255,0.43), transparent),
+    radial-gradient(1.01px 1.01px at 41.6% 45.7%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(1.15px 1.15px at 48.9% 51.2%, rgba(255,255,255,0.68), transparent),
+    radial-gradient(0.83px 0.83px at 59.2% 52.1%, rgba(255,255,255,0.59), transparent),
+    radial-gradient(1.2px 1.2px at 71.5% 55.0%, rgba(255,255,255,0.66), transparent),
+    radial-gradient(1.12px 1.12px at 76.4% 48.2%, rgba(255,255,255,0.39), transparent),
+    radial-gradient(0.88px 0.88px at 82.8% 42.2%, rgba(255,255,255,0.42), transparent),
+    radial-gradient(0.88px 0.88px at 94.1% 41.9%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(1.24px 1.24px at 1.3% 67.5%, rgba(255,255,255,0.36), transparent),
+    radial-gradient(0.97px 0.97px at 14.6% 63.7%, rgba(255,255,255,0.44), transparent),
+    radial-gradient(1.3px 1.3px at 21.6% 63.2%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(0.85px 0.85px at 31.5% 69.7%, rgba(255,255,255,0.38), transparent),
+    radial-gradient(0.88px 0.88px at 39.6% 65.8%, rgba(255,255,255,0.64), transparent),
+    radial-gradient(0.87px 0.87px at 46.1% 78.1%, rgba(255,255,255,0.53), transparent),
+    radial-gradient(1.29px 1.29px at 59.4% 61.5%, rgba(255,255,255,0.53), transparent),
+    radial-gradient(0.98px 0.98px at 71.2% 73.5%, rgba(255,255,255,0.44), transparent),
+    radial-gradient(1.19px 1.19px at 74.5% 74.9%, rgba(255,255,255,0.54), transparent),
+    radial-gradient(1.29px 1.29px at 85.0% 65.0%, rgba(255,255,255,0.63), transparent),
+    radial-gradient(1.17px 1.17px at 98.3% 75.5%, rgba(255,255,255,0.64), transparent),
+    radial-gradient(0.81px 0.81px at 2.3% 90.3%, rgba(255,255,255,0.47), transparent),
+    radial-gradient(1.15px 1.15px at 9.8% 86.0%, rgba(255,255,255,0.44), transparent),
+    radial-gradient(1.29px 1.29px at 26.5% 89.1%, rgba(255,255,255,0.68), transparent),
+    radial-gradient(0.91px 0.91px at 35.5% 87.6%, rgba(255,255,255,0.43), transparent),
+    radial-gradient(1.25px 1.25px at 38.4% 84.7%, rgba(255,255,255,0.57), transparent),
+    radial-gradient(1.2px 1.2px at 52.8% 89.6%, rgba(255,255,255,0.58), transparent),
+    radial-gradient(1.19px 1.19px at 55.7% 92.9%, rgba(255,255,255,0.67), transparent),
+    radial-gradient(1.19px 1.19px at 70.2% 89.6%, rgba(255,255,255,0.41), transparent),
+    radial-gradient(2.68px 2.68px at 2.0% 7.6%, rgba(255,255,255,0.94), transparent),
+    radial-gradient(2.73px 2.73px at 39.2% 7.6%, rgba(255,255,255,0.92), transparent),
+    radial-gradient(2.3px 2.3px at 72.8% 35.8%, rgba(255,255,255,0.97), transparent),
+    radial-gradient(2.9px 2.9px at 17.7% 72.6%, rgba(255,255,255,0.94), transparent),
+    radial-gradient(2.48px 2.48px at 37.8% 53.4%, rgba(255,255,255,0.99), transparent),
+    radial-gradient(2.87px 2.87px at 74.3% 67.4%, rgba(255,255,255,0.94), transparent);
+  }
+  .titilan {
+    animation: titilar 7s ease-in-out infinite alternate;
+    background-image:
+    radial-gradient(1.66px 1.66px at 11.0% 25.2%, rgba(255,255,255,0.88), transparent),
+    radial-gradient(1.47px 1.47px at 23.4% 31.6%, rgba(255,255,255,0.82), transparent),
+    radial-gradient(1.53px 1.53px at 38.1% 9.5%, rgba(255,255,255,0.83), transparent),
+    radial-gradient(1.68px 1.68px at 52.4% 11.4%, rgba(255,255,255,0.83), transparent),
+    radial-gradient(1.67px 1.67px at 70.5% 3.8%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1.61px 1.61px at 90.0% 23.7%, rgba(255,255,255,0.95), transparent),
+    radial-gradient(1.6px 1.6px at 2.3% 56.8%, rgba(255,255,255,0.94), transparent),
+    radial-gradient(1.82px 1.82px at 27.4% 44.0%, rgba(255,255,255,0.98), transparent),
+    radial-gradient(1.67px 1.67px at 46.0% 63.6%, rgba(255,255,255,0.81), transparent),
+    radial-gradient(1.47px 1.47px at 61.8% 59.0%, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1.4px 1.4px at 76.9% 38.1%, rgba(255,255,255,0.93), transparent),
+    radial-gradient(1.64px 1.64px at 91.0% 49.4%, rgba(255,255,255,0.78), transparent),
+    radial-gradient(1.83px 1.83px at 8.3% 79.4%, rgba(255,255,255,0.97), transparent),
+    radial-gradient(1.59px 1.59px at 30.9% 75.7%, rgba(255,255,255,0.76), transparent),
+    radial-gradient(1.46px 1.46px at 35.9% 89.5%, rgba(255,255,255,0.82), transparent),
+    radial-gradient(1.63px 1.63px at 55.1% 80.4%, rgba(255,255,255,0.93), transparent),
+    radial-gradient(1.5px 1.5px at 72.0% 88.7%, rgba(255,255,255,0.76), transparent),
+    radial-gradient(1.43px 1.43px at 94.5% 90.9%, rgba(255,255,255,0.78), transparent);
+  }
+  @keyframes titilar { from { opacity: .68 } to { opacity: 1 } }
+
   .heroe { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center;
-           padding: 60px 0 50px; }
+           padding: 66px 0 120px; }
   .heroe .kicker { color: var(--acento-2); font-family: var(--mono); font-size: .85rem;
                    letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
   .heroe p.bajada { font-size: 1.12rem; color: var(--texto-2); max-width: 52ch; }
   .acciones { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
 
-  /* Órbita: el satélite tarda ~87 s en dar una vuelta, un segundo por cada minuto reales */
-  .orbita { position: relative; aspect-ratio: 1; max-width: 380px; margin: 0 auto; }
+  /* ===========================================================================
+     La órbita.
+
+     CÓMO SE HACE LA ELIPSE. Una animación CSS solo sabe rotar, y rotar da un
+     círculo, que se ve plano. Para que la órbita se vea inclinada en el espacio,
+     el grupo `.orb-marco` aplasta el plano entero (`scale(1,.42)`) y lo ladea
+     (`rotate(-16)`): un movimiento circular ahí adentro se ve como una elipse
+     inclinada. El problema es que ese aplastado también deforma al satélite, así
+     que el satélite va envuelto en dos capas que lo deshacen — `.antigira`, que
+     gira lo mismo que la órbita pero al revés, y una escala inversa (1/0,42 =
+     2,381). Las dos rotaciones se cancelan y queda un satélite sin deformar
+     sobre una elipse.
+
+     CÓMO PASA POR DETRÁS DE LA TIERRA. La mitad de arriba de la elipse es la
+     mitad lejana. Hay dos copias del satélite, una dibujada antes del globo y
+     otra después, y cada una se muestra en su media vuelta (`.tras` / `.frente`).
+     El cambio ocurre en los extremos laterales, que es donde el satélite está de
+     perfil y el salto no se nota.
+
+     POR QUÉ 0,42 Y NO MENOS. Con un aplastado más fuerte la elipse se ve más
+     inclinada, pero la mitad lejana entera pasa por dentro del disco del planeta
+     y el satélite queda tapado media vuelta completa: se lee como que
+     desapareció. Con 0,42 el radio menor (70 px) queda apenas por debajo del
+     radio del globo (78 px), así que solo se esconde en el tramo de arriba —
+     entra por detrás del polo y sale, que es justo el efecto que se busca.
+
+     LA VELOCIDAD ES PARA QUE SE LEA, NO A ESCALA. La vuelta real son ~87 min
+     (lo dice el pie del dibujo). Animarla a un segundo por minuto dejaba un
+     satélite que casi no se movía; `--periodo` está elegido para que el
+     movimiento se note sin marear. `--fase` lo arranca ya entrado en la mitad
+     cercana, para que se vea apenas carga la página en vez de aparecer después.
+     =========================================================================== */
+  .orbita { position: relative; aspect-ratio: 1; max-width: 380px; margin: 0 auto;
+            --periodo: 26s; --fase: calc(var(--periodo) * -0.3);
+            background: radial-gradient(circle at 50% 50%, var(--orbita-cielo) 0%, transparent 68%); }
   .orbita svg { width: 100%; height: 100%; overflow: visible; }
-  .tierra { filter: drop-shadow(0 0 26px rgba(78, 168, 255, .45)); }
-  #satelite { animation: girar 87s linear infinite; transform-origin: 200px 200px; }
+
+  /* Las cuatro animaciones comparten período y desfase: si se separaran, el
+     satélite se deformaría o cambiaría de capa en el lugar equivocado.
+
+     CUIDADO AL TOCAR ESTO. Cada elemento lleva UNA sola animación, y por eso el
+     giro y el cambio de capa están en grupos distintos del SVG en vez de en el
+     mismo. `animation` es un atajo: dos reglas de igual especificidad sobre el
+     mismo elemento no se suman, la segunda pisa entera a la primera. Cuando
+     `.gira` y `.tras` compartían elemento, la regla de opacidad borraba la del
+     giro y el satélite se quedaba quieto arriba, parpadeando, sin dar la vuelta.
+     Si hiciera falta poner dos animaciones en un mismo elemento, van en una sola
+     declaración separadas por coma — nunca en dos reglas. */
+  .gira     { animation: girar var(--periodo) linear infinite var(--fase);
+              transform-box: view-box; transform-origin: 200px 200px; }
+  .antigira { animation: girar var(--periodo) linear infinite reverse var(--fase);
+              transform-box: view-box; transform-origin: 0 0; }
   @keyframes girar { to { transform: rotate(360deg); } }
-  .sombra-tierra { fill: url(#gradSombra); }
+
+  /* El satélite arranca arriba (lejos). La mitad lejana va del 75 % al 25 % de la
+     vuelta pasando por el 0; el cambio cae en los laterales. */
+  .tras   { animation: mitad-lejana  var(--periodo) linear infinite var(--fase); }
+  .frente { opacity: 0; animation: mitad-cercana var(--periodo) linear infinite var(--fase); }
+  @keyframes mitad-lejana  { 0%,24.9% { opacity: 1 } 25%,74.9% { opacity: 0 } 75%,100% { opacity: 1 } }
+  @keyframes mitad-cercana { 0%,24.9% { opacity: 0 } 25%,74.9% { opacity: 1 } 75%,100% { opacity: 0 } }
+
+  /* Las capas del globo se desplazan para que la Tierra se vea girar. Las nubes van
+     un poco más lento que el suelo: esa diferencia es la que da sensación de volumen. */
+  .capa-suelo { animation: rodar 96s linear infinite; }
+  .capa-nubes { animation: rodar 132s linear infinite; }
+  @keyframes rodar { to { transform: translateX(-312px); } }
+
+  .anillo { fill: none; stroke: var(--orbita-anillo); stroke-width: 1.4;
+            stroke-dasharray: 4 7; }
+  /* La mitad cercana del anillo se dibuja encima del globo y sin guiones: es la
+     pista principal de que la órbita rodea al planeta y no está detrás. */
+  .anillo.cerca { stroke-width: 1.8; stroke-dasharray: none; opacity: .8; }
+  .globo { filter: drop-shadow(0 0 26px rgba(96, 170, 245, .45)); }
+
+  /* Con movimiento reducido no hay vuelta: el satélite queda quieto en la mitad
+     cercana, que es donde se lo ve entero. Sin esto la regla global de
+     `estilos.css` (duración .01 ms) lo haría girar a una velocidad absurda. */
+  @media (prefers-reduced-motion: reduce) {
+    .gira      { animation: none !important; transform: rotate(148deg); }
+    .antigira  { animation: none !important; transform: rotate(-148deg); }
+    .capa-suelo, .capa-nubes { animation: none !important; }
+    .titilan { animation: none !important; opacity: .85; }
+    .tras   { animation: none !important; opacity: 0; }
+    .frente { animation: none !important; opacity: 1; }
+  }
 
   .pasos { counter-reset: paso; display: grid; gap: 14px; }
   .paso { display: grid; grid-template-columns: 46px 1fr; gap: 16px; align-items: start;
@@ -47,11 +286,14 @@
   section:first-of-type { border-top: none; }
 
   @media (max-width: 900px) {
-    .heroe { grid-template-columns: 1fr; padding: 34px 0 30px; gap: 26px; }
+    .heroe { grid-template-columns: 1fr; padding: 38px 0 110px; gap: 26px; }
     .orbita { max-width: 260px; }
+    .espacio { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 130px), transparent 100%);
+                       mask-image: linear-gradient(to bottom, #000 calc(100% - 130px), transparent 100%); }
   }
   @media (max-width: 560px) {
-    .orbita { max-width: 200px; }
+    .orbita { max-width: 210px; }
+    .heroe { padding: 30px 0 92px; }
     .paso { grid-template-columns: 36px 1fr; gap: 11px; padding: 13px 14px; }
     .paso::before { width: 28px; height: 28px; font-size: .85rem; }
     .embudo .nivel { grid-template-columns: 105px 1fr 62px; gap: 8px; font-size: .78rem; }
@@ -81,8 +323,16 @@
   </nav>
 </header>
 
-<div class="envoltorio">
+<!-- El cielo es a todo el ancho, por eso queda fuera del envoltorio y lleva el suyo adentro. -->
+<div class="cielo">
+  <div class="capa espacio">
+    <div class="capa nebulosa"></div>
+    <div class="capa via-lactea"></div>
+    <div class="capa polvo"></div>
+    <div class="capa titilan"></div>
+  </div>
 
+  <div class="envoltorio">
   <div class="heroe">
     <div>
       <div class="kicker">Tesis · UNA–FPUNA</div>
@@ -99,35 +349,168 @@
     </div>
 
     <div class="orbita">
-      <svg viewBox="0 0 400 400" role="img" aria-label="Satélite orbitando la Tierra">
+      <!-- Los colores del globo y del satélite son los únicos fijos del sitio: no salen de la
+           paleta de `estilos.css` a propósito, porque son el color de un objeto físico. La Tierra
+           es azul de día y de noche; lo que sí cambia con el tema es el cielo de atrás y el anillo
+           de la órbita, que sí usan variables. -->
+      <svg viewBox="0 0 400 400" role="img" aria-label="Satélite en órbita alrededor de la Tierra">
         <defs>
-          <radialGradient id="gradTierra" cx="35%" cy="30%">
-            <stop offset="0%" stop-color="#5ba8e8"/><stop offset="60%" stop-color="#1d5c96"/>
-            <stop offset="100%" stop-color="#0b2b4a"/>
+          <radialGradient id="gOceano" cx="34%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#63b7ef"/>
+            <stop offset="52%" stop-color="#1f6aa8"/>
+            <stop offset="100%" stop-color="#0a2b4a"/>
           </radialGradient>
-          <linearGradient id="gradSombra" x1="0" x2="1">
-            <stop offset="0%" stop-color="#000" stop-opacity="0"/>
-            <stop offset="100%" stop-color="#000" stop-opacity=".72"/>
+          <!-- Terminador: el borde entre el día y la noche, cayendo hacia la derecha. -->
+          <linearGradient id="gNoche" x1="0.1" y1="0" x2="1" y2="0.3">
+            <stop offset="34%" stop-color="#000814" stop-opacity="0"/>
+            <stop offset="70%" stop-color="#000814" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#000610" stop-opacity=".86"/>
           </linearGradient>
+          <!-- Atmósfera vista contra el borde del planeta: se acumula en el limbo. -->
+          <radialGradient id="gAtmos" cx="50%" cy="50%" r="50%">
+            <stop offset="70%" stop-color="#8ccbff" stop-opacity="0"/>
+            <stop offset="93%" stop-color="#8ccbff" stop-opacity=".28"/>
+            <stop offset="100%" stop-color="#d3ecff" stop-opacity=".6"/>
+          </radialGradient>
+          <linearGradient id="gPanel" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4c8ecb"/><stop offset="100%" stop-color="#1f4f86"/>
+          </linearGradient>
+          <linearGradient id="gCuerpo" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f2f7fd"/><stop offset="100%" stop-color="#9db2cc"/>
+          </linearGradient>
+
+          <!-- El hielo se dibuja como banda recta en el mapa plano, y sin esto el borde se ve
+               como una línea horizontal que cruza el globo. Estos degradados lo desvanecen hacia
+               el ecuador; el sombreado esférico hace el resto. -->
+          <linearGradient id="gHieloN" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#eef6ff" stop-opacity=".9"/>
+            <stop offset="55%" stop-color="#eef6ff" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#eef6ff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="gHieloS" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#eef6ff" stop-opacity="0"/>
+            <stop offset="45%" stop-color="#eef6ff" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#eef6ff" stop-opacity=".9"/>
+          </linearGradient>
+          <clipPath id="recorteGlobo"><circle cx="200" cy="200" r="78"/></clipPath>
+          <filter id="difuso" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3"/>
+          </filter>
+
+          <!-- Un mosaico de 312 px de ancho que se repite: se copia tres veces y se desplaza
+               312 px, así el suelo entra por un borde del globo justo cuando sale por el otro.
+
+               POR QUÉ 312 Y NO CUALQUIER NÚMERO. Es un mapa equirectangular de verdad: los
+               continentes están en sus coordenadas reales, con lon -180..180 sobre el ancho del
+               mosaico y lat 90..-90 sobre el alto del globo. Como de una esfera se ve la mitad,
+               los 156 px de diámetro son 180° de longitud, así que los 360° completos ocupan
+               312 px y la escala queda igual en los dos ejes (0,867 px por grado). Con otro ancho
+               el mapa saldría estirado o achatado.
+
+               Es un trazado grueso, de pocos vértices por continente: a 150 px en pantalla no
+               entra más detalle, y lo que importa es que África, América y Eurasia se reconozcan
+               al pasar. -->
+          <g id="suelo">
+            <g fill="#41966a">
+              <path d="M141.3,187.0 L141.3,181.8 L144.7,176.6 L148.2,174.0 L150.8,168.8 L164.7,167.9 L173.3,171.4 L177.7,172.3 L184.6,173.1 L186.3,175.7 L188.9,180.9 L193.3,189.6 L200.2,189.6 L197.6,195.7 L192.4,200.9 L190.7,208.7 L186.3,216.5 L184.6,222.5 L182.0,226.9 L177.7,229.5 L171.6,229.5 L168.1,219.9 L166.4,214.7 L163.8,204.3 L163.8,196.5 L158.6,194.8 L151.7,195.7 L144.7,192.2 Z"/>
+              <path d="M85.8,200.0 L87.5,193.1 L93.6,189.6 L102.3,191.3 L110.9,195.7 L112.7,200.0 L117.9,202.6 L125.7,205.2 L122.2,213.0 L121.3,219.1 L114.4,224.3 L106.6,230.3 L102.3,234.7 L99.7,239.0 L97.1,245.1 L91.9,245.9 L91.0,239.9 L92.7,232.1 L94.5,226.0 L95.3,217.3 L90.1,212.1 L85.8,205.2 Z"/>
+              <path d="M10.4,143.7 L17.3,139.3 L34.7,139.3 L47.7,139.3 L60.7,141.1 L73.7,141.1 L82.3,139.3 L91.0,141.1 L99.7,148.0 L108.3,154.9 L99.7,161.0 L95.3,163.6 L90.1,167.9 L85.8,173.1 L86.7,178.3 L83.2,174.0 L78.0,174.9 L71.9,177.5 L71.9,182.7 L76.3,184.4 L79.7,186.1 L84.1,192.2 L81.5,188.7 L73.7,186.1 L65.0,182.7 L60.7,179.2 L54.6,172.3 L48.5,163.6 L43.3,153.2 L34.7,148.0 L26.0,148.9 L14.7,149.7 Z"/>
+              <path d="M147.3,162.7 L148.2,166.2 L150.8,168.8 L156.0,166.2 L158.6,163.6 L160.3,162.7 L166.4,161.0 L169.9,162.7 L172.5,165.3 L176.8,167.1 L180.3,164.5 L187.2,168.8 L187.2,171.4 L185.5,173.1 L193.3,174.0 L197.6,174.0 L205.4,178.3 L208.0,178.3 L214.1,179.2 L218.4,181.8 L219.3,187.0 L222.7,193.1 L225.3,188.7 L231.4,181.8 L235.7,181.8 L240.1,186.1 L241.8,191.3 L246.1,199.1 L247.0,191.3 L250.5,181.8 L257.4,180.1 L261.7,174.0 L261.7,166.2 L266.1,166.2 L268.7,162.7 L273.0,158.4 L277.3,154.1 L279.9,148.9 L290.3,148.0 L296.4,148.0 L303.3,142.8 L312.0,142.8 L312.0,137.6 L294.7,139.3 L277.3,136.7 L251.3,133.3 L234.0,134.1 L221.0,136.7 L208.0,139.3 L203.7,141.1 L190.7,141.1 L182.0,139.3 L173.3,139.3 L166.4,143.7 L160.3,148.0 L162.9,150.6 L159.5,154.9 L154.3,157.5 L152.5,158.4 L155.1,160.1 L148.2,162.7 Z"/>
+              <path d="M117.0,148.0 L130.0,141.1 L136.9,139.3 L138.7,134.1 L130.0,128.1 L117.0,128.1 L108.3,132.4 L108.3,141.1 Z"/>
+              <path d="M253.9,219.1 L254.8,222.5 L256.5,230.3 L261.7,229.5 L267.8,227.7 L273.0,230.3 L277.3,232.9 L282.5,233.8 L286.0,232.1 L288.6,224.3 L282.5,216.5 L279.1,209.5 L273.9,210.4 L268.7,210.4 L264.3,212.1 L258.3,217.3 Z"/>
+              <path d="M150.8,149.7 L154.3,149.7 L156.0,154.1 L156.9,155.8 L151.7,156.7 L151.7,153.2 Z"/>
+              <path d="M194.1,210.4 L199.3,213.0 L199.3,221.7 L195.0,221.7 L193.3,215.6 Z"/>
+              <path d="M268.7,173.1 L273.0,170.5 L277.3,168.8 L279.1,163.6 L281.7,161.9 L278.2,161.0 L275.6,167.9 L271.3,170.5 Z"/>
+              <path d="M305.1,229.5 L310.3,232.9 L306.8,236.4 L303.3,239.9 L299.9,239.9 L301.6,235.5 Z"/>
+            </g>
+            <!-- Manchas áridas tierra adentro: el Sahara, Arabia y el centro de Australia.
+                 Rompen el verde parejo, que es lo que hacía ver el suelo plano. -->
+            <g fill="#bfa068" opacity=".5">
+              <path d="M149.1,182.7 L160.3,178.3 L173.3,177.5 L182.0,178.3 L184.6,182.7 L177.7,186.1 L164.7,187.9 L151.7,187.9 Z"/>
+              <path d="M190.7,175.7 L199.3,177.5 L204.5,180.9 L201.1,186.1 L194.1,185.3 L189.8,180.9 Z"/>
+              <path d="M260.0,217.3 L271.3,216.5 L277.3,219.9 L275.6,225.1 L266.9,226.0 L260.0,222.5 Z"/>
+            </g>
+            <!-- Casquetes polares. En el mapa plano son bandas rectas; el sombreado esférico del
+                 globo se encarga de curvarlas. -->
+            <g>
+              <path fill="url(#gHieloN)" d="M0.0,122.0 L312.0,122.0 L312.0,131.5 L277.3,133.3 L234.0,130.7 L190.7,132.4 L138.7,129.8 L86.7,131.5 L34.7,130.7 L0.0,129.8 Z"/>
+              <path fill="url(#gHieloS)" d="M0.0,278.0 L312.0,278.0 L312.0,260.7 L260.0,258.1 L208.0,260.7 L156.0,262.4 L104.0,264.1 L52.0,263.3 L0.0,261.5 Z"/>
+            </g>
+          </g>
+          <!-- Nubes: jirones chicos y repartidos. Van más lento que el suelo (ver `.capa-nubes`):
+               esa diferencia de velocidad es la que da sensación de que hay volumen debajo.
+               Tienen que ser sutiles — con bandas grandes y opacas tapaban el mapa justo cuando
+               el mapa pasó a ser lo que hay que reconocer. -->
+          <g id="nubes" fill="#ffffff">
+            <path d="M14,150 C32,142 58,146 68,153 C76,159 56,166 34,165 C18,164 6,156 14,150 Z"/>
+            <path d="M88,138 C106,131 130,135 136,142 C141,148 118,154 100,152 C88,151 80,143 88,138 Z"/>
+            <path d="M52,196 C76,188 108,192 116,200 C123,207 92,214 66,211 C48,209 40,201 52,196 Z"/>
+            <path d="M150,210 C172,203 198,207 204,214 C209,220 182,227 160,224 C145,222 140,214 150,210 Z"/>
+            <path d="M210,160 C232,153 258,157 264,164 C269,170 242,177 220,174 C205,172 200,164 210,160 Z"/>
+            <path d="M262,200 C282,194 304,198 309,204 C313,210 290,216 271,213 C258,211 254,204 262,200 Z"/>
+            <path d="M108,246 C130,239 156,243 162,250 C167,256 140,263 118,260 C103,258 98,250 108,246 Z"/>
+            <path d="M232,244 C250,238 272,242 277,248 C281,254 258,260 240,257 C228,255 224,248 232,244 Z"/>
+            <path d="M30,228 C46,222 66,226 70,231 C74,237 54,242 38,240 C27,238 23,231 30,228 Z"/>
+          </g>
+
+          <g id="nave">
+            <!-- paneles solares -->
+            <g fill="url(#gPanel)" stroke="#7fb4e6" stroke-width=".6">
+              <rect x="-27" y="-6" width="17" height="12" rx="1.2"/>
+              <rect x="10" y="-6" width="17" height="12" rx="1.2"/>
+            </g>
+            <g stroke="#8fc2ef" stroke-width=".5" opacity=".8">
+              <path d="M-21.5,-6 v12 M-16,-6 v12 M15.5,-6 v12 M21,-6 v12 M-27,0 h17 M10,0 h17"/>
+            </g>
+            <!-- brazos -->
+            <path d="M-10,0 h2 M8,0 h2" stroke="#8fa6c2" stroke-width="1.6"/>
+            <!-- cuerpo -->
+            <rect x="-8" y="-6.5" width="16" height="13" rx="2.4" fill="url(#gCuerpo)"
+                  stroke="#5d738f" stroke-width=".7"/>
+            <rect x="-5" y="-3.6" width="10" height="3" rx="1" fill="#2f5f92" opacity=".75"/>
+            <!-- antena -->
+            <path d="M0,-6.5 v-5" stroke="#8fa6c2" stroke-width="1.1"/>
+            <circle cx="0" cy="-12.6" r="1.9" fill="#e7f0fa" stroke="#5d738f" stroke-width=".5"/>
+          </g>
         </defs>
 
-        <!-- trayectoria -->
-        <ellipse cx="200" cy="200" rx="165" ry="165" fill="none"
-                 stroke="#2a3c5e" stroke-width="1.5" stroke-dasharray="4 7"/>
+        <!-- ============ trayectoria y satélite: mitad lejana (detrás del globo) ============ -->
+        <g class="orb-marco" transform="translate(200,200) rotate(-16) scale(1,.42) translate(-200,-200)">
+          <circle class="anillo" cx="200" cy="200" r="168" vector-effect="non-scaling-stroke"/>
+          <g class="tras">
+            <g class="gira">
+              <g transform="translate(200,32)">
+                <g class="antigira"><g transform="scale(1,2.381)"><use href="#nave"/></g></g>
+              </g>
+            </g>
+          </g>
+        </g>
 
-        <!-- Tierra -->
-        <circle class="tierra" cx="200" cy="200" r="78" fill="url(#gradTierra)"/>
-        <circle cx="200" cy="200" r="78" class="sombra-tierra"/>
-        <ellipse cx="178" cy="176" rx="26" ry="16" fill="#2e7d55" opacity=".55"/>
-        <ellipse cx="222" cy="222" rx="20" ry="13" fill="#2e7d55" opacity=".45"/>
+        <!-- ============ la Tierra ============ -->
+        <g class="globo">
+          <g clip-path="url(#recorteGlobo)">
+            <circle cx="200" cy="200" r="78" fill="url(#gOceano)"/>
+            <g class="capa-suelo" opacity=".92">
+              <use href="#suelo" x="-312"/><use href="#suelo"/><use href="#suelo" x="312"/>
+            </g>
+            <g class="capa-nubes" opacity=".24" filter="url(#difuso)">
+              <use href="#nubes" x="-312"/><use href="#nubes"/><use href="#nubes" x="312"/>
+            </g>
+            <circle cx="200" cy="200" r="78" fill="url(#gNoche)"/>
+          </g>
+          <circle cx="200" cy="200" r="78" fill="url(#gAtmos)"/>
+          <circle cx="200" cy="200" r="78.5" fill="none" stroke="#9ed3ff" stroke-width=".8" opacity=".35"/>
+        </g>
 
-        <!-- satélite -->
-        <g id="satelite">
-          <g transform="translate(200,35)">
-            <rect x="-9" y="-7" width="18" height="14" rx="3" fill="#dbe7f7"/>
-            <rect x="-26" y="-4" width="15" height="8" rx="1.5" fill="#4ea8ff"/>
-            <rect x="11" y="-4" width="15" height="8" rx="1.5" fill="#4ea8ff"/>
-            <circle cx="0" cy="0" r="15" fill="#7ef0c0" opacity=".16"/>
+        <!-- ============ satélite: mitad cercana (delante del globo) ============ -->
+        <g class="orb-marco" transform="translate(200,200) rotate(-16) scale(1,.42) translate(-200,-200)">
+          <path class="anillo cerca" d="M32,200 A168,168 0 0,0 368,200" vector-effect="non-scaling-stroke"/>
+          <g class="frente">
+            <g class="gira">
+              <g transform="translate(200,32)">
+                <g class="antigira"><g transform="scale(1,2.381)"><use href="#nave"/></g></g>
+              </g>
+            </g>
           </g>
         </g>
       </svg>
@@ -136,6 +519,10 @@
       </p>
     </div>
   </div>
+  </div>
+</div>
+
+<div class="envoltorio">
 
   <section id="problema">
     <h2>El problema</h2>
@@ -258,6 +645,7 @@
        y resultados— vive en el repositorio de la tesis.</p>
   </footer>
 </div>
+
 <script src="/estatico/tema.js" defer></script>
 </body>
 </html>

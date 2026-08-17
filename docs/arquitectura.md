@@ -149,3 +149,15 @@ quedó en el DOM. Por lo mismo escucha `storage`, para que dos pestañas abierta
 **Excepción anotada.** El globo terráqueo y el satélite del inicio llevan colores fijos, fuera de la
 paleta. Son el color de un objeto físico —la Tierra es azul de día y de noche—, así que cambiarlos
 con el tema se vería mal. Lo que sí usa variables es el cielo de atrás y el anillo de la órbita.
+
+**El héroe del inicio va siempre sobre fondo de espacio**, en los dos temas, y termina disolviéndose
+en el fondo de la página. Eso no rompe la regla de un solo lugar para los colores: el bloque
+`.cielo` **redefine** las mismas variables acotadas a él, así que el `h1`, la bajada y los botones
+siguen escritos con `var(--texto)` sin enterarse de dónde están. La única salvedad es que `body`
+resuelve `color: var(--texto)` una sola vez y los hijos heredan el color ya calculado, no la
+variable: por eso `.cielo` también fija `color` explícitamente.
+
+**Dónde NO va el universo.** El resto del inicio y todo el taller quedan sobre la paleta plana. En
+el taller hay tablas, formularios y cinco curvas por gráfico: un fondo con textura compite con el
+dato justo donde hay que leerlo, y arruina las capturas que van al documento — que es la misma razón
+por la que el tema claro es el de por defecto.
