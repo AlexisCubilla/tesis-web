@@ -207,6 +207,19 @@ function etapaSiguiente() {
 
 // ============================================================================ fase
 /** Qué entra y qué sale de cada etapa, en números, para la tira de flujo. */
+/* Lo que el recuadro «entra → sale» ya dice, y por lo tanto no se repite abajo en los recuadros
+   de números. La regla es esa y no el gusto: el resumen del backend trae todo, y volcarlo entero
+   hacía que cada etapa dijera el mismo número tres veces —en el flujo, en un recuadro y en el pie
+   de un gráfico—. Cuando todo se repite, nada resalta. */
+const YA_EN_EL_FLUJO = {
+  datos: ['filas_entrada', 'filas_salida', 'hojas', 'limpieza'],   // «limpieza» ya es una pastilla de parámetro
+  ventaneo: ['ventanas_generadas', 'ventanas_conservadas', 'reduccion_pct'],
+  features: ['filas', 'features', 'rezagos'],                       // «rezagos» ya es una pastilla
+  filtrado: ['features_entrada', 'features_salida', 'descartadas'], // «descartadas» es la suma de los dos motivos
+  deteccion: ['detectores', 'ventanas_puntuadas'],
+  eventos: ['eventos', 'ventanas_candidatas'],
+};
+
 function flujoDe(nodo) {
   const r = nodo.resumen || {};
   return ({
@@ -270,6 +283,7 @@ function pintarFase() {
   }).join('');
 
   $('#fase-resumen').innerHTML = Object.entries(n.resumen || {})
+    .filter(([k]) => !(YA_EN_EL_FLUJO[n.etapa] || []).includes(k))
     .filter(([, v]) => typeof v !== 'object' || Array.isArray(v))
     .map(([k, v]) => `<div class="celda"><div class="v">${Array.isArray(v) ? v.length
       : miles(v === true ? 'sí' : v === false ? 'no' : v)}</div>
@@ -738,12 +752,10 @@ function correlacionDeFeatures(destino, d) {
 
 function verScores(d) {
   $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo se reparten los puntajes</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:8px">De izquierda a derecha, los tramos
-    ordenados del menos raro al más raro. Lo que importa es la forma: una curva que se dispara al final
-    significa que ese método separa con claridad unos pocos tramos del resto; una recta significa que
-    reparte parejo y distingue poco. Cada método va en <strong>su propio panel</strong> justamente
-    porque cada uno tiene su escala: las alturas no se comparan entre paneles, y ahora eso se ve en vez
-    de estar solo aclarado acá.</p><div id="caja-perc"></div>
+    <p class="tenue" style="font-size:.8rem;margin-bottom:8px">Cada método le pone un puntaje a cada
+    tramo y los ordena. Los puntajes <strong>no se comparan entre métodos</strong>: cada uno tiene su
+    escala. Cómo los reparte cada uno —y dónde cae el corte de candidatos— está en la pestaña
+    <strong>Análisis de la rama</strong>.</p>
     <h4 style="font-size:.88rem;margin:18px 0 8px">Los tramos más extremos según cada método</h4>
     <div class="mini">${d.detectores.map((det, i) => `
       <div class="caja"><h5 style="color:var(--serie-${(i % 5) + 1})">${det}</h5>
@@ -751,14 +763,6 @@ function verScores(d) {
         `<tr><td>${t.hoja}</td><td class="num">${t.inicio}</td>
          <td class="num" style="color:var(--acento-2)">${t.score.toFixed(2)}</td></tr>`).join('')}
       </tbody></table></div>`).join('')}</div>`;
-  Grafico.lineas($('#caja-perc'), {
-    titulo: 'Distribución de puntajes, un panel por método',
-    altoPanel: 68,
-    xNombre: 'percentil',
-    formatoX: (i) => `${i * 5}%`,
-    sustantivo: 'percentiles',
-    paneles: d.detectores.map((c) => ({ nombre: c, valores: d.percentiles[c] })),
-  });
 }
 
 function verEventos(d) {

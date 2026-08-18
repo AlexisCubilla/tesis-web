@@ -276,14 +276,10 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
             top[c] = [{"pos": int(p), "hoja": str(meta.loc[p, grupo]),
                        "inicio": int(meta.loc[p, "start"]), "score": float(sc.loc[p, c])}
                       for p in idx]
-        return {
-            "tipo": "scores",
-            "detectores": list(sc.columns),
-            # Percentiles: cada detector tiene su escala, no son comparables entre sí.
-            "percentiles": {c: [float(sc[c].quantile(q / 100)) for q in range(0, 101, 5)]
-                            for c in sc.columns},
-            "top": top,
-        }
+        # Sin percentiles: eran la misma información que los histogramas de la pestaña de análisis
+        # —una curva acumulada y una densidad dicen lo mismo—, y allá además está el corte de
+        # candidatos marcado. Dos vistas del mismo dato hacen que ninguna se mire.
+        return {"tipo": "scores", "detectores": list(sc.columns), "top": top}
 
     # ---- Eventos: el entregable --------------------------------------------------------
     if etapa == "eventos":

@@ -34,30 +34,26 @@ window.Analisis = (function () {
      '4 y 5 métodos resultan ser sistemáticamente los más largos, ese número estaría midiendo ' +
      'duración antes que consenso. <strong>Cada punto es un evento</strong>; la línea une la ' +
      'mediana de cada grupo.']] : []),
-    ['puntajes', '¿Cómo reparte los puntajes cada método?',
-     'Un panel por método, porque <strong>los puntajes no se comparan entre métodos</strong>: cada uno ' +
-     'tiene su escala. Lo que sí se compara es la forma. La línea punteada es el corte de candidatos: ' +
-     'todo lo que queda a su derecha es lo que ese método marca.'],
-    ['dispersion', '¿Están realmente aislados los candidatos?',
-     'Cada punto es un tramo, proyectado a dos dimensiones para poder verlo. Los marcados por el método ' +
-     'elegido van resaltados. Si aparecen en el borde de la nube, el método está encontrando cosas ' +
-     'efectivamente atípicas; si caen en el medio del montón, marca por algo que esta vista no muestra. ' +
-     '<strong>La proyección es solo para mirar</strong>: no alimenta ninguna etapa y ningún número de ' +
-     'la tesis depende de ella.'],
     ['desplazamiento', '¿Qué hace distinta a una candidata?',
      'Cuánto se corre la media de las candidatas respecto del resto de los tramos, en desvíos ' +
      'estándar, característica por característica. Es lo que va a mirar quien tenga que etiquetar: ' +
      'no <em>cuáles</em> son raras, sino <em>en qué</em> son raras. Lo calcula el paquete de la ' +
      'tesis con las mismas funciones que arman su reporte de feature-shift.'],
-    ['correlacion', '¿Por qué se descartaron esas características?',
-     'Cada celda es cuánto se mueven juntas dos características. Los bloques intensos fuera de la ' +
-     'diagonal son familias que repiten información, y de cada una sobrevive una. Las conservadas van ' +
-     'en negrita en los rótulos.'],
+    ['puntajes', '¿Cómo reparte los puntajes cada método?',
+     'Un panel por método, porque <strong>los puntajes no se comparan entre métodos</strong>: cada uno ' +
+     'tiene su escala. Lo que sí se compara es la forma. La línea punteada es el corte de candidatos: ' +
+     'todo lo que queda a su derecha es lo que ese método marca.', true],
+    ['dispersion', '¿Están realmente aislados los candidatos?',
+     'Cada punto es un tramo, proyectado a dos dimensiones para poder verlo. Los marcados por el método ' +
+     'elegido van resaltados. Si aparecen en el borde de la nube, el método está encontrando cosas ' +
+     'efectivamente atípicas; si caen en el medio del montón, marca por algo que esta vista no muestra. ' +
+     '<strong>La proyección es solo para mirar</strong>: no alimenta ninguna etapa y ningún número de ' +
+     'la tesis depende de ella.', true],
   ];
 
   /** Arma el armazón de la pestaña y dibuja los cuatro cortes. */
-  function pintar(destino, d, alCambiarDetector) {
-    destino.innerHTML = secciones(d).map(([id, titulo, texto]) => `
+  /** Un corte: título, explicación y el hueco donde va su gráfico. */
+  const bloque = (d) => ([id, titulo, texto]) => `
       <div class="corte">
         <h4 style="font-size:.95rem;margin:0 0 4px">${titulo}</h4>
         <p class="explica">${texto}</p>
@@ -69,7 +65,20 @@ window.Analisis = (function () {
         ${id === 'coincidencia'
           ? '<div class="duo"><div id="g-coincidencia"></div><div id="g-reparto"></div></div>'
           : `<div id="g-${id}"></div>`}
-      </div>`).join('');
+      </div>`;
+
+  function pintar(destino, d, alCambiarDetector) {
+    const todas = secciones(d);
+    const principales = todas.filter((x) => !x[3]);
+    const secundarias = todas.filter((x) => x[3]);
+
+    // Los secundarios van detrás de un pliegue. No es esconderlos: es decir cuáles son los que
+    // sostienen el argumento. Con nueve gráficos del mismo peso no se distingue el que puede
+    // refutar la tesis del que está para mirar.
+    destino.innerHTML = principales.map(bloque(d)).join('')
+      + (secundarias.length ? `<details class="corte plegado"><summary>Más cortes de esta rama
+           <span class="tenue">(${secundarias.length})</span></summary>
+           ${secundarias.map(bloque(d)).join('')}</details>` : '');
 
     cifras(d);
     coincidencia(d);
@@ -78,7 +87,6 @@ window.Analisis = (function () {
     puntajes(d);
     dispersion(d);
     desplazamiento(d);
-    correlacion(d);
     $('#sel-det').addEventListener('change', (e) => alCambiarDetector(e.target.value));
   }
 
@@ -275,54 +283,6 @@ window.Analisis = (function () {
       pie: `${miles(normales.length)} tramos sin marcar y ${miles(marcados.length)} marcados por ` +
            `${d.detector}. Las dos componentes juntas explican el ${((ve[0] + ve[1]) * 100).toFixed(0)} % ` +
            'de la variación: lo que no entra ahí no se ve en este dibujo.',
-    });
-  }
-
-  // ---------------------------------------------------------------- 5. correlación
-  function correlacion(d) {
-    const f = d.correlacion.features;
-    const celdas = [];
-    d.correlacion.matriz.forEach((fila, i) =>
-      fila.forEach((v, j) => celdas.push([j, i, v])));
-    const corto = (n) => n.replace('__', ' · ');
-    const alto = Math.max(420, Math.min(760, f.length * 9 + 150));
-
-    Grafico.medida($('#g-correlacion'), {
-      alto,
-      opcion: (c) => ({
-        animation: false,
-        textStyle: c.textStyle,
-        grid: { left: 186, right: 18, top: 34, bottom: 12 },
-        tooltip: Object.assign({}, c.tooltip, {
-          formatter: (p) => `<b>${V.fmt(p.data[2], 2)}</b> de correlación<br>` +
-                            `<span style="color:${c.tenue}">${corto(f[p.data[1]])}<br>${corto(f[p.data[0]])}</span>`,
-        }),
-        // Divergente: dos tonos con gris neutro en el cero, porque la correlación tiene signo.
-        visualMap: {
-          min: -1, max: 1, calculable: true, orient: 'horizontal', left: 'center', top: 0,
-          itemWidth: 12, itemHeight: 120, precision: 2,
-          textStyle: { color: c.tenue, fontSize: 10 },
-          inRange: { color: [V.serie(0), V.varCss('--fondo-2'), V.serie(3)] },
-        },
-        xAxis: { type: 'category', data: f, axisTick: { show: false },
-                 axisLine: { lineStyle: { color: c.borde } },
-                 axisLabel: { show: false } },
-        yAxis: {
-          type: 'category', data: f, inverse: true, axisTick: { show: false },
-          axisLine: { lineStyle: { color: c.borde } },
-          axisLabel: {
-            fontSize: 9, interval: 0,
-            // Conservadas en tinta plena; descartadas, tenues. Así el mapa explica el filtrado.
-            formatter: (v, i) => (d.correlacion.conservadas[i] ? `{ok|${corto(v)}}` : `{no|${corto(v)}}`),
-            rich: { ok: { color: c.tinta, fontWeight: 600, fontSize: 9 },
-                    no: { color: c.tenue, opacity: .55, fontSize: 9 } },
-          },
-        },
-        series: [{ type: 'heatmap', data: celdas, progressive: 2000,
-                   emphasis: { itemStyle: { borderColor: V.varCss('--acento'), borderWidth: 1 } } }],
-      }),
-      pie: `${f.length} características antes del filtrado; sobreviven ` +
-           `${d.correlacion.conservadas.filter(Boolean).length}, en negrita.`,
     });
   }
 

@@ -248,6 +248,18 @@ distinguían ni con visión de color completa. Si se tocan esos valores hay que 
 desplazamiento de la página, que es lo que la persona estaba haciendo. Hace falta tener Ctrl
 apretado; para lo demás está la barra de rango y la herramienta de recuadro.
 
+**Regla de poda: nada se dice dos veces.** Un gráfico que repite algo ya visible en pantalla no
+suma, resta — hace que el resto pese menos. De ahí tres cortes concretos: los recuadros de números
+ya no repiten lo que dice el recuadro «entra → sale» (24 recuadros pasaron a 7); el mapa de
+correlación vive solo en la etapa de filtrado, que es donde explica algo, y no también en el
+análisis; y la curva de percentiles de la etapa de detección se fue porque es la misma información
+que el histograma del análisis —una acumulada y una densidad dicen lo mismo—, que además marca el
+corte de candidatos.
+
+**Y no todo pesa igual.** En el análisis, los cortes que sostienen el argumento van abiertos y el
+resto detrás de un pliegue. Con nueve gráficos del mismo peso visual no se distinguía el que puede
+refutar la tesis del que está para mirar.
+
 **Qué sobrevivió al cambio de librería.** Las decisiones de arriba son de contenido, no de
 implementación: al pasar de Canvas a mano a ECharts se conservaron enteras. Lo que la librería
 aportó fue terminación —globo, leyenda, barra de rango, exportar imagen, ver los datos en tabla— y

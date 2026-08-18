@@ -109,6 +109,14 @@
   .pestanas button:hover { color: var(--texto); }
   .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--acento); }
 
+  /* Los cortes secundarios, plegados: están, pero no compiten con el argumento. */
+  .corte.plegado > summary { cursor: pointer; font-weight: 650; font-size: .9rem;
+    padding: 10px 0; list-style: none; }
+  .corte.plegado > summary::before { content: '▸ '; color: var(--acento); }
+  .corte.plegado[open] > summary::before { content: '▾ '; }
+  .corte.plegado > summary:hover { color: var(--acento); }
+  .corte.plegado > .corte:first-of-type { margin-top: 4px; padding-top: 0; border-top: none; }
+
   /* Cada corte del análisis, dentro de su pestaña. */
   .corte + .corte { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--borde); }
   .explica { font-size: .84rem; color: var(--texto-2); margin: 0 0 12px; max-width: 88ch; }
