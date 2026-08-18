@@ -41,10 +41,10 @@ const miles = (v) => typeof v === 'number' ? v.toLocaleString('es') : v;
 
 // ============================================================================ arranque
 async function iniciar() {
-  const def = await api('/api/etapas');
+  const def = await api('api/etapas');
   S.defs = def.etapas; S.cadena = def.cadena;
 
-  const est = await api('/api/estado');
+  const est = await api('api/estado');
   S.oficial = est.config_tesis || {};
   S.muestreo = est.muestreo_segundos || 10.6;
   $('#sello').textContent = `tesis @ ${est.commit_tesis}`;
@@ -75,7 +75,7 @@ async function iniciar() {
 }
 
 async function recargar() {
-  S.nodos = (await api('/api/arbol')).nodos;
+  S.nodos = (await api('api/arbol')).nodos;
   if (S.sel && !S.nodos.find((n) => n.clave === S.sel)) S.sel = null;
   pintar();
 }
@@ -326,7 +326,7 @@ async function borrarSeleccion() {
                                             && x.clave !== S.sel).length;
   if (!confirm(`Se borran ${cuantos} paso(s) desde acá en adelante, con sus resultados en disco.\n` +
                `¿Seguir?`)) return;
-  const r = await api(`/api/nodo/${S.sel}`, { method: 'DELETE' });
+  const r = await api(`api/nodo/${S.sel}`, { method: 'DELETE' });
   S.sel = n.padre;
   await recargar();
   if (S.sel) cargarVisual();
@@ -405,7 +405,7 @@ async function lanzar(etapa, padre, parametros) {
   $('#btn-ejecutar').disabled = true;
   $('#estado-ejecucion').textContent = 'Encolando…';
   try {
-    const r = await api('/api/ejecutar', {
+    const r = await api('api/ejecutar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ etapa, padre, parametros }),
     });
@@ -429,7 +429,7 @@ function sondear(clave) {
     clearInterval(S.sondeo);
     const t0 = Date.now();
     S.sondeo = setInterval(async () => {
-      const n = await api(`/api/nodo/${clave}`);
+      const n = await api(`api/nodo/${clave}`);
       $('#estado-ejecucion').textContent = `${n.estado}… ${((Date.now() - t0) / 1000).toFixed(0)}s`;
       S.sel = clave;
       await recargar();
@@ -502,13 +502,13 @@ async function cargarVisual() {
   vis.innerHTML = '<p class="tenue" style="font-size:.85rem">Cargando datos…</p>';
   try {
     if (S.vista === 'analisis') {
-      const url = `/api/nodo/${n.clave}/analisis` + (S.detector ? `?detector=${encodeURIComponent(S.detector)}` : '');
+      const url = `api/nodo/${n.clave}/analisis` + (S.detector ? `?detector=${encodeURIComponent(S.detector)}` : '');
       const d = await api(url);
       vis.innerHTML = '';
       Analisis.pintar(vis, d, (det) => { S.detector = det; cargarVisual(); });
       return;
     }
-    const d = await api(`/api/nodo/${n.clave}/datos`);
+    const d = await api(`api/nodo/${n.clave}/datos`);
     vis.innerHTML = '';
     ({ serie: verSerie, ventanas: verVentanas, features: verFeatures, filtrado: verFiltrado,
        scores: verScores, eventos: verEventos }[d.tipo] || (() => {}))(d);
@@ -544,7 +544,7 @@ function verSerie(d) {
     nota: 'Las 20 hojas con más mediciones.',
   });
   $('#sel-hoja').addEventListener('change', async (e) =>
-    dibujar(await api(`/api/nodo/${S.sel}/datos?hoja=${encodeURIComponent(e.target.value)}`)));
+    dibujar(await api(`api/nodo/${S.sel}/datos?hoja=${encodeURIComponent(e.target.value)}`)));
 }
 
 function verVentanas(d) {
@@ -781,11 +781,11 @@ function verEventos(d) {
         rama</b>. Cada uno abre con una hoja que dice de dónde salió.</p>
       </div>
       <span class="esp"></span>
-      <a class="boton" download href="/api/nodo/${S.sel}/excel/experto"
+      <a class="boton" download href="api/nodo/${S.sel}/excel/experto"
          title="Candidatos consolidados, con el porqué de cada evento">Para el experto</a>
-      <a class="boton" download href="/api/nodo/${S.sel}/excel/presentable"
+      <a class="boton" download href="api/nodo/${S.sel}/excel/presentable"
          title="Versión con formato, tiempo real y gráficos">Presentable</a>
-      <a class="boton" download href="/api/nodo/${S.sel}/excel/normales"
+      <a class="boton" download href="api/nodo/${S.sel}/excel/normales"
          title="Ventanas normales, para contrastar contra las candidatas">Contraste normal</a>
     </div>
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
@@ -882,7 +882,7 @@ async function verEvento(id) {
   const cont = $('#detalle-evento');
   cont.innerHTML = '<p class="tenue" style="font-size:.84rem">Cargando…</p>';
   try {
-    const d = await api(`/api/nodo/${S.sel}/evento/${id}`);
+    const d = await api(`api/nodo/${S.sel}/evento/${id}`);
     const ev = d.evento;
     cont.innerHTML = `<div style="background:var(--fondo-2);border:1px solid var(--borde);
         border-radius:10px;padding:14px">

@@ -7,7 +7,7 @@
 <!-- El tema se resuelve acá, antes de pintar nada: si esperara a `tema.js` (que va al final del
      cuerpo) quien tiene el oscuro guardado vería un destello blanco en cada carga. -->
 <script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
-<link rel="stylesheet" href="/estatico/estilos.css">
+<link rel="stylesheet" href="estatico/estilos.css">
 <style>
   /* ===========================================================================
      El cielo del héroe.
@@ -307,8 +307,8 @@
 <header class="barra">
   <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
   <nav>
-    <a href="/" class="activo">El proyecto</a>
-    <a href="/taller">Taller</a>
+    <a href="." class="activo">El proyecto</a>
+    <a href="taller">Taller</a>
     <button class="btn-tema" type="button" title="Cambiar de tema">
       <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" aria-hidden="true">
@@ -343,7 +343,7 @@
         pila a un puñado de tramos sospechosos para que un experto los revise.
       </p>
       <div class="acciones">
-        <a class="boton primario" href="/taller">Abrir el taller →</a>
+        <a class="boton primario" href="taller">Abrir el taller →</a>
         <a class="boton" href="#pipeline">Ver cómo funciona</a>
       </div>
     </div>
@@ -635,7 +635,7 @@
       oficial de la tesis está fijada por decisiones documentadas (ADR) y aparece siempre marcada como
       tal. Cambiar un parámetro en el taller no cambia la tesis.
     </div>
-    <div class="acciones"><a class="boton primario" href="/taller">Abrir el taller →</a></div>
+    <div class="acciones"><a class="boton primario" href="taller">Abrir el taller →</a></div>
   </section>
 
   <footer style="padding:40px 0;border-top:1px solid var(--borde);color:var(--texto-2);font-size:.87rem">
@@ -646,6 +646,6 @@
   </footer>
 </div>
 
-<script src="/estatico/tema.js" defer></script>
+<script src="estatico/tema.js" defer></script>
 </body>
 </html>

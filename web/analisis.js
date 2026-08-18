@@ -7,7 +7,7 @@
  * taller el nodo ya está elegido sobre el mapa, que es donde una rama se ve como lo que es, y todo
  * eso sobra.
  *
- * No calcula nada: recibe lo que devuelve `/api/nodo/{clave}/analisis` y dibuja. La regla de «qué
+ * No calcula nada: recibe lo que devuelve `api/nodo/{clave}/analisis` y dibuja. La regla de «qué
  * tramo está marcado» la decide el backend preguntándosela al paquete de la tesis.
  */
 

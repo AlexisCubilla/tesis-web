@@ -335,3 +335,36 @@ backend calcula es solo presentación.
 tesis. Se acepta porque es **solo para mirar**: no alimenta ninguna etapa, no se guarda y ningún
 número del trabajo depende de ella. La pantalla lo dice con todas las letras, para que nadie la
 confunda con el detector PCA del pipeline.
+
+---
+
+## A11 — Las rutas del frontend son relativas, para no atarse a la raíz del servidor
+
+**Decisión.** Ninguna referencia del frontend empieza con `/`. Ni las hojas de estilo, ni los
+scripts, ni los enlaces de navegación, ni las llamadas a la API: `estatico/estilos.css`,
+`api/etapas`, `taller`, `.`. El navegador las resuelve contra la página actual, no contra la raíz.
+
+**Por qué.** Una ruta absoluta obliga a que la aplicación viva en la raíz del dominio. Al montarla
+detrás de un prefijo —`https://demo/tesis/`— la portada carga pero pide `/estatico/estilos.css`, que
+en ese servidor no es suyo. La alternativa habitual es un `<base href>` o una variable de
+configuración con el prefijo; las dos agregan un valor que hay que acordar entre el servidor y el
+código, y que se desincroniza en silencio. Las rutas relativas no necesitan que nadie declare nada:
+desde `/taller` la llamada va a `/api/etapas`, desde `/tesis/taller` va a `/tesis/api/etapas`, y es
+la misma línea de código.
+
+**El riesgo concreto que evita.** No es un 404. En el nginx de Demo **ya existe un `location /api`**
+hacia otro backend. Con rutas absolutas el taller no habría fallado por no encontrar sus archivos:
+le habría pegado al servicio equivocado y recibido respuestas ajenas. Un fallo silencioso, que es
+peor que uno ruidoso.
+
+**La condición que lo sostiene, y cuándo se rompe.** Funciona porque **todas las páginas están a un
+solo nivel** (`/` y `/taller`) y ninguna se sirve con barra final. Ahí `.` es el directorio de la
+aplicación y `taller` es su hermano. Si algún día apareciera una ruta más profunda —`/taller/algo/`—
+o la misma página respondiera con y sin barra final, las relativas se resolverían distinto según por
+dónde se entró y esto deja de andar. Es el precio de no tener configuración: la restricción no está
+declarada en ningún lado, vive en la forma de las URLs. Agregar un nivel de ruta obliga a revisar
+esta decisión.
+
+**Relación con A6.** Es la misma línea de pensamiento: sin compilación no hay paso que reescriba
+rutas, así que la ruta que se escribe es la que se sirve. Que sea relativa es lo que permite
+desplegar el mismo directorio en la raíz o bajo un prefijo sin tocar un archivo.

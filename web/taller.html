@@ -7,7 +7,7 @@
 <!-- El tema se resuelve acá, antes de pintar nada: si esperara a `tema.js` (que va al final del
      cuerpo) quien tiene el oscuro guardado vería un destello blanco en cada carga. -->
 <script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
-<link rel="stylesheet" href="/estatico/estilos.css">
+<link rel="stylesheet" href="estatico/estilos.css">
 <style>
   .envoltorio { max-width: 1320px; }
 
@@ -167,8 +167,8 @@
 <header class="barra">
   <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
   <nav>
-    <a href="/">El proyecto</a>
-    <a href="/taller" class="activo">Taller</a>
+    <a href=".">El proyecto</a>
+    <a href="taller" class="activo">Taller</a>
     <button class="btn-tema" type="button" title="Cambiar de tema">
       <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" aria-hidden="true">
@@ -263,10 +263,10 @@
   </div>
 </div>
 
-<script src="/estatico/tema.js" defer></script>
-<script src="/estatico/vendor/echarts.min.js"></script>
-<script src="/estatico/grafico.js"></script>
-<script src="/estatico/analisis.js"></script>
-<script src="/estatico/app.js"></script>
+<script src="estatico/tema.js" defer></script>
+<script src="estatico/vendor/echarts.min.js"></script>
+<script src="estatico/grafico.js"></script>
+<script src="estatico/analisis.js"></script>
+<script src="estatico/app.js"></script>
 </body>
 </html>
