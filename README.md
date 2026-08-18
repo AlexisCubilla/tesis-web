@@ -268,7 +268,15 @@ rama»**. Muestra cuatro cortes que el paso por sí solo no da:
   con el corte de candidatos marcado.
 - **Si los candidatos están realmente aislados**, proyectando los tramos a dos dimensiones. Esa
   proyección es solo para mirar: no alimenta ninguna etapa.
+- **Qué hace distinta a una candidata**: cuánto se corre cada característica respecto del resto de
+  los tramos, en desvíos estándar. Es lo que va a mirar quien tenga que etiquetar en la Etapa 2.
 - **Por qué se descartaron esas características**, con el mapa de correlación.
+
+En los nodos de **eventos** aparece además **«¿Es acuerdo, o es duración?»**, que es el único gráfico
+del taller que puede contradecir a la tesis. El aviso de la tabla ya decía que «un evento largo tiene
+más chances de juntar métodos distintos»; el gráfico muestra que la mediana pasa de 2 tramos con tres
+métodos de acuerdo a 12 con cuatro. Plantear la duda y no mostrar la evidencia era lo peor de los dos
+mundos.
 
 Está adentro del taller a propósito: la rama es la que tocaste en el mapa, así que no hay que
 elegirla ni reconocerla en ningún lado.

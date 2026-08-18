@@ -18,14 +18,22 @@ window.Analisis = (function () {
   const miles = (v) => Number(v).toLocaleString('es');
   const $ = (s, raiz) => (raiz || document).querySelector(s);
 
-  /** El texto explicativo de cada corte. Va en el JS porque la pestaña se arma al vuelo. */
-  const SECCIONES = [
+  /** El texto explicativo de cada corte. Va en el JS porque la pestaña se arma al vuelo.
+   *  Depende del nodo: en eventos hay material que en detección todavía no existe. */
+  const secciones = (d) => [
     ['coincidencia', '¿En qué coinciden los métodos?',
      'Es el argumento central del trabajo: como nadie etiquetó estos datos, <strong>el acuerdo entre ' +
      'métodos que piensan distinto reemplaza a la respuesta correcta que no existe</strong>. En la ' +
      'tabla de eventos eso vive comprimido en un «4/5». A la izquierda, cuántos tramos marcan de a ' +
      'pares; en la diagonal, cuántos marca cada uno por su cuenta. A la derecha, cuántos tramos junta ' +
      'cada nivel de acuerdo.'],
+    ...(d.eventos ? [['acuerdo', '¿Es acuerdo, o es duración?',
+     'La pregunta incómoda del corte anterior. Un evento largo abarca muchos tramos vecinos, y ' +
+     'cuantos más tramos abarca, más chances tiene de que <em>algún</em> método haya marcado ' +
+     'alguno — sin que dos métodos hayan coincidido nunca en el mismo tramo. Si los eventos de ' +
+     '4 y 5 métodos resultan ser sistemáticamente los más largos, ese número estaría midiendo ' +
+     'duración antes que consenso. <strong>Cada punto es un evento</strong>; la línea une la ' +
+     'mediana de cada grupo.']] : []),
     ['puntajes', '¿Cómo reparte los puntajes cada método?',
      'Un panel por método, porque <strong>los puntajes no se comparan entre métodos</strong>: cada uno ' +
      'tiene su escala. Lo que sí se compara es la forma. La línea punteada es el corte de candidatos: ' +
@@ -36,6 +44,11 @@ window.Analisis = (function () {
      'efectivamente atípicas; si caen en el medio del montón, marca por algo que esta vista no muestra. ' +
      '<strong>La proyección es solo para mirar</strong>: no alimenta ninguna etapa y ningún número de ' +
      'la tesis depende de ella.'],
+    ['desplazamiento', '¿Qué hace distinta a una candidata?',
+     'Cuánto se corre la media de las candidatas respecto del resto de los tramos, en desvíos ' +
+     'estándar, característica por característica. Es lo que va a mirar quien tenga que etiquetar: ' +
+     'no <em>cuáles</em> son raras, sino <em>en qué</em> son raras. Lo calcula el paquete de la ' +
+     'tesis con las mismas funciones que arman su reporte de feature-shift.'],
     ['correlacion', '¿Por qué se descartaron esas características?',
      'Cada celda es cuánto se mueven juntas dos características. Los bloques intensos fuera de la ' +
      'diagonal son familias que repiten información, y de cada una sobrevive una. Las conservadas van ' +
@@ -44,7 +57,7 @@ window.Analisis = (function () {
 
   /** Arma el armazón de la pestaña y dibuja los cuatro cortes. */
   function pintar(destino, d, alCambiarDetector) {
-    destino.innerHTML = SECCIONES.map(([id, titulo, texto]) => `
+    destino.innerHTML = secciones(d).map(([id, titulo, texto]) => `
       <div class="corte">
         <h4 style="font-size:.95rem;margin:0 0 4px">${titulo}</h4>
         <p class="explica">${texto}</p>
@@ -61,8 +74,10 @@ window.Analisis = (function () {
     cifras(d);
     coincidencia(d);
     reparto(d);
+    if (d.eventos) acuerdoODuracion(d);
     puntajes(d);
     dispersion(d);
+    desplazamiento(d);
     correlacion(d);
     $('#sel-det').addEventListener('change', (e) => alCambiarDetector(e.target.value));
   }
@@ -308,6 +323,89 @@ window.Analisis = (function () {
       }),
       pie: `${f.length} características antes del filtrado; sobreviven ` +
            `${d.correlacion.conservadas.filter(Boolean).length}, en negrita.`,
+    });
+  }
+
+  // ---------------------------------------------------------------- acuerdo vs duración
+  function acuerdoODuracion(d) {
+    const pts = d.eventos.puntos;
+    const grupos = Object.keys(d.eventos.por_acuerdo).map(Number).sort((a, b) => a - b);
+    // Los dos ejes son discretos y 40 puntos se pisan: se separan a mano, con un corrimiento
+    // estable derivado del id para que no salten al redibujar.
+    const jitter = (id) => ((id * 2654435761) % 1000) / 1000 * 0.5 - 0.25;
+    const medianas = grupos.map((k) => [k, d.eventos.por_acuerdo[k].mediana]);
+
+    Grafico.medida($('#g-acuerdo'), {
+      titulo: 'Tamaño del evento contra métodos que lo marcan',
+      alto: 340,
+      opcion: (c) => ({
+        animation: false,
+        textStyle: c.textStyle,
+        grid: { left: 62, right: 26, top: 16, bottom: 52 },
+        tooltip: Object.assign({}, c.tooltip, {
+          formatter: (p) => (p.seriesIndex === 1
+            ? `mediana de <b>${p.data[1]}</b> tramos con ${p.data[0]} métodos`
+            : `<b>Evento ${p.data[2]}</b> · ${p.data[3]}<br>` +
+              `<span style="color:${c.tenue}">${p.data[1]} tramos · ${Math.round(p.data[0])} métodos</span>`),
+        }),
+        // El mínimo tiene que ser entero: ECharts cuenta las marcas desde `min` de a `interval`,
+        // así que con 0,5 caían en 0,5 · 1,5 · 2,5… y ningún grupo quedaba rotulado.
+        xAxis: Object.assign({}, c.eje, { type: 'value', min: 0, max: grupos.length + 0.6,
+          interval: 1, name: 'métodos que marcan el evento', nameLocation: 'middle', nameGap: 30,
+          nameTextStyle: { color: c.tenue }, splitLine: { show: false },
+          axisLabel: { color: c.tenue, formatter: (v) => (d.eventos.por_acuerdo[v]
+            ? `${v}\n(${d.eventos.por_acuerdo[v].n})` : '') } }),
+        yAxis: Object.assign({}, c.eje, { type: 'value', name: 'tramos que abarca',
+          nameTextStyle: { color: c.tenue } }),
+        series: [
+          { type: 'scatter', symbolSize: 11,
+            data: pts.map((p) => [p.detectores + jitter(p.id), p.ventanas, p.id, p.hoja]),
+            itemStyle: { color: V.serie(0), opacity: .75,
+                         borderColor: V.varCss('--panel'), borderWidth: 1 } },
+          { type: 'line', data: medianas, symbol: 'circle', symbolSize: 9,
+            lineStyle: { color: V.serie(3), width: 2 }, itemStyle: { color: V.serie(3) }, z: 4 },
+        ],
+      }),
+      pie: 'Debajo de cada grupo, entre paréntesis, cuántos eventos lo componen: los grupos de 4 y ' +
+           '5 métodos son chicos, así que su mediana se mueve fácil. Es una señal para mirar, no una medición.',
+    });
+  }
+
+  // ---------------------------------------------------------------- desplazamiento de features
+  function desplazamiento(d) {
+    const s = d.desplazamiento;
+    const corto = (n) => n.replace('__', ' · ');
+    // De mayor a menor desvío, y con el mayor arriba: se lee de arriba abajo como un ranking.
+    const orden = s.features.map((_, i) => i).reverse();
+    Grafico.medida($('#g-desplazamiento'), {
+      titulo: `Las ${s.features.length} características que más se corren`,
+      alto: Math.max(300, s.features.length * 17 + 70),
+      opcion: (c) => ({
+        animation: false,
+        textStyle: c.textStyle,
+        grid: { left: 210, right: 40, top: 12, bottom: 40 },
+        tooltip: Object.assign({}, c.tooltip, { trigger: 'item',
+          formatter: (p) => {
+            const i = orden[p.dataIndex];
+            return `<b>${s.shift[i] > 0 ? '+' : ''}${V.fmt(s.shift[i], 2)}</b> desvíos estándar<br>` +
+                   `<span style="color:${c.tenue}">${corto(s.features[i])} · familia ${s.familia[i]}</span>`;
+          } }),
+        xAxis: Object.assign({}, c.eje, { type: 'value',
+          name: 'desvíos estándar respecto del resto de los tramos',
+          nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: c.tenue } }),
+        yAxis: Object.assign({}, c.eje, { type: 'category',
+          data: orden.map((i) => corto(s.features[i])),
+          axisTick: { show: false }, splitLine: { show: false },
+          axisLabel: { color: c.tenue, fontSize: 10, interval: 0 } }),
+        series: [{
+          type: 'bar', barMaxWidth: 11,
+          // Dos tonos porque el signo importa: hacia arriba o hacia abajo de lo normal.
+          data: orden.map((i) => ({ value: s.shift[i],
+            itemStyle: { color: s.shift[i] >= 0 ? V.serie(3) : V.serie(0) } })),
+        }],
+      }),
+      pie: `Calculado sobre las ${miles(s.n_candidatas)} candidatas de ${d.detector}, contra el resto. ` +
+           'Positivo: la candidata tiene ese valor más alto que un tramo normal; negativo, más bajo.',
     });
   }
 

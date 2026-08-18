@@ -283,6 +283,22 @@ entró**.
 vista de fase ya es larga y el mapa de correlación mide unos 760 px. Con pestañas se dibuja una
 sola por vez, así que la altura no se suma.
 
+**Qué muestra, y por qué no es lo mismo en los dos nodos.** Los cortes que salen de los puntajes
+—coincidencia, distribución, dispersión, desplazamiento de características, correlación— son
+idénticos en un nodo de detección y en su hijo de eventos, y tiene que ser así: la etapa de eventos
+hace `salida = dict(entrada)` y solo agrega la tabla, así que los `scores` y las `filtradas` son los
+mismos objetos. Verificado campo por campo.
+
+Lo que sí es exclusivo de eventos es **«¿Es acuerdo, o es duración?»**, que sale de la tabla de
+eventos y no existe un paso antes. Es el único gráfico del taller que puede **contradecir a la
+tesis**: si los eventos de 4 y 5 métodos son sistemáticamente los más largos, ese número mide
+duración antes que consenso, y el consenso es el argumento central del trabajo. La interfaz ya
+advertía del confounder en un aviso de texto; mostrarlo era lo que faltaba.
+
+**Descartado a propósito.** Un histograma de tamaños de evento. Diría lo que los recuadros ya dicen
+(«18 eventos de una ventana», «3 en el límite») y lo que la línea de tiempo ya deja ver. Un gráfico
+que repite algo que está en pantalla hace que el resto pese menos.
+
 **Qué se conservó.** Los enlaces de la pantalla vieja siguen funcionando: `/taller?nodo=…&vista=analisis`
 abre el nodo con la pestaña puesta, para poder guardar o proyectar un enlace directo.
 

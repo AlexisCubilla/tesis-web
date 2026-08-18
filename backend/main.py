@@ -442,6 +442,39 @@ def get_analisis(clave: str, detector: str | None = None):
     proy = U[:, :2] * S[:2]
     varianza = (S ** 2) / float((S ** 2).sum() or 1.0)
 
+    # ---- Qué corre a una candidata del resto -------------------------------------------
+    # Se le pide al paquete de la tesis: `select_candidates` para elegir el grupo y `feature_shift`
+    # para medir el desplazamiento. Es la misma pareja de funciones que usa
+    # `detector_feature_shift_tables`, la que produce el PNG del pipeline. Alcanzaba con parsear la
+    # columna `features_top` de la tabla de eventos, pero esa cadena la arma `export` para
+    # mostrarla, no para consumirla: atarse a su formato se rompe en silencio el día que cambie.
+    from tesis import detection, interpretation
+
+    pos = detection.select_candidates(scores[elegido], cfg_det)
+    corrimiento = interpretation.feature_shift(filtradas, pos)
+    top = corrimiento.head(22)
+    desplazamiento = {
+        "features": [str(i) for i in top.index],
+        "shift": [round(float(v), 4) for v in top["standardized_mean_shift"]],
+        "familia": [str(v) for v in top["feature_family"]],
+        "n_candidatas": int(len(pos)),
+    }
+
+    # ---- Solo donde hay eventos: ¿el acuerdo es acuerdo, o es duración? -----------------
+    # El propio taller advierte que «un evento largo tiene más chances de juntar métodos
+    # distintos». Eso plantea la duda y no muestra la evidencia; acá se muestra.
+    eventos = None
+    if "eventos" in salida and len(salida["eventos"]):
+        t = salida["eventos"]
+        eventos = {
+            "puntos": [{"id": int(r.event_id), "hoja": str(r.SheetName),
+                        "ventanas": int(r.n_ventanas), "detectores": int(r.n_detectores)}
+                       for r in t.itertuples()],
+            "por_acuerdo": {int(k): {"n": int(len(g)), "mediana": float(g["n_ventanas"].median()),
+                                     "media": round(float(g["n_ventanas"].mean()), 2)}
+                            for k, g in t.groupby("n_detectores")},
+        }
+
     marcado_elegido = marcados[elegido]
     meta = salida.get("meta")
     hojas = (meta[grupo].astype(str).tolist() if meta is not None and grupo in meta
@@ -460,6 +493,8 @@ def get_analisis(clave: str, detector: str | None = None):
             "matriz": [[round(float(v), 4) for v in fila] for fila in corr.to_numpy()],
             "conservadas": [c in conservadas for c in cols_prev],
         },
+        "desplazamiento": desplazamiento,
+        "eventos": eventos,
         "dispersion": {
             "x": [round(float(v), 4) for v in proy[:, 0]],
             "y": [round(float(v), 4) for v in proy[:, 1]],
