@@ -109,6 +109,21 @@
   .pestanas button:hover { color: var(--texto); }
   .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--acento); }
 
+  /* Explicación bajo demanda.
+     La interfaz tenía casi 2.000 palabras de prosa: un párrafo editorializando antes de cada
+     gráfico. El sitio es didáctico, así que la explicación no sobra — sobraba que estuviera
+     siempre puesta. Ahora queda una línea que dice qué mirar, y el porqué se despliega para quien
+     lo necesite. Ver `interaction.md` de Distill: mantener la vista general y bajar al detalle. */
+  .pista { font-size: .82rem; color: var(--texto-2); margin: 0 0 8px; max-width: 90ch; }
+  .pista b { color: var(--texto); font-weight: 600; }
+  .saber-mas { margin: -2px 0 12px; }
+  .saber-mas > summary { cursor: pointer; font-size: .78rem; color: var(--acento);
+    list-style: none; display: inline-block; padding: 2px 0; }
+  .saber-mas > summary::before { content: '＋ '; }
+  .saber-mas[open] > summary::before { content: '－ '; }
+  .saber-mas > p { font-size: .82rem; color: var(--texto-2); margin: 6px 0 0;
+    max-width: 78ch; border-left: 2px solid var(--borde); padding-left: 12px; }
+
   /* Los cortes secundarios, plegados: están, pero no compiten con el argumento. */
   .corte.plegado > summary { cursor: pointer; font-weight: 650; font-size: .9rem;
     padding: 10px 0; list-style: none; }

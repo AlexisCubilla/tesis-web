@@ -34,6 +34,9 @@ const api = async (ruta, op) => {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
   return r.json();
 };
+/** Una línea de qué mirar, y el porqué plegado. Ver `.saber-mas` en taller.html. */
+const pista = (corta, larga) => `<p class="pista">${corta}</p>` + (larga
+  ? `<details class="saber-mas"><summary>Por qué</summary><p>${larga}</p></details>` : '');
 const miles = (v) => typeof v === 'number' ? v.toLocaleString('es') : v;
 
 // ============================================================================ arranque
@@ -519,11 +522,10 @@ function verSerie(d) {
     <span class="esp"></span><select id="sel-hoja">${d.hojas.map((h) =>
       `<option ${h === d.hoja ? 'selected' : ''}>${h}</option>`).join('')}</select></div>
     <div id="caja-serie"></div>
-    <p class="tenue" style="font-size:.78rem;margin-top:8px">Un panel por señal, cada uno con su propia
-    escala y su unidad, y el eje horizontal compartido. Antes iban las tres encimadas y escaladas cada
-    una a su rango: se comparaban las formas, pero las alturas no querían decir nada y no había forma
-    de leer un valor. Pasá el puntero para ver los tres valores a la vez, y usá la barra de abajo o la
-    lupa de la esquina para acercarte a un tramo.</p>
+    ${pista('Un panel por señal, con su escala y su unidad. El eje horizontal es común a los tres.',
+      'Las tres señales tienen unidades distintas —volts, miliamperios, grados—, así que superponerlas ' +
+      'obliga a escalar cada una a su propio rango y las alturas dejan de significar algo. En paneles ' +
+      'separados se comparan las formas y además se lee el valor.')}
     <h4 style="font-size:.88rem;margin:18px 0 6px">Mediciones por hoja</h4><div id="caja-hojas"></div>`;
   const dibujar = (dd) => {
     const caja = $('#caja-serie');
@@ -547,10 +549,10 @@ function verSerie(d) {
 
 function verVentanas(d) {
   $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo quedó un tramo</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:10px">Cuatro tramos tomados de distintas
-    partes del conjunto. Cada uno son ${d.tamano} mediciones consecutivas
-    (~${Math.round(d.tamano * S.muestreo / 60)} min) y es la unidad que los detectores van a puntuar.
-    Pasá el puntero por encima para ver los valores.</p>
+    ${pista(`Cuatro tramos de ${d.tamano} mediciones (~${Math.round(d.tamano * S.muestreo / 60)} min), ` +
+      'tomados de distintas partes del registro.',
+      'Una falla no es un valor suelto sino un comportamiento a lo largo del tiempo, así que la unidad ' +
+      'de análisis no es la fila sino el tramo. Cada uno de estos es lo que los detectores van a puntuar.')}
     <div class="mini" id="caja-mini"></div>
     <h4 style="font-size:.88rem;margin:18px 0 6px">Tramos por hoja</h4><div id="caja-hojas"></div>`;
   d.ejemplos.forEach((ej) => {
@@ -585,12 +587,10 @@ function verFeatures(d) {
         ${senal} <span style="color:var(--acento-2)">${fs.length}</span></div>
       <div class="pildoras">${fs.map((f) => `<span class="pildora">${f}</span>`).join('')}</div></div>`).join('')}
     <h4 style="font-size:.88rem;margin:20px 0 4px">Y cómo se reparten esos números</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:6px">Cada caja abarca la mitad central de
-    los tramos, y la línea de adentro es la mediana. <strong>El eje está en desvíos estándar</strong>,
-    porque en sus unidades originales no se podrían poner juntas: una está en volts, otra en
-    miliamperios y otra es una energía de seis cifras. Así el eje quiere decir una sola cosa para las
-    ${d.total} y lo que se compara es la forma: las de cola larga son las que van a servir para
-    encontrar tramos raros.</p>
+    ${pista('Las de <b>cola larga</b> son las que sirven para encontrar tramos raros.',
+      'Cada caja abarca la mitad central de los tramos y la línea de adentro es la mediana. El eje va ' +
+      'en desvíos estándar porque en sus unidades originales no se pueden poner juntas: una está en ' +
+      'volts, otra en miliamperios y otra es una energía de seis cifras.')}
     <div id="caja-feats"></div>`;
   cajasDeFeatures($('#caja-feats'), d.cajas);
 }
@@ -648,18 +648,16 @@ function verFiltrado(d) {
       <div class="celda"><div class="v">${cuenta('repite a otra')}</div><div class="r">se van por repetir a otra</div></div>
     </div>
     <h4 style="font-size:.88rem;margin:20px 0 4px">Por qué se cae cada una</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:6px">El filtro mira el <strong>rango
-    intercuartílico</strong>: cuánto se mueve la característica entre el tramo típico bajo y el típico
-    alto. Las que casi no se mueven no distinguen nada. La línea punteada es el corte real — el
-    percentil ${d.percentil} de todas — y a su izquierda quedan las descartadas por eso. Ojo con el
-    orden: los dos filtros van en cadena, así que lo que se cae por acá ni siquiera llega a
-    compararse con las demás.</p>
+    ${pista(`A la izquierda de la línea punteada, lo que se descarta por moverse poco (percentil ${d.percentil}).`,
+      'El filtro mira el rango intercuartílico: cuánto se mueve la característica entre el tramo típico ' +
+      'bajo y el típico alto. Las que casi no se mueven no distinguen un tramo de otro. Los dos filtros ' +
+      'van en cadena, así que lo que se cae acá ni siquiera llega a compararse con las demás.')}
     <div id="caja-iqr"></div>
     <h4 style="font-size:.88rem;margin:22px 0 4px">Y cuáles repiten a otra</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:6px">Cada celda es cuánto se mueven juntas
-    dos características. Donde hay un bloque intenso fuera de la diagonal, esas dicen lo mismo: de
-    cada grupo con correlación ${d.umbral_correlacion} o más sobrevive una sola. Los rótulos en
-    negrita son las conservadas.</p>
+    ${pista('Los <b>bloques intensos fuera de la diagonal</b> son familias que repiten información: ' +
+      'de cada una sobrevive una.',
+      `Cada celda es cuánto se mueven juntas dos características. Con correlación ${d.umbral_correlacion} ` +
+      'o más se considera que dicen lo mismo. Los rótulos en negrita son las conservadas.')}
     <div id="caja-corr"></div>`;
   iqrDeFeatures($('#caja-iqr'), d);
   correlacionDeFeatures($('#caja-corr'), d);
@@ -752,10 +750,9 @@ function correlacionDeFeatures(destino, d) {
 
 function verScores(d) {
   $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo se reparten los puntajes</h4>
-    <p class="tenue" style="font-size:.8rem;margin-bottom:8px">Cada método le pone un puntaje a cada
-    tramo y los ordena. Los puntajes <strong>no se comparan entre métodos</strong>: cada uno tiene su
-    escala. Cómo los reparte cada uno —y dónde cae el corte de candidatos— está en la pestaña
-    <strong>Análisis de la rama</strong>.</p>
+    ${pista('Los puntajes <b>no se comparan entre métodos</b>: cada uno tiene su escala.',
+      'Cada método ordena los tramos del menos al más raro según su propia idea de «raro». Cómo los ' +
+      'reparte cada uno, y dónde cae el corte de candidatos, está en la pestaña Análisis de la rama.')}
     <h4 style="font-size:.88rem;margin:18px 0 8px">Los tramos más extremos según cada método</h4>
     <div class="mini">${d.detectores.map((det, i) => `
       <div class="caja"><h5 style="color:var(--serie-${(i % 5) + 1})">${det}</h5>
@@ -780,9 +777,8 @@ function verEventos(d) {
     <div class="descargas">
       <div>
         <h4 style="font-size:.92rem;margin:0 0 2px">Llevarse el entregable</h4>
-        <p class="tenue" style="font-size:.78rem;margin:0">Los mismos Excel que produce el pipeline de
-        la tesis, pero con <strong>la configuración de esta rama</strong>. Cada archivo abre con una
-        hoja que dice de dónde salió y si coincide con la configuración firmada.</p>
+        <p class="pista" style="margin:0">Los mismos Excel del pipeline, con <b>la configuración de esta
+        rama</b>. Cada uno abre con una hoja que dice de dónde salió.</p>
       </div>
       <span class="esp"></span>
       <a class="boton" download href="/api/nodo/${S.sel}/excel/experto"

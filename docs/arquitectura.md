@@ -256,6 +256,18 @@ análisis; y la curva de percentiles de la etapa de detección se fue porque es 
 que el histograma del análisis —una acumulada y una densidad dicen lo mismo—, que además marca el
 corte de candidatos.
 
+**La explicación va bajo demanda, no siempre puesta.** La interfaz llegó a tener **1.975 palabras**
+de prosa: un párrafo editorializando antes de cada gráfico, y los cinco títulos del análisis eran
+preguntas —«¿En qué coinciden los métodos?», «¿Es acuerdo, o es duración?»…—, que no es estilo sino
+una plantilla. El sitio es didáctico, así que la explicación no sobra; sobraba que estuviera siempre
+delante. Ahora el título nombra, una línea dice **dónde mirar**, y el porqué se despliega para quien
+lo busque. Quedan 188 palabras visibles.
+
+**Guiar es señalar dentro del dibujo.** Un párrafo al lado no guía: compite. En «Acuerdo, o
+duración» la banda y el rótulo del salto se **calculan** —el mayor entre dos grupos consecutivos, y
+solo si supera un umbral—, no se escriben a mano, para que la anotación siga siendo cierta en
+cualquier rama.
+
 **Y no todo pesa igual.** En el análisis, los cortes que sostienen el argumento van abiertos y el
 resto detrás de un pliegue. Con nueve gráficos del mismo peso visual no se distinguía el que puede
 refutar la tesis del que está para mirar.

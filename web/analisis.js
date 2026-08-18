@@ -20,43 +20,43 @@ window.Analisis = (function () {
 
   /** El texto explicativo de cada corte. Va en el JS porque la pestaña se arma al vuelo.
    *  Depende del nodo: en eventos hay material que en detección todavía no existe. */
+  /** Cada corte: id, título, la línea que dice qué mirar, el porqué (plegado) y si es secundario.
+   *
+   *  Los títulos eran los cinco preguntas —«¿En qué coinciden los métodos?», «¿Es acuerdo, o es
+   *  duración?»…—, que no es estilo sino una plantilla, y cada uno traía un párrafo editorializando
+   *  antes del gráfico. La interfaz llegó a tener casi 2.000 palabras de prosa. Ahora el título
+   *  nombra, la línea dice dónde mirar, y el porqué está para quien lo busque. */
   const secciones = (d) => [
-    ['coincidencia', '¿En qué coinciden los métodos?',
-     'Es el argumento central del trabajo: como nadie etiquetó estos datos, <strong>el acuerdo entre ' +
-     'métodos que piensan distinto reemplaza a la respuesta correcta que no existe</strong>. En la ' +
-     'tabla de eventos eso vive comprimido en un «4/5». A la izquierda, cuántos tramos marcan de a ' +
-     'pares; en la diagonal, cuántos marca cada uno por su cuenta. A la derecha, cuántos tramos junta ' +
-     'cada nivel de acuerdo.'],
-    ...(d.eventos ? [['acuerdo', '¿Es acuerdo, o es duración?',
-     'La pregunta incómoda del corte anterior. Un evento largo abarca muchos tramos vecinos, y ' +
-     'cuantos más tramos abarca, más chances tiene de que <em>algún</em> método haya marcado ' +
-     'alguno — sin que dos métodos hayan coincidido nunca en el mismo tramo. Si los eventos de ' +
-     '4 y 5 métodos resultan ser sistemáticamente los más largos, ese número estaría midiendo ' +
-     'duración antes que consenso. <strong>Cada punto es un evento</strong>; la línea une la ' +
-     'mediana de cada grupo.']] : []),
-    ['desplazamiento', '¿Qué hace distinta a una candidata?',
-     'Cuánto se corre la media de las candidatas respecto del resto de los tramos, en desvíos ' +
-     'estándar, característica por característica. Es lo que va a mirar quien tenga que etiquetar: ' +
-     'no <em>cuáles</em> son raras, sino <em>en qué</em> son raras. Lo calcula el paquete de la ' +
-     'tesis con las mismas funciones que arman su reporte de feature-shift.'],
-    ['puntajes', '¿Cómo reparte los puntajes cada método?',
-     'Un panel por método, porque <strong>los puntajes no se comparan entre métodos</strong>: cada uno ' +
-     'tiene su escala. Lo que sí se compara es la forma. La línea punteada es el corte de candidatos: ' +
-     'todo lo que queda a su derecha es lo que ese método marca.', true],
-    ['dispersion', '¿Están realmente aislados los candidatos?',
-     'Cada punto es un tramo, proyectado a dos dimensiones para poder verlo. Los marcados por el método ' +
-     'elegido van resaltados. Si aparecen en el borde de la nube, el método está encontrando cosas ' +
-     'efectivamente atípicas; si caen en el medio del montón, marca por algo que esta vista no muestra. ' +
-     '<strong>La proyección es solo para mirar</strong>: no alimenta ninguna etapa y ningún número de ' +
-     'la tesis depende de ella.', true],
+    ['coincidencia', 'Coincidencia entre métodos',
+     'La diagonal es cuántos marca cada uno solo; fuera de ella, cuántos comparten de a pares.',
+     'Nadie etiquetó estos datos, así que no hay contra qué medir el acierto. Que métodos con ideas ' +
+     'distintas de «raro» señalen el mismo tramo es lo que reemplaza a esa respuesta que no existe.'],
+    ...(d.eventos ? [['acuerdo', 'Acuerdo, o duración',
+     'Si los eventos de más métodos son también los más largos, el acuerdo puede ser un efecto del tamaño.',
+     'Un evento largo abarca muchos tramos vecinos, y cuantos más abarca, más chances tiene de que ' +
+     'algún método haya marcado alguno — sin que dos hayan coincidido nunca en el mismo tramo.']] : []),
+    ['desplazamiento', 'Qué corre en una candidata',
+     'Cuánto se aparta cada característica respecto del resto de los tramos, en desvíos estándar.',
+     'Es lo que va a mirar quien tenga que etiquetar en la Etapa 2: no cuáles son raras, sino en qué ' +
+     'lo son. Lo calcula el paquete de la tesis, con las funciones de su reporte de feature-shift.'],
+    ['puntajes', 'Reparto de puntajes',
+     'La línea punteada es el corte de candidatos: a su derecha, lo que ese método marca.',
+     'Un panel por método porque los puntajes no se comparan entre sí: cada uno tiene su escala. Lo ' +
+     'que sí se compara es la forma — una cola larga y separada distingue mejor que una campana.', true],
+    ['dispersion', 'Los candidatos en el plano',
+     'En el borde de la nube, el método encuentra algo atípico; en el medio, marca por otra cosa.',
+     'La proyección a dos dimensiones es solo para mirar: no alimenta ninguna etapa, no se guarda y ' +
+     'ningún número del trabajo depende de ella.', true],
   ];
+
 
   /** Arma el armazón de la pestaña y dibuja los cuatro cortes. */
   /** Un corte: título, explicación y el hueco donde va su gráfico. */
-  const bloque = (d) => ([id, titulo, texto]) => `
+  const bloque = (d) => ([id, titulo, linea, porque]) => `
       <div class="corte">
         <h4 style="font-size:.95rem;margin:0 0 4px">${titulo}</h4>
-        <p class="explica">${texto}</p>
+        <p class="pista">${linea}</p>
+        ${porque ? `<details class="saber-mas"><summary>Por qué</summary><p>${porque}</p></details>` : ''}
         ${id === 'coincidencia' ? '<div class="resumen-grid" id="cifras" style="margin:0 0 12px"></div>' : ''}
         ${id === 'dispersion' ? `<div class="fila-sup"><span class="esp"></span>
            <label class="tenue" style="font-size:.8rem" for="sel-det">Método</label>
@@ -69,8 +69,8 @@ window.Analisis = (function () {
 
   function pintar(destino, d, alCambiarDetector) {
     const todas = secciones(d);
-    const principales = todas.filter((x) => !x[3]);
-    const secundarias = todas.filter((x) => x[3]);
+    const principales = todas.filter((x) => !x[4]);
+    const secundarias = todas.filter((x) => x[4]);
 
     // Los secundarios van detrás de un pliegue. No es esconderlos: es decir cuáles son los que
     // sostienen el argumento. Con nueve gráficos del mismo peso no se distingue el que puede
@@ -149,8 +149,6 @@ window.Analisis = (function () {
           emphasis: { itemStyle: { borderColor: V.varCss('--acento'), borderWidth: 2 } },
         }],
       }),
-      pie: 'La diagonal es cuántos marca cada método por su cuenta: siempre el mismo número, porque ' +
-           'cada uno marca su top del mismo tamaño.',
     });
   }
 
@@ -180,8 +178,6 @@ window.Analisis = (function () {
           label: { show: true, position: 'top', color: c.tinta, fontFamily: 'ui-monospace, monospace' },
         }],
       }),
-      pie: 'Que un tramo lo marquen 4 o 5 métodos distintos es la señal más fuerte que este trabajo ' +
-           'puede dar sin etiquetas.',
     });
   }
 
@@ -239,7 +235,8 @@ window.Analisis = (function () {
           }),
         };
       },
-      pie: dets.map((n) => `${n}: ${d.puntajes[n].atipicos} tramos fuera de los bigotes`).join(' · '),
+      pie: 'Bigotes a 1,5 veces el rango intercuartílico: ' +
+         dets.map((n) => `${n} ${d.puntajes[n].atipicos}`).join(' · ') + ' tramos fuera.',
     });
   }
 
@@ -295,6 +292,15 @@ window.Analisis = (function () {
     const jitter = (id) => ((id * 2654435761) % 1000) / 1000 * 0.5 - 0.25;
     const medianas = grupos.map((k) => [k, d.eventos.por_acuerdo[k].mediana]);
 
+    // Guiar es señalar dentro del dibujo, no escribir un párrafo al lado. El salto se busca —el
+    // mayor entre dos grupos consecutivos— para que la anotación siga siendo cierta en otra rama,
+    // y solo se marca si es grande de verdad.
+    let salto = null;
+    for (let i = 1; i < medianas.length; i++) {
+      const dif = medianas[i][1] - medianas[i - 1][1];
+      if (dif > 2 && (!salto || dif > salto.dif)) salto = { dif, desde: medianas[i - 1], hasta: medianas[i] };
+    }
+
     Grafico.medida($('#g-acuerdo'), {
       titulo: 'Tamaño del evento contra métodos que lo marcan',
       alto: 340,
@@ -323,11 +329,19 @@ window.Analisis = (function () {
             itemStyle: { color: V.serie(0), opacity: .75,
                          borderColor: V.varCss('--panel'), borderWidth: 1 } },
           { type: 'line', data: medianas, symbol: 'circle', symbolSize: 9,
-            lineStyle: { color: V.serie(3), width: 2 }, itemStyle: { color: V.serie(3) }, z: 4 },
+            lineStyle: { color: V.serie(3), width: 2 }, itemStyle: { color: V.serie(3) }, z: 4,
+            markArea: salto ? {
+              silent: true,
+              itemStyle: { color: V.serie(3), opacity: .07 },
+              label: { show: true, position: 'insideTop', color: V.serie(3), fontSize: 11,
+                       fontWeight: 600,
+                       formatter: `la mediana salta de ${salto.desde[1]} a ${salto.hasta[1]} tramos` },
+              data: [[{ xAxis: salto.desde[0] }, { xAxis: grupos[grupos.length - 1] + 0.6 }]],
+            } : undefined },
         ],
       }),
-      pie: 'Debajo de cada grupo, entre paréntesis, cuántos eventos lo componen: los grupos de 4 y ' +
-           '5 métodos son chicos, así que su mediana se mueve fácil. Es una señal para mirar, no una medición.',
+      pie: 'Entre paréntesis, cuántos eventos tiene cada grupo. Los de 4 y 5 métodos son chicos: ' +
+           'su mediana se mueve fácil.',
     });
   }
 
