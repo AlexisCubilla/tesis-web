@@ -136,8 +136,22 @@ corridas crea una segunda fuente de verdad que compite con ese registro. Si en u
 pregunta *"¿esta tabla salió de la configuración firmada o de una corrida exploratoria?"*, tiene que
 haber una respuesta inmediata.
 
-**Pendiente.** Marcar visualmente cuál rama corresponde a la configuración oficial (ADR-0008: dedup
-0,95, límite 15) para distinguirla de un vistazo.
+**Resuelto.** La marca ★ distingue de un vistazo las ramas que coinciden con la configuración
+oficial, tanto en el mapa como en el nombre de cada rama en la pantalla de análisis.
+
+**Consecuencia al exportar: todo Excel que sale del taller abre con una hoja «Procedencia».**
+Desde que el taller genera entregables, la pregunta de la defensa deja de ser hipotética: alguien
+va a tener un archivo en la mano. Esa hoja va **primera** —es lo que se ve al abrir, no algo que
+haya que ir a buscar— y dice si la rama coincide con la configuración de la tesis, cuál es su
+clave, con qué commit del paquete se generó, la configuración completa paso por paso y, si se
+aparta, en qué. El nombre del archivo también lo lleva: `..._tesis.xlsx` contra `..._rama-58ef8255.xlsx`,
+para poder distinguirlos sin abrirlos.
+
+**Trampa documentada.** Comparar los parámetros con la referencia serializándolos a JSON no
+funciona: los valores salen del backend como float, pasan por el navegador —que tiene un solo tipo
+numérico— y vuelven como entero, así que `percentil_baja_var=5` no coincidía con `5.0` y **la
+configuración de la tesis aparecía apartándose de sí misma**. Todos sus Excel salían marcados como
+exploratorios. La comparación es por valor, no por su texto, y hay tests que la cubren.
 
 ---
 

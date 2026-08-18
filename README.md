@@ -247,6 +247,16 @@ configuración quedan marcadas con ★.
 
 **Borrar** elimina el paso seleccionado, todo lo que cuelga de él y sus resultados en disco.
 
+**Llevarse el entregable.** Desde el último paso se descargan los mismos tres Excel que produce el
+pipeline de la tesis —el de revisión experta, el presentable y el de contraste normal— pero con la
+configuración de *esa* rama. No los reimplementa nadie: son las mismas funciones de `tesis.export`.
+
+Cada archivo abre con una hoja **Procedencia** que dice si la rama coincide con la configuración de
+la tesis, con qué commit del paquete se generó y cuál fue su configuración completa. El nombre lo
+lleva también: `candidatos_etapa1_tesis.xlsx` contra `candidatos_etapa1_rama-58ef8255.xlsx`. Sin eso,
+en unos meses nadie podría decir si el Excel que tiene en la mano salió de la configuración firmada
+o de una prueba.
+
 ## La pantalla de Análisis
 
 El taller sirve para *operar*: configurar, ejecutar, ramificar. **Análisis** es para mirar una rama
@@ -276,5 +286,4 @@ Necesita una rama que llegue por lo menos al paso 5 (detección).
 La cadena completa (datos → ventaneo → características → filtrado → detección → eventos) anda de punta
 a punta, con ramas, caché, borrado e inspección por etapa.
 
-Pendiente: estabilidad Jaccard y feature-shift como etapas, exportar el Excel entregable desde el
-taller, comparar dos ramas lado a lado, y la animación de la ventana deslizándose sobre la señal.
+Pendiente: estabilidad Jaccard y feature-shift como etapas, comparar dos ramas lado a lado, y la animación de la ventana deslizándose sobre la señal.

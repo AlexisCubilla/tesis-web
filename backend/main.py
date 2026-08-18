@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import shutil
+import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from . import ajustes, almacen, etapas, trabajos
 
@@ -495,6 +498,172 @@ def get_evento(clave: str, event_id: int):
         "valores": [[None if np.isnan(v) else float(v) for v in fila_v] for fila_v in acum],
     }
 
+
+# --------------------------------------------------------------------------------------
+# El entregable: los Excel que produce el pipeline, pero de la rama que elijas
+# --------------------------------------------------------------------------------------
+
+#: Los tres exportables del paquete de la tesis, con el nombre base de su archivo.
+EXPORTABLES = {
+    "experto": ("candidatos_etapa1", "Candidatos consolidados para revisión experta"),
+    "presentable": ("candidatos_etapa1_presentable", "Versión presentable, con formato y gráficos"),
+    "normales": ("ventanas_normales_contraste", "Ventanas normales, para contrastar"),
+}
+
+
+def _mismo_valor(a, b) -> bool:
+    """¿Son el mismo valor de parámetro, sin tropezarse con el tipo?
+
+    Hace falta porque `5` y `5.0` son el mismo umbral pero no el mismo JSON. Los parámetros salen
+    del backend como float, pasan por el navegador —que tiene un solo tipo numérico y los colapsa a
+    entero— y vuelven así al guardarse. Comparando el texto JSON, la configuración de la tesis
+    aparecía apartándose de sí misma por `percentil_baja_var=5` contra `5.0`.
+    """
+    # `bool` es subclase de `int`, así que va antes que la rama numérica. Comparar
+    # `bool(a) is bool(b)` sería más simple pero colapsa cualquier valor no nulo a verdadero, y
+    # entonces `True` y `2` pasarían por iguales. Se compara el valor, no su veracidad.
+    if isinstance(a, bool) and isinstance(b, bool):
+        return a is b
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return float(a) == float(b)
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(_mismo_valor(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def _diferencias_con_la_tesis(cadena: list[dict]) -> list[tuple[str, str, object, object]]:
+    """Qué parámetros de la rama se apartan de la configuración de referencia.
+
+    Es lo mismo que muestra la pantalla de análisis, calculado acá porque el Excel se genera en el
+    servidor y tiene que poder decir de dónde salió sin depender del navegador.
+    """
+    dif = []
+    for nodo in cadena:
+        ref = ajustes.CONFIG_TESIS.get(nodo["etapa"], {})
+        for k, v in (nodo["parametros"] or {}).items():
+            if k in ref and not _mismo_valor(v, ref[k]):
+                dif.append((nodo["etapa"], k, v, ref[k]))
+    return dif
+
+
+def _hoja_de_procedencia(ruta: Path, nodo: dict, cadena: list[dict], dif: list) -> None:
+    """Antepone al Excel una hoja que dice de qué rama salió.
+
+    Sin esto el taller produciría archivos indistinguibles de los oficiales de la tesis, que es
+    justo lo que el ADR A7 quiere evitar: dentro de seis meses nadie podría decir si un Excel vino
+    de la configuración firmada o de una prueba. La hoja va PRIMERA a propósito — es lo que se ve
+    al abrir el archivo, no algo que haya que ir a buscar.
+    """
+    import openpyxl
+
+    libro = openpyxl.load_workbook(ruta)
+    hoja = libro.create_sheet("Procedencia", 0)
+    hoja.column_dimensions["A"].width = 26
+    hoja.column_dimensions["B"].width = 64
+
+    filas = [
+        ("Generado por", "Taller Etapa 1 — banco de experimentación"),
+        ("", ""),
+        ("¿Es la configuración de la tesis?",
+         "SÍ — coincide en todos los parámetros" if not dif
+         else f"NO — {len(dif)} parámetro(s) distinto(s); ver el detalle abajo"),
+        ("", ""),
+        ("Rama (clave)", nodo["clave"]),
+        ("Commit del paquete `tesis`", nodo.get("commit_tesis") or almacen.commit_tesis()),
+        ("Generado el", _ahora_iso()),
+        ("", ""),
+        ("ADVERTENCIA", "Las ramas del taller son exploración. El registro canónico de la tesis "
+                        "—código, decisiones y resultados firmados— vive en el repositorio de la tesis."),
+        ("", ""),
+        ("CONFIGURACIÓN DE ESTA RAMA", ""),
+    ]
+    for nodo_c in cadena:
+        params = ", ".join(f"{k}={v}" for k, v in sorted((nodo_c["parametros"] or {}).items()))
+        filas.append((nodo_c["etapa"], params or "(sin parámetros)"))
+
+    if dif:
+        filas += [("", ""), ("SE APARTA DE LA TESIS EN", "")]
+        for etapa, k, v, ref in dif:
+            filas.append((f"{etapa} · {k}", f"{v}   (en la tesis: {ref})"))
+
+    for i, (a, b) in enumerate(filas, start=1):
+        hoja.cell(row=i, column=1, value=a).font = openpyxl.styles.Font(bold=True)
+        hoja.cell(row=i, column=2, value=str(b))
+        hoja.cell(row=i, column=2).alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="top")
+    libro.save(ruta)
+
+
+def _ahora_iso() -> str:
+    from datetime import datetime
+
+    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+
+
+@app.get("/api/nodo/{clave}/excel/{tipo}")
+def get_excel(clave: str, tipo: str):
+    """Genera y devuelve uno de los Excel entregables, para la rama que se esté mirando.
+
+    El taller ya tenía todo lo necesario en el caché del nodo; lo único que faltaba era llamar a
+    las funciones de `export` que el pipeline usa y devolver el archivo. Nada se reimplementa
+    (ADR A1): son las mismas tres funciones del paquete de la tesis.
+
+    Tarda menos de un segundo, así que va en la propia petición y no por la cola de trabajos.
+    """
+    import dataclasses as dc
+
+    if tipo not in EXPORTABLES:
+        raise HTTPException(404, f"Tipo desconocido: {tipo}. Hay: {', '.join(EXPORTABLES)}")
+
+    nodo = almacen.obtener(_con, clave)
+    if nodo is None:
+        raise HTTPException(404, "Nodo inexistente")
+    if nodo["etapa"] != "eventos" or nodo["estado"] != "listo" or not nodo["tiene_resultado"]:
+        raise HTTPException(409, "El entregable sale del último paso: hace falta un nodo de eventos listo")
+
+    salida = almacen.cargar_resultado(clave)
+    cadena = almacen.cadena_hasta(_con, clave)
+    dif = _diferencias_con_la_tesis(cadena)
+
+    from tesis import export
+    from tesis.config import CONFIG
+
+    params = nodo["parametros"]
+    cfg = dc.replace(
+        CONFIG.detection,
+        detectors=tuple(salida["scores"].columns),
+        candidate_fraction=float(params["fraccion_candidatos"]),
+        max_event_windows=int(params["max_ventanas_evento"]) if params["max_ventanas_evento"] else None,
+    )
+
+    base, _titulo = EXPORTABLES[tipo]
+    # El nombre lleva la procedencia: quien recibe el archivo suelto tiene que poder distinguir
+    # el de la configuración firmada del de una prueba sin abrirlo.
+    marca = "tesis" if not dif else f"rama-{clave[:8]}"
+    carpeta = Path(tempfile.mkdtemp(prefix="taller-xlsx-"))
+    destino = carpeta / f"{base}_{marca}.xlsx"
+
+    if tipo == "experto":
+        export.build_expert_excel(salida["scores"], salida["meta"], destino,
+                                  features=salida["filtradas"], detection_cfg=cfg,
+                                  window_size=salida["tamano_ventana"])
+    elif tipo == "presentable":
+        export.build_presentation_excel(salida["eventos"], destino,
+                                        raw_windows=salida["ventanas"], scores=salida["scores"],
+                                        detection_cfg=cfg)
+    else:
+        normales = export.select_normal_windows(salida["scores"], salida["meta"], detection_cfg=cfg,
+                                                n_examples=20, window_size=salida["tamano_ventana"])
+        export.build_normal_examples_excel(normales, salida["ventanas"], destino)
+
+    _hoja_de_procedencia(destino, nodo, cadena, dif)
+    return FileResponse(
+        destino, filename=destino.name,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        # El temporal se borra recién cuando terminó de mandarse.
+        background=BackgroundTask(shutil.rmtree, carpeta, ignore_errors=True),
+    )
 
 # --------------------------------------------------------------------------------------
 # Web estática

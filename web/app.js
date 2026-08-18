@@ -723,6 +723,21 @@ function verEventos(d) {
       <em>al menos un tramo</em> dentro del evento — no que coincidieran en el mismo. Un evento largo
       tiene más chances de juntar métodos distintos. En «qué se desvió», el número está en desvíos
       respecto de lo normal: +9 es muchísimo, +2 es notorio pero no extremo.</div>
+    <div class="descargas">
+      <div>
+        <h4 style="font-size:.92rem;margin:0 0 2px">Llevarse el entregable</h4>
+        <p class="tenue" style="font-size:.78rem;margin:0">Los mismos Excel que produce el pipeline de
+        la tesis, pero con <strong>la configuración de esta rama</strong>. Cada archivo abre con una
+        hoja que dice de dónde salió y si coincide con la configuración firmada.</p>
+      </div>
+      <span class="esp"></span>
+      <a class="boton" download href="/api/nodo/${S.sel}/excel/experto"
+         title="Candidatos consolidados, con el porqué de cada evento">Para el experto</a>
+      <a class="boton" download href="/api/nodo/${S.sel}/excel/presentable"
+         title="Versión con formato, tiempo real y gráficos">Presentable</a>
+      <a class="boton" download href="/api/nodo/${S.sel}/excel/normales"
+         title="Ventanas normales, para contrastar contra las candidatas">Contraste normal</a>
+    </div>
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem">clic en una fila para ver sus señales</span></div>
