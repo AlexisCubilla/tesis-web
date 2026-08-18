@@ -345,17 +345,17 @@ scripts, ni los enlaces de navegación, ni las llamadas a la API: `estatico/esti
 `api/etapas`, `taller`, `.`. El navegador las resuelve contra la página actual, no contra la raíz.
 
 **Por qué.** Una ruta absoluta obliga a que la aplicación viva en la raíz del dominio. Al montarla
-detrás de un prefijo —`https://demo/tesis/`— la portada carga pero pide `/estatico/estilos.css`, que
-en ese servidor no es suyo. La alternativa habitual es un `<base href>` o una variable de
+detrás de un prefijo —`https://ejemplo.org/tesis/`— la portada carga pero pide `/estatico/estilos.css`,
+que en ese servidor no es suyo. La alternativa habitual es un `<base href>` o una variable de
 configuración con el prefijo; las dos agregan un valor que hay que acordar entre el servidor y el
 código, y que se desincroniza en silencio. Las rutas relativas no necesitan que nadie declare nada:
 desde `/taller` la llamada va a `/api/etapas`, desde `/tesis/taller` va a `/tesis/api/etapas`, y es
 la misma línea de código.
 
-**El riesgo concreto que evita.** No es un 404. En el nginx de Demo **ya existe un `location /api`**
-hacia otro backend. Con rutas absolutas el taller no habría fallado por no encontrar sus archivos:
-le habría pegado al servicio equivocado y recibido respuestas ajenas. Un fallo silencioso, que es
-peor que uno ruidoso.
+**El riesgo concreto que evita.** No es un 404. Un servidor que aloja varias aplicaciones bajo
+prefijos puede tener **su propio `/api`** apuntando a otro backend. Con rutas absolutas el taller no
+falla por no encontrar sus archivos: le pega al servicio equivocado y recibe respuestas ajenas. Un
+fallo silencioso, que es peor que uno ruidoso.
 
 **La condición que lo sostiene, y cuándo se rompe.** Funciona porque **todas las páginas están a un
 solo nivel** (`/` y `/taller`) y ninguna se sirve con barra final. Ahí `.` es el directorio de la
