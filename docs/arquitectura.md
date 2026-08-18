@@ -20,7 +20,28 @@ parámetro nuevo (por ejemplo, el interruptor de limpieza), el cambio va **en el
 su ADR y su entrada de changelog — no acá.
 
 **Verificación.** Con los valores por defecto el taller reproduce la corrida oficial exactamente:
-24.138 filas, 6.102 ventanas, 45 características, 40 eventos, 3 en el límite.
+24.138 filas, 6.102 ventanas, 45 características, 40 eventos, 3 en el límite. Hay tests que lo
+afirman (`mise run test`), porque una afirmación así no puede depender de que alguien la mire.
+
+**Cómo se cumple, en concreto.** El paquete se instala con `pip install -e`, así que no hay copia:
+`tesis.export.__file__` apunta al `.py` del repo de la tesis y editarlo ahí cambia lo que ejecuta el
+taller en la petición siguiente. Las seis etapas, la selección de candidatos y los tres Excel del
+entregable son llamadas a esas funciones.
+
+**Dónde el backend sí calcula, y por qué se acepta.** Para dibujar hace falta más que lo que el
+paquete expone: histogramas, percentiles, cajas, matrices de correlación y una proyección 2D. Todo
+eso es *presentación* —descriptivo, no decide nada, no vuelve a ninguna etapa— y va anotado como tal
+donde aparece.
+
+**La excepción a vigilar.** El gráfico del filtrado dibuja el rango intercuartílico y su corte
+replicando el criterio de `filtering.filter_low_variance`, aunque el motivo de cada descarte sí se
+delega a esa función. Hoy coinciden. Si allá se cambia el criterio, las etiquetas seguirían bien y
+las barras mostrarían una magnitud que el filtro ya no usa: un gráfico que parece correcto mientras
+miente. Está marcado en el código con la advertencia de tocar ambos lados.
+
+**Deuda anotada.** La salida de fondo es que el paquete devuelva qué medida y qué corte usó, en vez
+de que el taller lo deduzca. Ese cambio va **en el repo de la tesis**, con su ADR — como manda la
+consecuencia de arriba.
 
 ---
 

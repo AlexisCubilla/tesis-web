@@ -229,6 +229,21 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
                       else "poca variación" if c not in tras_iqr
                       else "repite a otra") for c in cols}
 
+        # ⚠ ACOPLAMIENTO CONOCIDO CON `filtering.filter_low_variance`.
+        #
+        # El MOTIVO de cada descarte se delega (arriba), pero el NÚMERO que se dibuja se calcula
+        # acá: el rango intercuartílico y el corte por percentil, replicando el criterio que hoy usa
+        # esa función. Coinciden — se verificó leyéndola antes de graficar, y por eso el gráfico
+        # dice «rango intercuartílico» y no «varianza».
+        #
+        # Pero si en la tesis se cambia ese criterio (a desviación estándar, a MAD, a lo que sea),
+        # las etiquetas de motivo seguirían correctas y estas barras pasarían a mostrar una magnitud
+        # que el filtro ya no usa: un gráfico que sigue pareciendo correcto mientras miente. Es el
+        # modo de falla que el ADR A1 existe para evitar.
+        #
+        # QUIEN TOQUE `filter_low_variance` TIENE QUE TOCAR ESTO TAMBIÉN. La salida de fondo es que
+        # el paquete exponga qué medida y qué corte usó, en vez de que el taller lo deduzca; ese
+        # cambio va en el repo de la tesis con su ADR (ver A1).
         X = previas[cols]
         iqr = (X.quantile(0.75) - X.quantile(0.25)).astype(float)
         corte_pct = (float(np.nanpercentile(iqr.to_numpy(), cfg.lowvar_percentile))
