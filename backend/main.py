@@ -716,11 +716,6 @@ def raiz():
     return FileResponse(WEB / "index.html")
 
 
-@app.get("/analisis")
-def analisis():
-    return FileResponse(WEB / "analisis.html")
-
-
 @app.get("/taller")
 def taller():
     return FileResponse(WEB / "taller.html")

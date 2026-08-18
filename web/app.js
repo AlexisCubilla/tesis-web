@@ -16,6 +16,8 @@ const S = {
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
   form: null,         // {etapa, padre, modo} cuando el formulario está abierto
   sondeo: null,
+  vista: 'paso',      // 'paso' | 'analisis' — qué pestaña de la fase se está mirando
+  detector: null,     // método elegido para la dispersión del análisis
   // Configuración de referencia de la tesis y segundos entre mediciones: los sirve el backend desde
   // `backend/ajustes.py` (ajustable por .env), para que no estén duplicados acá.
   oficial: {},
@@ -51,6 +53,16 @@ async function iniciar() {
   }
 
   await recargar();
+
+  // Compatibilidad con los enlaces de la pantalla de análisis, que ahora es una pestaña de acá.
+  const url = new URLSearchParams(location.search);
+  const pedido = url.get('nodo');
+  if (pedido && S.nodos.some((n) => n.clave === pedido)) {
+    S.sel = pedido;
+    if (url.get('vista') === 'analisis') S.vista = 'analisis';
+    pintar();
+    cargarVisual();
+  }
   $('#btn-nueva').addEventListener('click', () => { S.sel = null; pintar(); abrirForm('datos', null, 'nueva'); });
   $('#btn-oficial').addEventListener('click', correrOficial);
   $('#btn-cancelar').addEventListener('click', () => { S.form = null; pintar(); });
@@ -160,7 +172,8 @@ function dibujarMapa() {
 
   svg.innerHTML = partes.join('');
   svg.querySelectorAll('.nodo-g').forEach((g) => g.addEventListener('click', () => {
-    S.sel = g.dataset.clave; S.form = null; pintar(); cargarVisual();
+    S.sel = g.dataset.clave; S.form = null; S.vista = 'paso'; S.detector = null;
+    pintar(); cargarVisual();
   }));
 
   $('#cuenta').textContent = `${S.nodos.length} pasos · ${hojas().length} ramas`;
@@ -271,20 +284,23 @@ function pintarFase() {
   const sig = etapaSiguiente();
   const defSig = sig && S.defs.find((d) => d.nombre === sig);
   const yaHecho = sig && hijosDe(S.sel).length;
-  // El análisis se abre DESDE acá, con la rama ya elegida. Elegirla del otro lado obligaba a
-  // reconocerla en un desplegable, y ahí una rama es apenas un texto; en el mapa, en cambio, ya se
-  // está viendo dónde se bifurcó y de dónde viene.
+  // El análisis es una pestaña de esta misma vista, no otra pantalla: el nodo ya está elegido
+  // sobre el mapa, que es donde una rama se ve como lo que es —una bifurcación con su historia—
+  // y no como una línea de texto en un desplegable.
   const analizable = n.estado === 'listo' && ['deteccion', 'eventos'].includes(n.etapa);
   $('#fase-acciones').innerHTML = `
     ${sig ? `<button class="boton primario" id="a-seguir">Paso ${i + 2}: ${defSig.titulo} →</button>` : ''}
     <button class="boton" id="a-ramificar">Repetir este paso con otros valores</button>
-    ${analizable ? `<a class="boton" id="a-analizar" href="/analisis?nodo=${n.clave}">Analizar esta rama →</a>` : ''}
+    ${analizable && S.vista !== 'analisis'
+        ? '<button class="boton" id="a-analizar">Analizar esta rama →</button>' : ''}
     <span class="tenue" style="font-size:.82rem">
       ${sig ? (yaHecho ? 'Ya hay pasos más adelante; si cambiás algo, se abre una rama.'
                        : 'Continúa esta rama.') : 'Este es el último paso del pipeline.'}
     </span>`;
   if (sig) $('#a-seguir').addEventListener('click', () => abrirForm(sig, S.sel, 'seguir'));
   $('#a-ramificar').addEventListener('click', () => abrirForm(n.etapa, n.padre, 'rama'));
+  if ($('#a-analizar')) $('#a-analizar').addEventListener('click', () => verPestana('analisis'));
+  pintarPestanas(analizable);
 }
 
 async function borrarSeleccion() {
@@ -433,6 +449,33 @@ async function correrOficial() {
 }
 
 // ============================================================================ visualizaciones
+/** Las dos pestañas de la fase. La de análisis solo existe donde hay puntajes. */
+function pintarPestanas(analizable) {
+  const cont = $('#fase-pestanas');
+  if (!analizable) {
+    cont.hidden = true;
+    cont.innerHTML = '';
+    S.vista = 'paso';
+    return;
+  }
+  cont.hidden = false;
+  const tabs = [['paso', 'Este paso'], ['analisis', 'Análisis de la rama']];
+  cont.innerHTML = tabs.map(([id, t]) =>
+    `<button role="tab" data-vista="${id}" aria-selected="${S.vista === id}">${t}</button>`).join('');
+  cont.querySelectorAll('button').forEach((b) =>
+    b.addEventListener('click', () => verPestana(b.dataset.vista)));
+}
+
+function verPestana(vista) {
+  if (S.vista === vista) return;
+  S.vista = vista;
+  S.detector = null;
+  const n = nodoDe(S.sel);
+  pintarPestanas(n && n.estado === 'listo' && ['deteccion', 'eventos'].includes(n.etapa));
+  pintarFase();
+  cargarVisual();
+}
+
 async function cargarVisual() {
   if (!S.sel) return;
   const n = nodoDe(S.sel);
@@ -441,6 +484,13 @@ async function cargarVisual() {
   Grafico.limpiar(vis);   // si no, quedan ResizeObservers observando nodos ya desprendidos
   vis.innerHTML = '<p class="tenue" style="font-size:.85rem">Cargando datos…</p>';
   try {
+    if (S.vista === 'analisis') {
+      const url = `/api/nodo/${n.clave}/analisis` + (S.detector ? `?detector=${encodeURIComponent(S.detector)}` : '');
+      const d = await api(url);
+      vis.innerHTML = '';
+      Analisis.pintar(vis, d, (det) => { S.detector = det; cargarVisual(); });
+      return;
+    }
     const d = await api(`/api/nodo/${n.clave}/datos`);
     vis.innerHTML = '';
     ({ serie: verSerie, ventanas: verVentanas, features: verFeatures, filtrado: verFiltrado,

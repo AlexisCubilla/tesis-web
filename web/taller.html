@@ -98,6 +98,24 @@
   .fila-sup h3, .fila-sup h4 { margin: 0; }
   .esp { flex: 1; }
 
+  /* Pestañas de la vista de fase. El análisis vivía en una pantalla aparte; acá adentro el nodo ya
+     está elegido sobre el mapa, así que sobra todo lo que servía para reconocerlo. Se dibuja una
+     sola pestaña por vez: si no, la página se vuelve un scroll interminable. */
+  .pestanas { display: flex; gap: 4px; margin-top: 20px;
+              border-bottom: 1px solid var(--borde); }
+  .pestanas button { font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer;
+    padding: 8px 16px; border: none; background: none; color: var(--texto-2);
+    border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .pestanas button:hover { color: var(--texto); }
+  .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--acento); }
+
+  /* Cada corte del análisis, dentro de su pestaña. */
+  .corte + .corte { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--borde); }
+  .explica { font-size: .84rem; color: var(--texto-2); margin: 0 0 12px; max-width: 88ch; }
+  .explica strong { color: var(--texto); }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .duo { grid-template-columns: 1fr; } }
+
   /* Descargas del entregable: la acción que cierra el ciclo, así que va con su explicación. */
   .descargas { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 10px;
@@ -128,7 +146,6 @@
   <nav>
     <a href="/">El proyecto</a>
     <a href="/taller" class="activo">Taller</a>
-    <a href="/analisis">Análisis</a>
     <button class="btn-tema" type="button" title="Cambiar de tema">
       <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" aria-hidden="true">
@@ -200,7 +217,8 @@
     <div class="flujo" id="fase-flujo"></div>
     <div class="params-usados" id="fase-params"></div>
     <div class="resumen-grid" id="fase-resumen"></div>
-    <div id="fase-visual" style="margin-top:20px"></div>
+    <div class="pestanas" id="fase-pestanas" hidden></div>
+    <div id="fase-visual" style="margin-top:16px"></div>
 
     <div class="acciones-fase" id="fase-acciones"></div>
   </div>
@@ -225,6 +243,7 @@
 <script src="/estatico/tema.js" defer></script>
 <script src="/estatico/vendor/echarts.min.js"></script>
 <script src="/estatico/grafico.js"></script>
+<script src="/estatico/analisis.js"></script>
 <script src="/estatico/app.js"></script>
 </body>
 </html>

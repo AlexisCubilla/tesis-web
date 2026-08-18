@@ -257,29 +257,21 @@ lleva también: `candidatos_etapa1_tesis.xlsx` contra `candidatos_etapa1_rama-58
 en unos meses nadie podría decir si el Excel que tiene en la mano salió de la configuración firmada
 o de una prueba.
 
-## La pantalla de Análisis
+## El análisis de una rama
 
-El taller sirve para *operar*: configurar, ejecutar, ramificar. **Análisis** es para mirar una rama
-ya corrida desde cuatro ángulos que el taller no muestra.
+En los pasos de detección y de eventos, la vista de fase gana una segunda pestaña: **«Análisis de la
+rama»**. Muestra cuatro cortes que el paso por sí solo no da:
 
-Se entra con el botón **«Analizar esta rama»** de la vista de fase, desde cualquier paso de detección
-o de eventos. Se elige sobre el mapa, que es donde una rama se ve como lo que es —una bifurcación—
-en vez de como una línea de texto en un desplegable. La dirección queda con la rama (`?nodo=…`), así
-que el enlace se puede guardar o compartir. Arriba de todo se ve siempre la cadena completa de esa
-rama, con lo que se aparta de la configuración de la tesis resaltado.
-
-Los cuatro ángulos:
-
-- **En qué coinciden los métodos.** Cuántos tramos marcan de a pares, y cuántos junta cada nivel de
-  acuerdo. Es el argumento central del trabajo y hasta ahora vivía comprimido en un «4/5».
+- **En qué coinciden los métodos.** Cuántos tramos marcan de a pares y cuántos junta cada nivel de
+  acuerdo. Es el argumento central del trabajo, que en la tabla de eventos vive comprimido en un «4/5».
 - **Cómo reparte los puntajes cada método**, un panel por método porque no son comparables entre sí,
   con el corte de candidatos marcado.
 - **Si los candidatos están realmente aislados**, proyectando los tramos a dos dimensiones. Esa
   proyección es solo para mirar: no alimenta ninguna etapa.
-- **Por qué se descartaron esas características**, con el mapa de correlación que la etapa de
-  filtrado afirma pero no muestra.
+- **Por qué se descartaron esas características**, con el mapa de correlación.
 
-Necesita una rama que llegue por lo menos al paso 5 (detección).
+Está adentro del taller a propósito: la rama es la que tocaste en el mapa, así que no hay que
+elegirla ni reconocerla en ningún lado.
 
 ## Estado
 

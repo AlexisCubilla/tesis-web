@@ -255,29 +255,43 @@ el catálogo de tipos que hizo posible el A10.
 
 ---
 
-## A10 — Una pantalla aparte para analizar, separada de la de operar
+## A10 — El análisis es una pestaña de la vista de fase, no una pantalla aparte
 
-**Decisión.** «Análisis» es una tercera pantalla, hermana de «El proyecto» y «Taller». Muestra
-cuatro cortes de la rama que se elija: coincidencia entre detectores, distribución de puntajes,
-dispersión de las ventanas en dos dimensiones y correlación entre características.
+**Decisión (revisada).** Los cuatro cortes de análisis —coincidencia entre detectores, distribución
+de puntajes, dispersión de las ventanas y correlación entre características— viven en una pestaña
+de la vista de fase del taller, junto a «Este paso». Aparece solo en los nodos que tienen puntajes
+(detección y eventos).
 
-**Por qué separada.** El taller es para *operar*: configurar una etapa, ejecutarla, mirar qué
-produjo y ramificar. Analizar es otra cosa —comparar, buscar por qué— y necesita gráficos grandes y
-varios a la vez. Metidos dentro de la vista de fase alargaban una pantalla que ya es larga y
-competían con los botones que hacen avanzar el pipeline.
+**Qué decía antes, y por qué se dio vuelta.** La primera versión fue una tercera pantalla,
+«Análisis», con el argumento de que el taller era para *operar* —configurar, ejecutar, ramificar— y
+analizar era otra cosa. Ese argumento se cayó por dos lados:
 
-**Qué agrega que no existía.** Sobre todo la **coincidencia entre métodos**, que es el argumento
-central del trabajo —el acuerdo entre métodos que piensan distinto reemplaza a la respuesta correcta
-que no existe— y hasta ahora vivía comprimido en un «4/5» dentro de una celda. Y el **mapa de
-correlación**, que hace visible por qué la etapa de filtrado descarta lo que descarta, en vez de
-mostrar dos listas de pastillas sin explicación.
+1. **Se erosionó solo.** Después se le agregaron gráficos a las seis etapas, así que la vista de
+   fase pasó a ser, en su mayor parte, mirar lo que salió. La frontera que justificaba separarlas
+   dejó de existir.
+2. **La separación tuvo un costo medible.** Elegir la rama desde el otro lado obligaba a
+   reconocerla en un desplegable, y ahí una rama es apenas un texto: de seis ramas de una corrida
+   normal, **cinco compartían etiqueta** con otra. Hubo que construir nombres por diferencias
+   contra la referencia, una tira con la cadena y un `?nodo=` para compensarlo. Más de la mitad de
+   `analisis.js` —247 de 469 líneas— existía solo para eso.
 
-**Dónde está el límite con A1.** La regla de «qué tramo está marcado» no se reimplementa: se le
-pide al paquete de la tesis (`export._detector_candidates`, la misma que usa `build_candidate_table`),
-justamente para no tener dos definiciones que se separen con el tiempo. Lo que el backend calcula es
-solo presentación: contar intersecciones, armar histogramas, correlacionar columnas y proyectar.
+Dentro del taller nada de eso hace falta: el nodo ya está elegido sobre el mapa, que es donde una
+rama se ve como lo que es, una bifurcación con su historia. Al fusionar **salió más código del que
+entró**.
 
-**La proyección 2D es la excepción, y va anotada.** Es cálculo nuevo, hecho acá y no en la tesis.
-Se acepta porque es **solo para mirar**: no alimenta ninguna etapa, no se guarda y ningún número del
-trabajo depende de ella. La pantalla lo dice con todas las letras, para que nadie la confunda con el
-detector PCA del pipeline, que sí es parte del método.
+**Por qué pestañas y no todo junto.** La objeción válida de la propuesta original sigue en pie: la
+vista de fase ya es larga y el mapa de correlación mide unos 760 px. Con pestañas se dibuja una
+sola por vez, así que la altura no se suma.
+
+**Qué se conservó.** Los enlaces de la pantalla vieja siguen funcionando: `/taller?nodo=…&vista=analisis`
+abre el nodo con la pestaña puesta, para poder guardar o proyectar un enlace directo.
+
+**Dónde está el límite con A1.** No cambió con la mudanza. La regla de «qué tramo está marcado» se
+le pide al paquete de la tesis (`export._detector_candidates`, la misma que usa
+`build_candidate_table`), para no tener dos definiciones que se separen con el tiempo. Lo que el
+backend calcula es solo presentación.
+
+**La proyección 2D sigue siendo la excepción anotada.** Es cálculo nuevo, hecho acá y no en la
+tesis. Se acepta porque es **solo para mirar**: no alimenta ninguna etapa, no se guarda y ningún
+número del trabajo depende de ella. La pantalla lo dice con todas las letras, para que nadie la
+confunda con el detector PCA del pipeline.
