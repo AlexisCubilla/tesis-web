@@ -385,3 +385,60 @@ esta decisión.
 **Relación con A6.** Es la misma línea de pensamiento: sin compilación no hay paso que reescriba
 rutas, así que la ruta que se escribe es la que se sirve. Que sea relativa es lo que permite
 desplegar el mismo directorio en la raíz o bajo un prefijo sin tocar un archivo.
+
+---
+
+## A12 — El texto explicativo va en dos niveles
+
+**Decisión.** Cada etapa y cada parámetro tienen dos textos: un **resumen** de una línea, siempre
+visible, y el **desarrollo** completo detrás de un desplegable. La interfaz muestra el primero y deja
+el segundo a un clic.
+
+**Por qué.** El taller lo abre gente que no leyó la tesis, así que las explicaciones tienen que estar.
+Pero la descripción de 80 palabras de una etapa aparecía **cada vez** que se miraba esa fase, la
+número treinta igual que la primera, y una de las ayudas de parámetro llegaba a 106 palabras — un
+párrafo entero adentro de un campo de formulario. Explicar de más y explicar de menos son el mismo
+error visto desde dos lados; escalonar disuelve la disyuntiva en lugar de elegir un extremo.
+
+**Medido.** De 1.249 palabras que estaban siempre a la vista se pasó a 262: **80 % menos texto en
+pantalla sin borrar una sola palabra.** Todo lo que estaba escrito sigue estando, a un clic.
+
+**Detalle deliberado:** el estado abierto **no** se recuerda. Al cambiar de fase se vuelve a plegar.
+Si se recordara, bastaría con abrir un par de veces para volver al problema original.
+
+**Alternativa descartada.** Acortar los textos. Habría perdido lo que los hace útiles —el hallazgo H1
+en el interruptor de limpieza, el costo de la deduplicación, la trampa de leer el tope de evento como
+si fueran hallazgos nuevos—, que es justamente lo que alguien de afuera no puede deducir solo.
+
+---
+
+## A13 — Dos ramas se comparan lado a lado, dentro de la misma vista
+
+**Decisión.** Desde cualquier paso se puede elegir otro de la **misma etapa** y ver las dos
+configuraciones y sus dos resultados en una tabla, con las filas que difieren resaltadas.
+
+**Por qué.** Todo el diseño gira alrededor de ramificar —el hash encadenado (A3), el caché, el mapa
+con bifurcaciones— pero hasta acá sólo se podía mirar **una rama por vez**. Para contrastar el 1 %
+contra el 5 % había que abrir una, memorizar los números, abrir la otra y comparar de memoria. El
+sistema sabía ramificar y no sabía **elegir**, que es para lo que uno ramifica.
+
+**Sólo dentro de la misma etapa.** Comparar un ventaneo contra una detección no significaría nada: no
+comparten ni parámetros ni métricas. El mapa resalta los pasos elegibles mientras se está eligiendo,
+así la restricción se ve en lugar de explicarse.
+
+**Se listan todas las filas, no sólo las que cambian.** Ver que quince parámetros son idénticos y uno
+no es lo que permite **atribuir** la diferencia de resultado a ese cambio. Si se ocultaran las filas
+iguales se perdería justamente el argumento; por eso las que difieren se resaltan y el resto queda
+atenuado.
+
+**Qué habilita.** La decisión que la tesis tiene abierta —qué fracción de tramos entregar al experto—
+pasa a resolverse mirando una tabla:
+
+| | 1 % | 5 % |
+|---|---:|---:|
+| eventos | 40 | 95 |
+| con acuerdo de ≥4 métodos | 9 | 34 |
+| que tocan el tope | 3 | 22 |
+
+**Es exploración, no resultado firmado** (A7). La comparación ayuda a decidir; la decisión se firma
+por ADR en el repositorio de la tesis, no acá.

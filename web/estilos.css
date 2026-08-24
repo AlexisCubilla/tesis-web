@@ -652,3 +652,48 @@ td.num { text-align: right; font-family: var(--mono); }
 @media (hover: none) {
   .boton:hover { transform: none; }
 }
+
+
+/* --- Texto escalonado: resumen visible, desarrollo a un clic ------------------
+   La explicación completa ayuda la primera vez y estorba la número treinta. En vez
+   de elegir entre explicar de más o de menos, se muestra el resumen y el resto
+   queda a un clic. Se repliega solo al cambiar de fase: eso es lo que mantiene la
+   pantalla corta sin perder nada de lo escrito. */
+.resumen-txt { margin: 0; }
+.escalonado .mas {
+  background: none; border: none; padding: 0 0 0 6px; margin: 0;
+  font: inherit; font-size: .86em; color: var(--acento); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; white-space: nowrap;
+}
+.escalonado .mas:hover { color: var(--acento-2); }
+.escalonado .desarrollo {
+  margin-top: 8px; padding: 10px 12px;
+  border-left: 2px solid var(--borde); border-radius: 0 8px 8px 0;
+  background: var(--fondo-2); color: var(--texto-2);
+  font-size: .92em; line-height: 1.6;
+}
+.campo .ayuda .escalonado .desarrollo { font-size: .95em; margin-top: 6px; }
+
+
+/* --- Comparación de dos ramas ------------------------------------------------
+   Se listan TODOS los parámetros y métricas, no sólo los que cambian: ver que
+   quince filas son idénticas y una no, es lo que permite atribuirle la diferencia
+   de resultado a ese cambio y no a otra cosa. Por eso el resaltado va sobre las
+   que difieren, y el resto se deja atenuado en vez de ocultarlo. */
+table.comp { width: 100%; border-collapse: collapse; margin: 6px 0 18px; font-size: .87rem; }
+table.comp th { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--texto-2); font-weight: 600; text-align: right; padding: 6px 10px;
+  border-bottom: 1px solid var(--borde); }
+table.comp th:first-child { text-align: left; }
+table.comp td { padding: 6px 10px; border-bottom: 1px solid var(--borde); color: var(--texto-2); }
+table.comp td.rot { text-align: left; }
+table.comp tr.cambia td { color: var(--texto); background: rgba(78, 168, 255, .07); }
+table.comp tr.cambia td.rot { font-weight: 600; box-shadow: inset 3px 0 0 var(--acento); }
+table.comp .delta { font-family: var(--mono); font-size: .85em; }
+table.comp .delta.sube { color: var(--acento-2); }
+table.comp .delta.baja { color: var(--alerta); }
+#fase-visual h4 { font-size: .9rem; margin: 18px 0 2px; }
+
+/* En el mapa: los pasos que se pueden comparar, y el que quedó elegido. */
+#mapa .nodo-c.elegible { stroke: var(--acento-2); stroke-dasharray: 3 3; stroke-width: 3; }
+#mapa .nodo-c.comp { stroke: var(--acento-2); stroke-width: 3.5; }

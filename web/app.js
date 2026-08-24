@@ -16,7 +16,9 @@ const S = {
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
   form: null,         // {etapa, padre, modo} cuando el formulario está abierto
   sondeo: null,
-  vista: 'paso',      // 'paso' | 'analisis' — qué pestaña de la fase se está mirando
+  vista: 'paso',      // 'paso' | 'analisis' | 'comparar' — qué se está mirando de la fase
+  comp: null,         // clave del paso contra el que se compara (null = no hay comparación)
+  eligiendo: false,   // true mientras se espera que el usuario elija ese segundo paso en el mapa
   detector: null,     // método elegido para la dispersión del análisis
   // Configuración de referencia de la tesis y segundos entre mediciones: los sirve el backend desde
   // `backend/ajustes.py` (ajustable por .env), para que no estén duplicados acá.
@@ -95,6 +97,41 @@ async function recargar() {
 
 function pintar() { dibujarMapa(); pintarFase(); pintarForm(); }
 
+
+/** Texto en dos niveles: una línea siempre visible y el desarrollo detrás de un desplegable.
+ *
+ * La explicación completa sirve la primera vez y estorba la número treinta. En vez de elegir entre
+ * explicar de más o de menos, se muestra el resumen y se deja el resto a un clic. El estado abierto
+ * NO se recuerda a propósito: al cambiar de fase se vuelve a plegar, que es lo que mantiene la
+ * pantalla corta. */
+function escalonado(resumen, desarrollo, etiqueta = '¿por qué?') {
+  if (!desarrollo || desarrollo === resumen) return `<p class="resumen-txt">${resumen}</p>`;
+  return `<div class="escalonado">
+    <p class="resumen-txt">${resumen}
+      <button type="button" class="mas" aria-expanded="false">${etiqueta}</button></p>
+    <div class="desarrollo" hidden>${desarrollo}</div>
+  </div>`;
+}
+
+
+/** La ayuda de un parámetro, escalonada igual que las descripciones de etapa. */
+function ayudaParam(p) {
+  if (!p.titular && !p.ayuda) return '';
+  return `<div class="ayuda">${escalonado(p.titular || p.ayuda, p.titular ? p.ayuda : '', 'más')}</div>`;
+}
+
+/** Activa los desplegables de `escalonado()` dentro de un contenedor ya pintado. */
+function activarEscalonados(raiz) {
+  raiz.querySelectorAll('.escalonado .mas').forEach((b) => b.addEventListener('click', () => {
+    const d = b.closest('.escalonado').querySelector('.desarrollo');
+    const abierto = !d.hidden;
+    d.hidden = abierto;
+    b.setAttribute('aria-expanded', String(!abierto));
+    b.textContent = abierto ? b.dataset.cerrado || '¿por qué?' : 'ocultar';
+    if (!b.dataset.cerrado) b.dataset.cerrado = '¿por qué?';
+  }));
+}
+
 // ============================================================================ mapa
 const hijosDe = (clave) => S.nodos.filter((n) => n.padre === clave);
 const nodoDe = (clave) => S.nodos.find((n) => n.clave === clave);
@@ -162,7 +199,9 @@ function dibujarMapa() {
   // nodos
   S.nodos.forEach((n) => {
     const cx = x(n.etapa), cy = y(n.clave);
-    const sel = n.clave === S.sel ? 'sel' : '';
+    const sel = n.clave === S.sel ? 'sel'
+              : n.clave === S.comp ? 'comp'
+              : (S.eligiendo && comparable(n.clave)) ? 'elegible' : '';
     partes.push(`<g class="nodo-g" data-clave="${n.clave}">
       <circle class="nodo-c ${n.estado} ${sel}" cx="${cx}" cy="${cy}" r="13"/>
       ${ramaOficial(n.clave) && n.etapa === 'eventos' ? `<path class="estrella" transform="translate(${cx + 9} ${cy - 20})" d="${ESTRELLA}"/>` : ''}
@@ -188,12 +227,24 @@ function dibujarMapa() {
 
   svg.innerHTML = partes.join('');
   svg.querySelectorAll('.nodo-g').forEach((g) => g.addEventListener('click', () => {
-    S.sel = g.dataset.clave; S.form = null; S.vista = 'paso'; S.detector = null;
+    const clave = g.dataset.clave;
+    // Con la comparación activa, el clic elige el segundo término en vez de cambiar de paso.
+    // Sólo valen los pasos de la MISMA etapa: comparar un ventaneo contra una detección no
+    // significaría nada, porque no comparten ni parámetros ni métricas.
+    if (S.eligiendo && comparable(clave)) {
+      S.comp = clave; S.eligiendo = false; S.vista = 'comparar';
+      pintar(); pintarComparacion();
+      return;
+    }
+    S.sel = clave; S.form = null; S.vista = 'paso'; S.detector = null;
+    S.comp = null; S.eligiendo = false;
     pintar(); cargarVisual();
   }));
 
   $('#cuenta').textContent = `${S.nodos.length} pasos · ${hojas().length} ramas`;
-  $('#pista-mapa').textContent = S.nodos.length
+  $('#pista-mapa').textContent = S.eligiendo
+    ? 'Elegí en el mapa el otro paso a comparar: están resaltados los que sirven (misma etapa).'
+    : S.nodos.length
     ? 'Clic en un círculo para ver ese paso en detalle. El círculo punteado es dónde caería el próximo.'
     : 'Todavía no hay nada. Empezá de cero o corré la configuración de la tesis.';
 }
@@ -283,7 +334,8 @@ function pintarFase() {
   $('#fase-estado').className = `chip ${n.estado}`;
   $('#fase-estado').textContent = n.estado === 'listo'
     ? `paso ${i + 1} de 6 · ${n.duracion_s ?? 0}s` : n.estado;
-  $('#fase-desc').textContent = def.descripcion;
+  $('#fase-desc').innerHTML = escalonado(def.resumen || def.descripcion, def.descripcion);
+  activarEscalonados($('#fase-desc'));
   $('#btn-borrar').style.display = 'inline-flex';
 
   if (n.estado === 'listo') {
@@ -325,6 +377,8 @@ function pintarFase() {
     <button class="boton" id="a-ramificar">Repetir este paso con otros valores</button>
     ${analizable && S.vista !== 'analisis'
         ? `<button class="boton" id="a-analizar">Analizar esta rama ${icoFlecha()}</button>` : ''}
+    ${hayComparables() ? `<button class="boton" id="a-comparar">${
+        S.eligiendo ? 'Elegí el otro en el mapa…' : 'Comparar con otra rama'}</button>` : ''}
     <span class="tenue" style="font-size:.82rem">
       ${sig ? (yaHecho ? 'Ya hay pasos más adelante; si cambiás algo, se abre una rama.'
                        : 'Continúa esta rama.') : 'Este es el último paso del pipeline.'}
@@ -332,6 +386,9 @@ function pintarFase() {
   if (sig) $('#a-seguir').addEventListener('click', () => abrirForm(sig, S.sel, 'seguir'));
   $('#a-ramificar').addEventListener('click', () => abrirForm(n.etapa, n.padre, 'rama'));
   if ($('#a-analizar')) $('#a-analizar').addEventListener('click', () => verPestana('analisis'));
+  if ($('#a-comparar')) $('#a-comparar').addEventListener('click', () => {
+    S.eligiendo = !S.eligiendo; S.comp = null; pintar();
+  });
   pintarPestanas(analizable);
 }
 
@@ -365,7 +422,8 @@ function pintarForm() {
   const def = S.defs.find((d) => d.nombre === etapa);
   const i = S.cadena.indexOf(etapa);
   $('#form-titulo').textContent = `Paso ${i + 1}: ${def.titulo}`;
-  $('#form-desc').textContent = def.descripcion;
+  $('#form-desc').innerHTML = escalonado(def.resumen || def.descripcion, def.descripcion);
+  activarEscalonados($('#form-desc'));
 
   const modos = {
     nueva: ['chip pendiente', 'arranca una rama desde cero'],
@@ -387,7 +445,7 @@ function pintarForm() {
     if (p.tipo === 'booleano') {
       return `<div class="campo" style="grid-column:1/-1"><label class="interruptor">
         <input type="checkbox" id="${id}" ${val ? 'checked' : ''}> ${p.etiqueta}</label>
-        ${p.ayuda ? `<div class="ayuda">${p.ayuda}</div>` : ''}</div>`;
+        ${ayudaParam(p)}</div>`;
     }
     if (p.tipo === 'multiple') {
       const ops = p.opciones || p.defecto || [];
@@ -395,13 +453,14 @@ function pintarForm() {
       return `<div class="campo" style="grid-column:1/-1"><label>${p.etiqueta}</label>
         <div class="opciones">${ops.map((o) => `<label><input type="checkbox" name="${id}"
           value="${o}" ${marcadas.has(o) ? 'checked' : ''}> ${o}</label>`).join('')}</div>
-        ${p.ayuda ? `<div class="ayuda">${p.ayuda}</div>` : ''}</div>`;
+        ${ayudaParam(p)}</div>`;
     }
     return `<div class="campo"><label for="${id}">${p.etiqueta}</label>
       <input type="number" id="${id}" value="${val}" step="${p.tipo === 'decimal' ? 'any' : '1'}"
        ${p.minimo != null ? `min="${p.minimo}"` : ''} ${p.maximo != null ? `max="${p.maximo}"` : ''}>
-      ${p.ayuda ? `<div class="ayuda">${p.ayuda}</div>` : ''}</div>`;
+      ${ayudaParam(p)}</div>`;
   }).join('');
+  activarEscalonados($('#formulario'));
 }
 
 function leerForm() {
@@ -487,6 +546,98 @@ async function correrOficial() {
   $('#btn-oficial').disabled = false;
 }
 
+
+// ============================================================================ comparación
+/* Todo el diseño gira alrededor de ramificar —el hash, el caché, el mapa con bifurcaciones— pero
+ * hasta acá sólo se podía mirar una rama por vez: para contrastar dos configuraciones había que
+ * memorizar los números de una, hacer clic en la otra y comparar de memoria. Esto cierra ese hueco,
+ * que es donde el modelo de ramas termina de rendir: elegir, no sólo probar. */
+
+/** ¿Se puede comparar `clave` contra el paso seleccionado? Sólo dentro de la misma etapa. */
+function comparable(clave) {
+  const a = nodoDe(S.sel), b = nodoDe(clave);
+  return !!a && !!b && b.clave !== a.clave && b.etapa === a.etapa && b.estado === 'listo';
+}
+
+const hayComparables = () => S.nodos.some((n) => comparable(n.clave));
+
+/** Valor legible de una métrica del resumen (los objetos se resuelven aparte). */
+function valorMetrica(v) {
+  if (Array.isArray(v)) return v.length;
+  if (v === true) return 'sí';
+  if (v === false) return 'no';
+  return v;
+}
+
+/** Fila comparada: A, B y la diferencia. Marca las que cambian, que son las únicas que importan. */
+function filaComp(rotulo, a, b) {
+  const distinto = JSON.stringify(a) !== JSON.stringify(b);
+  let delta = '';
+  if (distinto && typeof a === 'number' && typeof b === 'number') {
+    const d = b - a;
+    delta = `<span class="delta ${d > 0 ? 'sube' : 'baja'}">${d > 0 ? '+' : ''}${miles(Math.round(d * 1000) / 1000)}</span>`;
+  }
+  return `<tr class="${distinto ? 'cambia' : ''}">
+    <td class="rot">${rotulo.replace(/_/g, ' ')}</td>
+    <td class="num">${miles(valorMetrica(a))}</td>
+    <td class="num">${miles(valorMetrica(b))}</td>
+    <td class="num">${delta}</td></tr>`;
+}
+
+function pintarComparacion() {
+  const a = nodoDe(S.sel), b = nodoDe(S.comp);
+  const cont = $('#fase-visual');
+  if (!a || !b) { S.vista = 'paso'; return; }
+  const def = S.defs.find((d) => d.nombre === a.etapa);
+
+  // Parámetros: se listan todos, pero los que difieren quedan marcados. Es lo que hace legible
+  // "en qué se diferencian estas dos ramas" sin tener que leer dos fichas completas.
+  const params = def.parametros
+    .map((p) => filaComp(p.etiqueta, a.parametros[p.nombre], b.parametros[p.nombre])).join('');
+
+  // Resumen: sólo las métricas escalares. Las que son objetos (la distribución por prioridad,
+  // los rangos por detector) se muestran aparte porque necesitan su propia tabla.
+  const claves = [...new Set([...Object.keys(a.resumen || {}), ...Object.keys(b.resumen || {})])]
+    .filter((k) => {
+      const v = (a.resumen || {})[k];
+      return typeof v !== 'object' || Array.isArray(v);
+    });
+  const metricas = claves.map((k) => filaComp(k, (a.resumen || {})[k], (b.resumen || {})[k])).join('');
+
+  // Distribución por prioridad: la comparación más útil de la última etapa. Cuántos eventos tienen
+  // el acuerdo de 5, 4, 3… métodos es justamente lo que decide si una configuración sirve.
+  const pa = (a.resumen || {}).por_prioridad, pb = (b.resumen || {}).por_prioridad;
+  let prioridad = '';
+  if (pa && pb) {
+    const ks = [...new Set([...Object.keys(pa), ...Object.keys(pb)])].sort((x, y) => y - x);
+    prioridad = `<h4>Eventos por cantidad de métodos que coinciden</h4>
+      <table class="comp"><thead><tr><th>métodos</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th></th></tr></thead>
+      <tbody>${ks.map((k) => filaComp(`${k}/5`, pa[k] || 0, pb[k] || 0)).join('')}</tbody></table>`;
+  }
+
+  cont.innerHTML = `
+    <div class="fila-sup">
+      <h3 style="font-size:1rem">Comparando dos ${def.titulo.toLowerCase()}</h3>
+      <span class="esp"></span>
+      <button class="boton" id="c-salir" style="padding:5px 11px;font-size:.8rem">Salir de la comparación</button>
+    </div>
+    <p class="tenue" style="font-size:.84rem">Se resaltan sólo las filas que cambian. Todo lo demás
+    es idéntico en las dos ramas, que es lo que hace que la diferencia sea atribuible.</p>
+
+    <h4>Configuración</h4>
+    <table class="comp"><thead><tr><th>parámetro</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th></th></tr></thead>
+      <tbody>${params}</tbody></table>
+
+    <h4>Resultado</h4>
+    <table class="comp"><thead><tr><th>métrica</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th>dif.</th></tr></thead>
+      <tbody>${metricas}</tbody></table>
+
+    ${prioridad}`;
+  $('#c-salir').addEventListener('click', () => {
+    S.comp = null; S.eligiendo = false; S.vista = 'paso'; pintar(); cargarVisual();
+  });
+}
+
 // ============================================================================ visualizaciones
 /** Las dos pestañas de la fase. La de análisis solo existe donde hay puntajes. */
 function pintarPestanas(analizable) {
@@ -517,6 +668,7 @@ function verPestana(vista) {
 
 async function cargarVisual() {
   if (!S.sel) return;
+  if (S.vista === 'comparar' && S.comp) { pintarComparacion(); return; }
   const n = nodoDe(S.sel);
   const vis = $('#fase-visual');
   if (!n || n.estado !== 'listo') return;

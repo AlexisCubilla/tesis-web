@@ -53,6 +53,10 @@ class Parametro:
     minimo: float | None = None
     maximo: float | None = None
     opciones: tuple[str, ...] | None = None
+    # `titular` es la línea corta que se ve siempre; `ayuda` es el desarrollo completo, que la
+    # interfaz muestra sólo si el lector lo pide. Separarlos evita que quien ya entendió el
+    # parámetro tenga que releer el párrafo cada vez que pasa por la etapa.
+    titular: str = ""
     ayuda: str = ""
     # Oculto como CONTROL, no como parámetro. Sigue existiendo, sigue teniendo su
     # defecto, sigue viajando en `defectos()` y sigue quedando registrado en los
@@ -69,6 +73,8 @@ class Parametro:
 class Etapa:
     nombre: str
     titulo: str
+    #: Una línea, siempre visible. El desarrollo va en `descripcion`, detrás de un desplegable.
+    resumen: str
     descripcion: str
     parametros: tuple[Parametro, ...]
     ejecutar: Callable[[Any, dict], tuple[Any, dict]]
@@ -122,6 +128,7 @@ def _ejecutar_datos(entrada, params):
 ETAPA_DATOS = Etapa(
     nombre="datos",
     titulo="Datos",
+    resumen="Telemetría cruda del satélite: 42 hojas del Excel, una medición cada 10-11 segundos.",
     descripcion=(
         "Punto de partida: la telemetría del satélite, una medición cada 10-11 segundos, repartida en "
         "45 hojas del Excel original (cada hoja es una sesión de descarga distinta). Entran 42. Dos de "
@@ -135,6 +142,7 @@ ETAPA_DATOS = Etapa(
     parametros=(
         Parametro(
             "limpiar", "Descartar filas inválidas", "booleano", _ref("datos", "limpiar", True),
+            titular="Descarta 886 filas que son huecos del decodificador, no mediciones reales.",
             ayuda="Hay 886 filas sin datos o con las tres señales exactamente en cero: son huecos del "
                   "programa que decodifica la telemetría, no mediciones reales. Al descartarlas, "
                   "además se marca dónde quedó un corte, para que después ninguna ventana de análisis "
@@ -149,6 +157,7 @@ ETAPA_DATOS = Etapa(
             "hojas_excluidas", "Hojas que NO entran", "multiple",
             tuple(_ref("datos", "hojas_excluidas", ("Test1 w batt", "Test2 wo batt", "Anomalous data"))),
             oculto=True,
+            titular="Tres hojas quedan afuera por definición del estudio.",
             ayuda="Dos son pruebas de laboratorio, no de vuelo. La tercera, 'Anomalous data', resultó "
                   "ser una anomalía de paneles solares y no de batería. Las tres quedan afuera por "
                   "definición del estudio: se registran acá, pero no se ofrecen como opción.",
@@ -202,6 +211,7 @@ def _ejecutar_ventaneo(entrada, params):
 ETAPA_VENTANEO = Etapa(
     nombre="ventaneo",
     titulo="Ventaneo",
+    resumen="Corta la señal en tramos que se deslizan sobre ella. Cada tramo es una unidad de análisis.",
     descripcion=(
         "Una falla de batería no es un valor suelto fuera de rango: es un comportamiento a lo largo "
         "del tiempo. Por eso no se analiza fila por fila, sino en tramos de varias mediciones "
@@ -211,6 +221,7 @@ ETAPA_VENTANEO = Etapa(
     parametros=(
         Parametro("tamano_ventana", "Mediciones por tramo", "entero",
                   _ref("ventaneo", "tamano_ventana", 50), 10, 500,
+                  titular="Cuántas mediciones mira cada tramo. Con 50 son unos 9 minutos.",
                   ayuda="Cuántas mediciones consecutivas mira cada tramo. Con 50 son unos 9 minutos de "
                         "telemetría. Como referencia: el satélite tarda unos 87 minutos en dar una "
                         "vuelta a la Tierra (medido en estos mismos datos), y en cada vuelta la batería "
@@ -218,12 +229,14 @@ ETAPA_VENTANEO = Etapa(
                         "de ese ciclo."),
         Parametro("paso", "Cada cuánto avanza el tramo", "entero",
                   _ref("ventaneo", "paso", 1), 1, 100,
+                  titular="Cada cuántas mediciones avanza el tramo. Con 1, dos vecinos comparten 49 datos.",
                   ayuda="Con paso 1, el tramo avanza de a una medición: dos tramos vecinos comparten 49 "
                         "de sus 50 datos. Eso garantiza que nada se escape entre dos tramos, pero genera "
                         "mucha repetición — y de ahí salen los dos pasos que siguen. Con paso 5, los "
                         "tramos se pisan menos y hay menos que analizar."),
         Parametro("deduplicar", "Descartar tramos casi idénticos", "booleano",
                   _ref("ventaneo", "deduplicar", True),
+                  titular="Conserva uno solo de cada grupo de tramos casi iguales. Reduce cerca del 70 %.",
                   ayuda="Compara los tramos entre sí y conserva uno solo de cada grupo de casi "
                         "iguales. Reduce el volumen alrededor de un 70 %. Tiene un costo conocido: la "
                         "comparación mira la FORMA de la señal y no su MAGNITUD, así que un tramo con "
@@ -232,6 +245,7 @@ ETAPA_VENTANEO = Etapa(
                         "con esa limitación documentada."),
         Parametro("umbral_dedup", "Qué tan parecidos para descartar", "decimal",
                   _ref("ventaneo", "umbral_dedup", 0.95), 0.80, 0.999,
+                  titular="De 0 a 1. Con 0,95 se descarta un tramo que se parezca 95 % o más a otro.",
                   ayuda="Va de 0 a 1: 1 significa idénticos. Con 0,95 se descarta un tramo si se parece "
                         "en un 95 % o más a otro ya conservado. Subirlo (0,97) conserva más tramos; "
                         "bajarlo descarta más."),
@@ -266,6 +280,7 @@ def _ejecutar_features(entrada, params):
 ETAPA_FEATURES = Etapa(
     nombre="features",
     titulo="Características",
+    resumen="Resume cada tramo en 24 números por señal que describen su comportamiento.",
     descripcion=(
         "Un tramo son 150 números sueltos (50 mediciones × 3 señales), difíciles de comparar entre sí. "
         "Acá cada tramo se resume en 24 números por señal que describen su comportamiento: cuánto vale "
@@ -275,6 +290,7 @@ ETAPA_FEATURES = Etapa(
     parametros=(
         Parametro("rezagos_autocorr", "Qué tan lejos se compara la señal consigo misma", "entero",
                   _ref("features", "rezagos_autocorr", 5), 1, 20,
+                  titular="Cuántos pasos hacia adelante se compara la señal consigo misma.",
                   ayuda="Mide si el valor de ahora permite predecir el de 1, 2, 3… mediciones después. "
                         "Una señal suave se parece mucho a sí misma; una errática, poco. Con 5 se "
                         "calculan cinco de esas comparaciones por señal."),
@@ -355,6 +371,7 @@ def _ejecutar_filtrado(entrada, params):
 ETAPA_FILTRADO = Etapa(
     nombre="filtrado",
     titulo="Filtrado",
+    resumen="Descarta las características que no informan y lleva el resto a una escala común.",
     descripcion=(
         "Este paso hace DOS cosas, y conviene tenerlas separadas. Primero descarta características: las "
         "que dan casi siempre el mismo valor (no informan nada) y las que suben y bajan junto con otra "
@@ -366,6 +383,7 @@ ETAPA_FILTRADO = Etapa(
     parametros=(
         Parametro(
             "descartar", "Descartar características", "booleano", True,
+            titular="Si se apaga, pasan las 72 características al paso siguiente.",
             ayuda="Apagarlo deja pasar las 72 al paso 5, estandarizadas igual. Sirve para responder "
                   "una pregunta concreta: ¿el filtrado mejora la detección, o solo la abarata? "
                   "Los dos umbrales de abajo quedan sin efecto cuando está apagado, y el paso sigue "
@@ -374,11 +392,13 @@ ETAPA_FILTRADO = Etapa(
         ),
         Parametro("umbral_correlacion", "Cuándo dos características son redundantes", "decimal",
                   _ref("filtrado", "umbral_correlacion", 0.95), 0.5, 0.999,
+                  titular="De 0 a 1. Por encima de este valor, dos características cuentan como una.",
                   ayuda="Va de 0 a 1. Si dos características se mueven juntas por encima de este valor, "
                         "se conserva solo una. Con 0,95 hay que ser casi idénticas; bajarlo descarta "
                         "más agresivamente."),
         Parametro("percentil_baja_var", "Cuánto descartar por poco variable", "decimal",
                   _ref("filtrado", "percentil_baja_var", 5.0), 0.0, 50.0,
+                  titular="Descarta ese porcentaje de características, las que menos varían. 0 lo desactiva.",
                   ayuda="Descarta el porcentaje indicado de características, empezando por las que "
                         "menos varían entre tramos. Con 5 se saca el 5 % más plano. Poner 0 desactiva "
                         "este filtro."),
@@ -422,6 +442,7 @@ def _ejecutar_deteccion(entrada, params):
 ETAPA_DETECCION = Etapa(
     nombre="deteccion",
     titulo="Detección",
+    resumen="Cinco métodos con ideas distintas de «raro» le ponen un puntaje a cada tramo.",
     descripcion=(
         "Acá se busca lo raro. Nadie etiquetó nunca estos datos, así que no hay forma de saber qué "
         "método acierta: por eso se usan cinco a la vez, cada uno con una idea distinta de qué "
@@ -432,6 +453,7 @@ ETAPA_DETECCION = Etapa(
     parametros=(
         Parametro("detectores", "Qué métodos usar", "multiple",
                   tuple(_ref("deteccion", "detectores", DETECTORES)), opciones=DETECTORES,
+                  titular="Cuáles de los cinco métodos se ejecutan.",
                   ayuda="isolation_forest: lo raro se separa del resto con pocos cortes al azar. "
                         "ecod y copod: lo raro está en los extremos de la distribución. "
                         "pca: lo raro no se puede reconstruir con el patrón general de los datos. "
@@ -439,10 +461,12 @@ ETAPA_DETECCION = Etapa(
                         "Sacar alguno permite ver cuánto depende el resultado de ese método."),
         Parametro("arboles_iforest", "Cuántos árboles usa isolation_forest", "entero",
                   _ref("deteccion", "arboles_iforest", 300), 50, 1000,
+                  titular="Más árboles: resultado más estable, pero más lento.",
                   ayuda="Ese método hace muchos cortes al azar y promedia. Más árboles = resultado más "
                         "estable, pero más lento. Con 300 alcanza para que no cambie entre corridas."),
         Parametro("min_cluster_hdbscan", "Grupo mínimo para hdbscan_glosh", "entero",
                   _ref("deteccion", "min_cluster_hdbscan", 15), 2, 100,
+                  titular="Cuántos tramos hacen falta para considerar que hay un grupo.",
                   ayuda="Ese método busca zonas densas de tramos parecidos; este número dice cuántos "
                         "tramos hacen falta para considerar que hay un grupo. Más chico = grupos más "
                         "finos y más tramos quedan marcados como aislados."),
@@ -493,6 +517,7 @@ def _ejecutar_eventos(entrada, params):
 ETAPA_EVENTOS = Etapa(
     nombre="eventos",
     titulo="Eventos candidatos",
+    resumen="Toma los tramos más raros y junta en un solo evento los que se pisan en el tiempo.",
     descripcion=(
         "El resultado final. De todos los tramos puntuados se toman los más raros, y los que se pisan "
         "en el tiempo se juntan en un solo EVENTO: una misma anomalía aparece marcada en muchos tramos "
@@ -503,6 +528,7 @@ ETAPA_EVENTOS = Etapa(
     parametros=(
         Parametro("fraccion_candidatos", "Qué proporción se marca como sospechosa", "decimal",
                   _ref("eventos", "fraccion_candidatos", 0.01), 0.001, 0.20,
+                  titular="0,01 = cada método señala el 1 % más raro. Es un presupuesto de revisión.",
                   ayuda="0,01 significa que cada método señala el 1 % de tramos con puntaje más alto. "
                         "OJO: esto NO afirma que el 1 % de los datos sean anomalías. Es un presupuesto "
                         "de revisión — cuántos casos puede mirar una persona en un rato razonable. "
@@ -510,6 +536,7 @@ ETAPA_EVENTOS = Etapa(
                         "métodos coinciden."),
         Parametro("max_ventanas_evento", "Tope de tramos por evento", "entero",
                   _ref("eventos", "max_ventanas_evento", 15), 0, 200,
+                  titular="Corta los eventos largos. Poner 0 los deja crecer sin tope.",
                   ayuda="Corta los eventos muy largos. Poner 0 los deja crecer sin límite. "
                         "CUIDADO AL INTERPRETARLO: cuando un evento llega al tope, el resto se "
                         "convierte en un evento aparte que en realidad es la continuación del anterior "
@@ -544,6 +571,7 @@ def descripcion_serializable() -> list[dict]:
         salida.append({
             "nombre": e.nombre,
             "titulo": e.titulo,
+            "resumen": e.resumen,
             "descripcion": e.descripcion,
             "parametros": [dataclasses.asdict(p) for p in e.parametros],
         })
