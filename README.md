@@ -89,7 +89,7 @@ según las reglas de ese repositorio es la fuente única de verdad de todos los 
 
 Eso alcanza para tres cosas a la vez, siempre sincronizadas:
 
-- el botón **★ Correr la de la tesis**,
+- el botón **★ Ejecutar tesis**,
 - la marca **★** de las ramas que coinciden,
 - y **los valores iniciales de los formularios**.
 
@@ -240,7 +240,7 @@ visualización de sus datos. Cada etapa muestra lo suyo:
 
 El círculo punteado en el mapa muestra dónde caería el próximo paso antes de ejecutarlo.
 
-**★ Correr la de la tesis** ejecuta las 6 etapas con la configuración con la que el trabajo reporta sus
+**★ Ejecutar tesis** ejecuta las 6 etapas con la configuración con la que el trabajo reporta sus
 resultados, para tener siempre una referencia contra la cual comparar. Las ramas que coinciden con esa
 configuración quedan marcadas con ★.
 

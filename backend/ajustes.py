@@ -104,7 +104,7 @@ def config_tesis() -> dict[str, dict]:
     **Sale del propio paquete de la tesis** (`tesis.config.CONFIG`), que según las reglas de ese
     repositorio es la fuente única de verdad de todos los parámetros. Así, cuando allá se firma un
     cambio por ADR —como pasó con el tope de 15 ventanas por evento—, el taller se actualiza solo: el
-    botón "★ Correr la de la tesis", la marca ★ de las ramas y los valores iniciales de los
+    botón "★ Ejecutar tesis", la marca ★ de las ramas y los valores iniciales de los
     formularios quedan sincronizados sin tocar nada acá.
 
     Las variables `TESIS_*` del entorno **solo se usan si están definidas**, para poder mostrar otra

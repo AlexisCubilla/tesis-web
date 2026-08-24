@@ -35,7 +35,7 @@ pytestmark = pytest.mark.skipif(
 def _correr(ajustar: dict[str, dict] | None = None) -> dict[str, dict]:
     """Corre la cadena de seis etapas y devuelve el resumen de cada una.
 
-    Los parámetros son los mismos que usa el botón «★ Correr la de la tesis»: los valores por
+    Los parámetros son los mismos que usa el botón «★ Ejecutar tesis»: los valores por
     defecto de cada etapa —que ya salen de la configuración de referencia— con la configuración de
     la tesis encima.
     """

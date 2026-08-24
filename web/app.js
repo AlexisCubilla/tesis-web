@@ -341,7 +341,7 @@ function pintarFase() {
     $('#btn-borrar').style.display = 'none';
     $('#btn-nombrar').style.display = 'none';
     $('#fase-acciones').innerHTML = S.nodos.length ? '' :
-      `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} Correr la configuración de la tesis</button>
+      `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} Ejecutar tesis</button>
        <button class="boton" onclick="document.getElementById('btn-nueva').click()">Configurar el paso 1 a mano</button>`;
     return;
   }
