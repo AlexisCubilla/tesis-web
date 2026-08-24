@@ -143,8 +143,27 @@ function cadenaDe(clave) {
   return c;
 }
 
-const esOficial = (n) => Object.entries(S.oficial[n.etapa] || {})
-  .every(([k, v]) => JSON.stringify(n.parametros[k]) === JSON.stringify(v));
+/** Valor esperado de un parámetro en la configuración de referencia.
+ *
+ * La config de la tesis sale de `tesis.config.CONFIG` y solo nombra los parámetros que el pipeline
+ * de la tesis tiene. El taller agrega perillas propias que allá no existen —hoy `filtrado.descartar`,
+ * que apaga el filtrado entero— y para esas el valor esperado es el `defecto` que declara la etapa.
+ * Sin este respaldo, apagar una perilla así dejaba la rama marcada como «la de la tesis» aunque
+ * salteara un paso que la tesis necesita.
+ */
+const esperadoOficial = (etapa, k) => {
+  const oficial = S.oficial[etapa] || {};
+  if (k in oficial) return oficial[k];
+  const def = S.defs.find((d) => d.nombre === etapa);
+  const p = def && (def.parametros || []).find((x) => x.nombre === k);
+  return p ? p.defecto : undefined;
+};
+
+// Se recorre la unión de las claves —las de la config de referencia y las que el nodo trae— porque
+// mirar solo las primeras deja pasar cualquier parámetro que la tesis no nombre.
+const esOficial = (n) => [...new Set([...Object.keys(S.oficial[n.etapa] || {}),
+                                      ...Object.keys(n.parametros || {})])]
+  .every((k) => JSON.stringify(n.parametros[k]) === JSON.stringify(esperadoOficial(n.etapa, k)));
 const ramaOficial = (clave) => cadenaDe(clave).every(esOficial);
 
 /** Ubica cada nodo: columna = etapa, fila = orden en el árbol (hijos consecutivos, padres centrados). */
