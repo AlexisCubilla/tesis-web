@@ -692,6 +692,11 @@ async function cargarVisual() {
   const vis = $('#fase-visual');
   if (!n || n.estado !== 'listo') return;
   Grafico.limpiar(vis);   // si no, quedan ResizeObservers observando nodos ya desprendidos
+  // El cartel de carga es mucho más bajo que la visualización que reemplaza: al vaciar el div el
+  // documento se encoge, el navegador recorta `scrollY` al nuevo máximo y la página salta sola
+  // hacia arriba. Reservar la altura mantiene el largo del documento hasta que entra el contenido
+  // nuevo, así el lector no pierde dónde estaba leyendo.
+  vis.style.minHeight = `${Math.round(vis.getBoundingClientRect().height)}px`;
   vis.innerHTML = '<p class="tenue" style="font-size:.85rem">Cargando datos…</p>';
   try {
     if (S.vista === 'analisis') {
@@ -707,6 +712,10 @@ async function cargarVisual() {
        scores: verScores, eventos: verEventos }[d.tipo] || (() => {}))(d);
   } catch (e) {
     vis.innerHTML = `<p class="tenue" style="font-size:.85rem">Sin vista para este paso (${e.message})</p>`;
+  } finally {
+    // Se libera recién cuando el contenido nuevo ya midió, y en `finally` porque la rama de
+    // análisis sale con un `return` temprano.
+    vis.style.minHeight = '';
   }
 }
 
