@@ -86,6 +86,7 @@ async function iniciar() {
   $('#btn-cancelar').addEventListener('click', () => { S.form = null; pintar(); });
   $('#btn-ejecutar').addEventListener('click', ejecutarForm);
   $('#btn-borrar').addEventListener('click', borrarSeleccion);
+  $('#btn-nombrar').addEventListener('click', nombrarSeleccion);
   addEventListener('resize', dibujarMapa);
 }
 
@@ -207,6 +208,7 @@ function dibujarMapa() {
       ${ramaOficial(n.clave) && n.etapa === 'eventos' ? `<path class="estrella" transform="translate(${cx + 9} ${cy - 20})" d="${ESTRELLA}"/>` : ''}
       <text class="nodo-t" x="${cx}" y="${cy + 3.5}" text-anchor="middle">${S.cadena.indexOf(n.etapa) + 1}</text>
       <text class="nodo-s" x="${cx}" y="${cy + 27}" text-anchor="middle">${etiqueta(n)}</text>
+      ${n.etiqueta ? `<text class="nodo-nombre" x="${cx}" y="${cy + 38}" text-anchor="middle">${n.etiqueta}</text>` : ''}
       <title>${n.etapa} · ${etiqueta(n)} · ${n.estado}${n.duracion_s ? ` · ${n.duracion_s}s` : ''}</title>
     </g>`);
   });
@@ -330,7 +332,8 @@ function pintarFase() {
 
   $('#fase-num').textContent = i + 1;
   $('#fase-num').className = 'num-fase';
-  $('#fase-titulo').textContent = def.titulo;
+  $('#fase-titulo').innerHTML = n.etiqueta
+    ? `${def.titulo} <span class="nombre-rama">${n.etiqueta}</span>` : def.titulo;
   $('#fase-estado').className = `chip ${n.estado}`;
   $('#fase-estado').textContent = n.estado === 'listo'
     ? `paso ${i + 1} de 6 · ${n.duracion_s ?? 0}s` : n.estado;
@@ -390,6 +393,19 @@ function pintarFase() {
     S.eligiendo = !S.eligiendo; S.comp = null; pintar();
   });
   pintarPestanas(analizable);
+}
+
+/** Le pone nombre a un paso. No entra en el hash: renombrar no crea una rama ni invalida el caché. */
+async function nombrarSeleccion() {
+  const n = nodoDe(S.sel);
+  if (!n) return;
+  const nombre = prompt('Nombre para esta rama (vacío lo saca):', n.etiqueta || '');
+  if (nombre === null) return;
+  await api(`api/nodo/${S.sel}/etiqueta`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ etiqueta: nombre }),
+  });
+  await recargar();
 }
 
 async function borrarSeleccion() {

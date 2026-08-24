@@ -442,3 +442,41 @@ pasa a resolverse mirando una tabla:
 
 **Es exploración, no resultado firmado** (A7). La comparación ayuda a decidir; la decisión se firma
 por ADR en el repositorio de la tesis, no acá.
+
+---
+
+## A14 — Dos columnas cuando hay lugar, una sola cuando no
+
+**Decisión.** Con 1180 px o más de ancho **y el formulario abierto**, el taller se parte en dos: mapa
+y fase a la izquierda, formulario fijo a la derecha. Por debajo de eso, o con el formulario cerrado,
+todo va apilado en una columna.
+
+**Por qué.** Apilado, abrir el formulario lo mandaba abajo del pliegue: se perdían de vista el mapa y
+la fase justo cuando hacen falta para decidir qué valor poner. Configurar un paso es una tarea de
+comparar contra lo que ya hay, no de completar campos a ciegas.
+
+**Por qué sólo si el formulario está abierto.** La grilla se define con `:has(#panel-form.abierto)`.
+Si se partiera siempre, con el formulario cerrado quedaría una columna vacía de 400 px y el contenido
+apretado contra el margen izquierdo, sin nada a cambio.
+
+**Relación con A6.** No hace falta JavaScript para esto: es una consulta de medios y un selector. El
+estado que decide el ancho —si el formulario está abierto— ya vive en una clase del DOM.
+
+---
+
+## A15 — Las ramas se pueden nombrar, y el nombre no entra en el hash
+
+**Decisión.** Cualquier paso acepta un nombre libre, que se muestra en el mapa y en la cabecera de la
+fase. Se guarda en la columna `etiqueta` del árbol.
+
+**Por qué.** El mapa identifica cada rama por su configuración: `50/1 · 0,95`. Es preciso y es
+anónimo. Con diez ramas exploradas, poder llamar a una «la que le mostré a Jara» o «sin dedup» es lo
+que la vuelve recuperable dos días después.
+
+**El nombre convive con la configuración, no la reemplaza.** El mapa sigue mostrando los parámetros
+debajo del nodo: hace falta ver en qué se diferencian dos ramas, y un nombre no lo dice.
+
+**No entra en el hash (A3), a propósito.** Si entrara, renombrar generaría una clave distinta: crearía
+una rama nueva y dejaría huérfano todo lo calculado. El nombre es una etiqueta para humanos, no parte
+de la identidad del resultado — dos ramas con la misma configuración y distinto nombre son la misma
+rama, y así se comportan.

@@ -152,6 +152,19 @@ def marcar(con, clave: str, estado: str, *, resumen: dict | None = None,
         con.commit()
 
 
+def etiquetar(con, clave: str, etiqueta: str | None) -> None:
+    """Le pone (o le saca) un nombre a un paso.
+
+    El mapa muestra las ramas por su configuración —`50/1 · 0,95`—, que es preciso pero anónimo.
+    Cuando hay diez, poder llamarlas «la que le mostré a Jara» o «sin dedup» es lo que las vuelve
+    recordables. No entra en el hash: es una etiqueta para humanos, no parte de la identidad del
+    resultado, así que renombrar no invalida el caché ni crea una rama nueva.
+    """
+    with _lock:
+        con.execute("UPDATE nodos SET etiqueta=? WHERE clave=?", (etiqueta or None, clave))
+        con.commit()
+
+
 def obtener(con, clave: str) -> dict | None:
     fila = con.execute("SELECT * FROM nodos WHERE clave=?", (clave,)).fetchone()
     return _fila_a_dict(fila) if fila else None

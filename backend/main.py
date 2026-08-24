@@ -30,6 +30,10 @@ _con = almacen.conectar()
 trabajos.iniciar_trabajador(_con)
 
 
+class PeticionEtiqueta(BaseModel):
+    etiqueta: str | None = None
+
+
 class PeticionEjecutar(BaseModel):
     etapa: str
     padre: str | None = None
@@ -136,6 +140,16 @@ def delete_nodo(clave: str):
 
 #: Tope de puntos de una serie temporal antes de empezar a submuestrear. Ver `get_datos`.
 SERIE_COMPLETA = 20_000
+
+
+@app.put("/api/nodo/{clave}/etiqueta")
+def put_etiqueta(clave: str, pet: PeticionEtiqueta):
+    """Renombra un paso. No toca el hash: es un nombre para humanos, no parte de su identidad."""
+    if almacen.obtener(_con, clave) is None:
+        raise HTTPException(404, "Nodo inexistente")
+    nombre = (pet.etiqueta or "").strip()[:60] or None
+    almacen.etiquetar(_con, clave, nombre)
+    return {"clave": clave, "etiqueta": nombre}
 
 
 @app.get("/api/nodo/{clave}/datos")
