@@ -85,6 +85,17 @@ def main() -> int:
             print(f"  {etapa:11s} " + " · ".join(f"{k}={v}" for k, v in params.items()))
 
     print()
+    print("Interfaz")
+    print("─" * 62)
+    import subprocess
+    r = subprocess.run([sys.executable, str(Path(__file__).parent / "verificar_ui.py")],
+                       capture_output=True, text=True)
+    print(r.stdout.rstrip())
+    if r.returncode:
+        problemas.append("Hay referencias del JavaScript a ids que no existen. Si alguna corre en el "
+                         "arranque, la página no carga (ver detalle arriba).")
+
+    print()
     if problemas:
         print("Falta resolver:")
         for i, p in enumerate(problemas, 1):

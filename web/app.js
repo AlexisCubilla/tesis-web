@@ -320,6 +320,7 @@ function pintarFase() {
       : 'El pipeline tiene 6 pasos. Arrancá por el primero, o corré de una la configuración con la que la tesis reporta sus resultados.';
     ['#fase-flujo', '#fase-params', '#fase-resumen', '#fase-visual'].forEach((s) => $(s).innerHTML = '');
     $('#btn-borrar').style.display = 'none';
+    $('#btn-nombrar').style.display = 'none';
     $('#fase-acciones').innerHTML = S.nodos.length ? '' :
       `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} Correr la configuración de la tesis</button>
        <button class="boton" onclick="document.getElementById('btn-nueva').click()">Configurar el paso 1 a mano</button>`;
@@ -340,6 +341,8 @@ function pintarFase() {
   $('#fase-desc').innerHTML = escalonado(def.resumen || def.descripcion, def.descripcion);
   activarEscalonados($('#fase-desc'));
   $('#btn-borrar').style.display = 'inline-flex';
+  $('#btn-nombrar').style.display = 'inline-flex';
+  $('#btn-nombrar').textContent = n.etiqueta ? 'Cambiar el nombre' : 'Ponerle nombre';
 
   if (n.estado === 'listo') {
     const [entra, sale] = flujoDe(n);
