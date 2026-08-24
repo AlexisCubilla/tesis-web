@@ -189,7 +189,7 @@ window.Grafico = (function () {
         restore: { title: 'Ver todo' },
         dataView: { title: 'Ver los datos', lang: ['Datos', 'Cerrar', 'Actualizar'], readOnly: true,
                     backgroundColor: varCss('--panel'), textColor: c.tinta,
-                    buttonColor: varCss('--acento'),
+                    buttonColor: varCss('--acento-hondo'),
                     // Sin `optionToContent`, ECharts vuelca una serie abajo de la otra y el índice
                     // de medición se repite una vez por señal: 246 líneas para 79 mediciones. Lo
                     // que hace falta es una fila por medición y una columna por señal.
@@ -294,7 +294,13 @@ window.Grafico = (function () {
         grid, xAxis, yAxis, series,
         // Un solo puntero para todos los paneles y un solo globo con todas las señales: nunca hay
         // que apuntarle a la línea.
-        axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: varCss('--acento') } },
+        // El puntero y la barra de rango son CHROME del gráfico, no una acción
+        // primaria ni una selección, así que no llevan el acento: si el acento
+        // apareciera acá dejaría de significar «algo pasa en este lugar». Van con
+        // la tinta tenue y con el filete, que es lo que corresponde a un control
+        // de encuadre. De paso desaparece el riesgo de confundir el acento con
+        // una de las cinco series, que comparten familia de matiz con él.
+        axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: varCss('--panel-2') } },
         tooltip: Object.assign({}, c.tooltip, {
           trigger: 'axis',
           axisPointer: { type: 'cross', crossStyle: { color: c.tenue }, lineStyle: { color: c.tenue } },
@@ -307,10 +313,16 @@ window.Grafico = (function () {
           // con el desplazamiento de la página, que es lo que la persona estaba haciendo.
           { type: 'inside', xAxisIndex: 'all', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false,
             moveOnMouseMove: true },
+          // `moveHandleStyle` y `selectedDataBackground` van explícitos porque ECharts
+          // trae celestes por defecto ahí (#d2dbee y #8fb0f7) y son los únicos colores
+          // del sitio que no salen de la paleta: 2746 px de celeste medidos en una
+          // captura de esta misma barra. No se veían mientras el sitio era azul.
           { type: 'slider', xAxisIndex: 'all', bottom: 8, height: 20,
-            borderColor: c.borde, fillerColor: varCss('--acento') + '22',
-            handleStyle: { color: varCss('--acento') },
+            borderColor: c.borde, fillerColor: varCss('--fila-hover'),
+            handleStyle: { color: c.tenue },
+            moveHandleStyle: { color: c.borde },
             dataBackground: { lineStyle: { color: c.borde }, areaStyle: { color: c.borde } },
+            selectedDataBackground: { lineStyle: { color: c.tenue }, areaStyle: { color: c.borde } },
             textStyle: { color: c.tenue, fontSize: 10 } },
         ];
       }
@@ -344,7 +356,9 @@ window.Grafico = (function () {
       }),
       series: [{
         type: 'bar', data: datos.map((d) => d.valor), barMaxWidth: 15,
-        itemStyle: { color: serie(0), borderRadius: [0, 4, 4, 0] },
+        // `--grafico-unico` y no `serie(0)`: acá no hay una primera categoría de
+        // cinco, hay una sola magnitud. Ver la nota de la ficha en `estilos.css`.
+        itemStyle: { color: varCss('--grafico-unico'), borderRadius: [0, 5, 5, 0] },
         label: { show: true, position: 'right', color: c.tinta, fontFamily: 'ui-monospace, monospace',
                  fontSize: 11, formatter: (p) => fmt(p.value) },
       }],

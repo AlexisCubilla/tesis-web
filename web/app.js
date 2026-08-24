@@ -39,6 +39,19 @@ const pista = (corta, larga) => `<p class="pista">${corta}</p>` + (larga
   ? `<details class="saber-mas"><summary>Por qué</summary><p>${larga}</p></details>` : '');
 const miles = (v) => typeof v === 'number' ? v.toLocaleString('es') : v;
 
+/* Íconos dibujados, no escritos. Ver la nota de `.ico` en `estilos.css`: un glifo como ★ o → se
+   dibuja distinto en cada sistema, no hereda el grosor de la fuente y en algunas plataformas sale
+   coloreado como emoji. `ESTRELLA` es el trazo suelto, para meterlo dentro del <svg> del mapa;
+   los dos ayudantes devuelven un <svg> completo, para el marcado normal. */
+const ESTRELLA = 'M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z';
+const icoEstrella = () =>
+  `<svg class="ico ico-estrella" viewBox="0 0 16 13" fill="currentColor" aria-hidden="true">
+     <path d="${ESTRELLA}"/></svg>`;
+const icoFlecha = () =>
+  `<svg class="ico ico-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.3em;height:1.3em">
+     <path d="M4 12h14M12.5 6l6 6-6 6"/></svg>`;
+
 // ============================================================================ arranque
 async function iniciar() {
   const def = await api('api/etapas');
@@ -152,7 +165,7 @@ function dibujarMapa() {
     const sel = n.clave === S.sel ? 'sel' : '';
     partes.push(`<g class="nodo-g" data-clave="${n.clave}">
       <circle class="nodo-c ${n.estado} ${sel}" cx="${cx}" cy="${cy}" r="13"/>
-      ${ramaOficial(n.clave) && n.etapa === 'eventos' ? `<text class="estrella" x="${cx + 15}" y="${cy - 9}">★</text>` : ''}
+      ${ramaOficial(n.clave) && n.etapa === 'eventos' ? `<path class="estrella" transform="translate(${cx + 9} ${cy - 20})" d="${ESTRELLA}"/>` : ''}
       <text class="nodo-t" x="${cx}" y="${cy + 3.5}" text-anchor="middle">${S.cadena.indexOf(n.etapa) + 1}</text>
       <text class="nodo-s" x="${cx}" y="${cy + 27}" text-anchor="middle">${etiqueta(n)}</text>
       <title>${n.etapa} · ${etiqueta(n)} · ${n.estado}${n.duracion_s ? ` · ${n.duracion_s}s` : ''}</title>
@@ -196,7 +209,9 @@ function etiqueta(n) {
     datos: () => p.limpiar ? 'limpio' : 'sin limpiar',
     ventaneo: () => `${p.tamano_ventana}/${p.paso}${p.deduplicar ? ` · ${p.umbral_dedup}` : ' · sin dedup'}`,
     features: () => `${p.rezagos_autocorr} rezagos`,
-    filtrado: () => `corr ${p.umbral_correlacion}`,
+    // Con el descarte apagado los umbrales no se aplican, así que mostrarlos en el
+    // mapa haría creer que sí. El nodo dice qué hizo, no qué tenía configurado.
+    filtrado: () => (p.descartar === false ? 'sin descartar' : `corr ${p.umbral_correlacion}`),
     deteccion: () => `${(p.detectores || []).length} métodos`,
     eventos: () => `${(p.fraccion_candidatos * 100).toFixed(1)}% · tope ${p.max_ventanas_evento || '∞'}`,
   }[n.etapa] || (() => n.etapa))();
@@ -253,7 +268,7 @@ function pintarFase() {
     ['#fase-flujo', '#fase-params', '#fase-resumen', '#fase-visual'].forEach((s) => $(s).innerHTML = '');
     $('#btn-borrar').style.display = 'none';
     $('#fase-acciones').innerHTML = S.nodos.length ? '' :
-      `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">★ Correr la configuración de la tesis</button>
+      `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} Correr la configuración de la tesis</button>
        <button class="boton" onclick="document.getElementById('btn-nueva').click()">Configurar el paso 1 a mano</button>`;
     return;
   }
@@ -275,7 +290,7 @@ function pintarFase() {
     const [entra, sale] = flujoDe(n);
     $('#fase-flujo').innerHTML = `
       <div class="caja-f"><div class="et">entra</div><div class="vl">${entra}</div></div>
-      <span class="fl">→</span>
+      ${icoFlecha()}
       <div class="caja-f sale"><div class="et">sale</div><div class="vl">${sale}</div></div>`;
   } else $('#fase-flujo').innerHTML = '';
 
@@ -306,10 +321,10 @@ function pintarFase() {
   // y no como una línea de texto en un desplegable.
   const analizable = n.estado === 'listo' && ['deteccion', 'eventos'].includes(n.etapa);
   $('#fase-acciones').innerHTML = `
-    ${sig ? `<button class="boton primario" id="a-seguir">Paso ${i + 2}: ${defSig.titulo} →</button>` : ''}
+    ${sig ? `<button class="boton primario" id="a-seguir">Paso ${i + 2}: ${defSig.titulo} ${icoFlecha()}</button>` : ''}
     <button class="boton" id="a-ramificar">Repetir este paso con otros valores</button>
     ${analizable && S.vista !== 'analisis'
-        ? '<button class="boton" id="a-analizar">Analizar esta rama →</button>' : ''}
+        ? `<button class="boton" id="a-analizar">Analizar esta rama ${icoFlecha()}</button>` : ''}
     <span class="tenue" style="font-size:.82rem">
       ${sig ? (yaHecho ? 'Ya hay pasos más adelante; si cambiás algo, se abre una rama.'
                        : 'Continúa esta rama.') : 'Este es el último paso del pipeline.'}
@@ -362,7 +377,11 @@ function pintarForm() {
 
   // Si estamos repitiendo un paso, precargar sus valores para que se vea qué se está cambiando.
   const base = modo === 'rama' ? nodoDe(S.sel).parametros : null;
-  $('#formulario').innerHTML = def.parametros.map((p) => {
+  /* `p.oculto` sale del formulario, no de la etapa. Un parámetro oculto sigue
+     existiendo: el servidor lo completa con su defecto (`main.py`, `etapa.defectos()`)
+     y sigue apareciendo en la ficha de la fase como registro de lo que se usó. Lo que
+     no hace es ofrecer un control. Ver la nota en `backend/etapas.py`. */
+  $('#formulario').innerHTML = def.parametros.filter((p) => !p.oculto).map((p) => {
     const id = `p_${p.nombre}`;
     const val = base && base[p.nombre] !== undefined ? base[p.nombre] : p.defecto;
     if (p.tipo === 'booleano') {
@@ -388,7 +407,10 @@ function pintarForm() {
 function leerForm() {
   const def = S.defs.find((d) => d.nombre === S.form.etapa);
   const params = {};
-  def.parametros.forEach((p) => {
+  // Los ocultos no se leen del formulario porque no tienen control. Se omiten del
+  // envío, y el servidor los completa con su defecto — que es exactamente lo que
+  // tiene que pasar: si el usuario no puede cambiarlo, el usuario no lo manda.
+  def.parametros.filter((p) => !p.oculto).forEach((p) => {
     const id = `p_${p.nombre}`;
     if (p.tipo === 'booleano') params[p.nombre] = $(`#${id}`).checked;
     else if (p.tipo === 'multiple')
@@ -671,17 +693,20 @@ function iqrDeFeatures(destino, d) {
   // Ordenadas por IQR: así las descartadas quedan juntas y el corte se ve como una frontera.
   const orden = d.features.map((n, i) => i).sort((a, b) => d.iqr[a] - d.iqr[b]);
   const nombres = orden.map((i) => corto(d.features[i]));
-  const alto = orden.length * 15 + 80;
+  const alto = orden.length * 15 + 98;   // +18 por la leyenda
   Grafico.medida(destino, {
     titulo: 'Cuánto se mueve cada característica',
     alto,
     opcion: (c) => ({
       animation: false,
       textStyle: c.textStyle,
-      grid: { left: 200, right: 30, top: 12, bottom: 46 },
+      grid: { left: 200, right: 30, top: 30, bottom: 46 },
       tooltip: Object.assign({}, c.tooltip, { trigger: 'item',
+        // El índice sale del dato y no de `p.dataIndex`: con la serie partida en
+        // tres, `dataIndex` es la posición DENTRO de su serie y ya no coincide con
+        // la fila del eje. Cada punto lleva su índice como segunda coordenada.
         formatter: (p) => {
-          const i = orden[p.dataIndex];
+          const i = orden[p.value[1]];
           return `<b>${Grafico.paleta.fmt(d.iqr[i], 5)}</b> de rango intercuartílico<br>` +
                  `<span style="color:${c.tenue}">${corto(d.features[i])} · ${d.motivo[i]}</span>`;
         } }),
@@ -696,21 +721,41 @@ function iqrDeFeatures(destino, d) {
         // posición, que es lo único legítimo en esta escala.
         splitLine: { show: true, lineStyle: { color: c.borde, opacity: .35 } },
         axisLabel: { color: c.tenue, fontSize: 9, interval: 0 } }),
-      series: [{
+      // LEYENDA DE VERDAD, con sus muestras de color, en lugar del pie que había:
+      // decía «Azul: conservada · violeta: poca variación · ámbar: repite a otra» y
+      // los tres eran falsos —con la paleta de hoy son turquesa, verde pálido y
+      // rosa—. Se rompió al cambiar las series y nadie lo notó, porque una prosa
+      // que nombra colores no tiene forma de enterarse de que la paleta se movió.
+      // Con una leyenda el color sale de la misma ficha que pinta el punto, así
+      // que no puede desincronizarse; y además sirve para quien no distingue esos
+      // matices, que con los nombres escritos no tenía nada.
+      //
+      // Eso obliga a partir la serie en tres, una por motivo: ECharts dibuja la
+      // leyenda desde los nombres de serie, no desde colores por punto.
+      legend: { top: 0, right: 0, textStyle: { color: c.tenue, fontSize: 10 },
+                icon: 'circle', itemHeight: 8, itemGap: 14 },
+      series: Object.keys(COLOR_MOTIVO).map((motivo) => ({
+        name: motivo,
         type: 'scatter', symbolSize: 9,
-        data: orden.map((i) => ({
-          value: Math.max(d.iqr[i], 1e-9),
-          itemStyle: { color: Grafico.paleta.serie(COLOR_MOTIVO[d.motivo[i]] ?? 0) },
-        })),
-        markLine: d.corte_percentil ? {
+        itemStyle: { color: Grafico.paleta.serie(COLOR_MOTIVO[motivo]) },
+        // `[valor, índice]` y no solo el valor: al partir en tres series cada una
+        // tiene huecos, y sin el índice explícito ECharts las apila desde el
+        // principio del eje de categorías en lugar de dejarlas en su fila.
+        data: orden.map((i, k) => (d.motivo[i] === motivo
+          ? [Math.max(d.iqr[i], 1e-9), k] : null)).filter(Boolean),
+        markLine: motivo === 'conservada' && d.corte_percentil ? {
           silent: true, symbol: 'none',
-          label: { formatter: `corte · percentil ${d.percentil}`, color: c.tenue, fontSize: 10 },
+          // `start` y no `end`: el eje de categorías va con `inverse: true`, así que
+          // el «final» de la línea es el pie y ahí la etiqueta se encima con el
+          // nombre del eje. Con `start` sube al tope. Probé `end` primero y la
+          // captura lo desmintió — es el tipo de cosa que no se deduce leyendo.
+          label: { formatter: `corte · percentil ${d.percentil}`, color: c.tenue, fontSize: 10,
+                   position: 'start', distance: 5 },
           lineStyle: { color: c.tenue, type: 'dashed' },
           data: [{ xAxis: d.corte_percentil }],
         } : undefined,
-      }],
+      })),
     }),
-    pie: 'Azul: conservada · violeta: descartada por poca variación · ámbar: descartada por repetir a otra.',
   });
 }
 
@@ -730,11 +775,16 @@ function correlacionDeFeatures(destino, d) {
         formatter: (p) => `<b>${Grafico.paleta.fmt(p.data[2], 2)}</b> de correlación<br>` +
           `<span style="color:${c.tenue}">${corto(f[p.data[1]])}<br>${corto(f[p.data[0]])}</span>`,
       }),
-      // Divergente: dos tonos con un neutro en el cero, porque la correlación tiene signo.
+      // Divergente: dos matices con un neutro en el cero, porque la correlación
+      // tiene signo. Los polos son fichas propias y no series de la paleta
+      // categórica: acá el color no dice «qué categoría» sino «cuánto y hacia qué
+      // lado», y el par verde/violeta está elegido para no colapsar en ninguna de
+      // las tres dicromatías. Ver la nota de `--div-mas` en `estilos.css`.
       visualMap: { min: -1, max: 1, calculable: true, orient: 'horizontal', left: 'center', top: 0,
         itemWidth: 12, precision: 2, textStyle: { color: c.tenue, fontSize: 10 },
-        inRange: { color: [Grafico.paleta.serie(0), Grafico.paleta.varCss('--fondo-2'),
-                           Grafico.paleta.serie(3)] } },
+        inRange: { color: [Grafico.paleta.varCss('--div-menos'),
+                           Grafico.paleta.varCss('--fondo-2'),
+                           Grafico.paleta.varCss('--div-mas')] } },
       xAxis: { type: 'category', data: f, axisTick: { show: false },
                axisLine: { lineStyle: { color: c.borde } }, axisLabel: { show: false } },
       yAxis: { type: 'category', data: f, inverse: true, axisTick: { show: false },

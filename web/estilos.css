@@ -1,137 +1,300 @@
 /* Taller Etapa 1 — estilos comunes.
 
-   DOS TEMAS, UNA SOLA PALETA.
+   UN SOLO TEMA, UNA SOLA PALETA.
    Todo color vive acá como variable. Ningún archivo (ni `index.html`, ni `taller.html`, ni `app.js`)
-   escribe un `#rrggbb` propio: si lo hiciera, ese color quedaría igual en los dos temas y en uno de
-   los dos se vería mal. Para agregar un color nuevo hay que darle su valor en los dos bloques de
-   abajo, no en el lugar donde se usa.
+   escribe un `#rrggbb` propio: si lo hiciera, quedaría fuera de la paleta y habría que ir a buscarlo
+   a mano el día que algo cambie. Para agregar un color nuevo hay que darle su valor en este bloque,
+   no en el lugar donde se usa.
 
-   El tema claro es el de por defecto y por eso vive en `:root` pelado. El oscuro se activa con
-   `data-tema="oscuro"` en el <html>, que pone un script chico en el <head> de cada página (ver
-   `tema.js` para el porqué de que sea inline y no acá). */
+   El sitio es oscuro, y no como preferencia: es telemetría satelital, y el fondo de universo es
+   parte de la identidad. Antes había dos temas con un interruptor; se unificó porque el claro no
+   aportaba nada que el oscuro no diera, y el interruptor traía toda una clase de errores propios
+   —destello blanco al cargar, tema viejo al volver con «atrás», dos pestañas en desacuerdo— que
+   desaparecen al no existir. Ver A8.
+
+   TEXTURA: solo el campo de estrellas, global y muy tenue. Antes había además un degradado radial
+   en el cuerpo, una nebulosa de tres manchas de color y la banda de la vía láctea en el héroe; las
+   tres se fueron. Las superficies donde se lee un dato —tarjetas, tablas, cajas de gráfico— siguen
+   siendo planas por el mismo motivo de siempre: una textura detrás de cinco curvas compite con el
+   dato justo donde hay que leerlo.
+
+   QUÉ COLOR SOBREVIVE. El chrome es monocromo: negro, blanco y la escalera de grises, sin una sola
+   separación entre canales. El color que quedó es el que codifica algo, y nada más —los tres
+   estados (verde éxito, rojo error, naranja claro información), las cinco series de los gráficos, y
+   el oro de la configuración de la tesis, que es una marca y no un estado. La regla para agregar
+   color es esa: si no significa nada, no va.
+
+   POR QUÉ SE FUE EL AZUL. Los neutros de antes no eran una paleta azul, eran un tinte: el fondo
+   tenía 12 puntos de separación entre canales, `--panel` 29, `--panel-2` 38, `--borde` 43 y
+   `--texto-2` 45. Cuando todo es un poco azul, nada es azul. Los grises de ahora tienen la misma
+   luminancia relativa que los azulados que reemplazaron —error menor a 0,003—, así que ningún par
+   de contraste se movió al neutralizarlos: lo único que se fue es el matiz. */
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* --- superficies --- */
-  --fondo: #eef2f8;
-  --fondo-brillo: #ffffff;   /* centro del degradado del cuerpo */
-  --fondo-2: #f4f7fc;        /* cajas internas, campos de formulario */
-  --panel: #ffffff;
-  --panel-2: #e7eef8;
-  --borde: #d3dcea;
+  /* --- superficies ---
+     Neutros PUROS, sin separación entre canales. Antes eran azules: el fondo
+     tenía 12 puntos de separación, `--panel` 29, `--panel-2` 38, `--borde` 43 y
+     `--texto-2` 45. Eso no era una paleta azul, era un tinte que se le había
+     filtrado a cada neutro, y el efecto es que todo sea un poco azul y por eso
+     nada sea azul. Los grises van opacos y no con alfa porque `grafico.js` pasa
+     `--panel` a ECharts como fondo del globo, y un alfa ahí deja ver la curva
+     por detrás. `--borde` sí va con alfa: sobre cualquier superficie de la
+     escalera un filete al 11 % da el mismo peso relativo. */
+  --fondo: #07080b;
+  --fondo-2: #0c0e11;        /* cajas internas, campos de formulario */
+  --panel: #101216;
+  --panel-2: #171a1f;
+  /* Filete más fino que antes (.11 → .085): con radios de 14 px el borde es más
+     largo, así que a igual opacidad pesa más. La superficie se define por el
+     borde de luz y no por el relleno, que es lo que hace que las cajas se sientan
+     livianas aunque estén ahí. */
+  --borde: rgba(255, 255, 255, .085);
+  /* Para lo que necesita un filete que se vea: foco, hover de un control,
+     borde de un nodo apuntado. Antes ese trabajo lo hacía `--acento`, que es
+     una ficha de RELLENO: llevarla a tinta calmaba los botones y convertía cada
+     hairline en una caja dura. Son dos trabajos y ahora son dos fichas. */
+  --borde-fuerte: rgba(255, 255, 255, .22);
 
-  /* --- texto --- */
-  --texto: #16202f;
-  --texto-2: #59667e;
+  /* --- texto ---
+     56 % y no 64 %, 36 % y no 44 %: el mismo alfa compra más contraste sobre
+     negro que sobre blanco (64 % de blanco sobre #0a0a0a llega a 8,2:1 donde
+     64 % de negro sobre blanco llega a 6,7:1), así que reusar los porcentajes
+     de un lienzo claro sube el volumen del texto de apoyo en vez de bajarlo. */
+  /* Blanco con un punto de frío, no blanco puro: acompaña al celeste del acento
+     y evita que el texto se vea más caliente que la interfaz que lo rodea. */
+  --texto: #f4f6f8;
+  --texto-2: rgba(244, 246, 248, .58);
+  --texto-3: rgba(244, 246, 248, .36);   /* rótulos, pies, metadatos */
 
-  /* --- acentos y estados --- */
-  --acento: #1a6fc4;
-  --acento-hondo: #14539b;   /* extremo oscuro del degradado de los botones primarios */
-  --acento-2: #0e8a63;
-  --sobre-acento: #ffffff;   /* texto encima de un fondo de acento pleno */
-  --oro: #a9700a;            /* la ★ de la configuración de la tesis */
-  --alerta: #c2540f;
-  --peligro: #cf3552;
-  --ok: #12794a;
+  /* --- acentos ---
+     El chrome es monocromo: el color que quedó en el sitio es el que codifica
+     algo —los tres estados, las cinco series y el oro de la tesis—, y nada más.
+     Si un color está, significa algo.
 
-  /* --- matices derivados --- */
-  --barra-fondo: rgba(255, 255, 255, .82);
-  --boton-hover: #dbe6f6;
-  --fila-hover: rgba(26, 111, 196, .07);
-  --opcion-activa: #dce9fa;
-  --aviso-fondo: rgba(194, 84, 15, .1);
-  --aviso-info-fondo: rgba(26, 111, 196, .09);
+     `--acento` va en HEX y no en `rgba()`, y no es cosmético: `grafico.js` arma
+     el relleno de la barra de rango con `varCss('--acento') + '22'`, que es un
+     truco que solo funciona sobre hex. Con `rgba(255,255,255,.72)` el resultado
+     era la cadena inválida «rgba(255,255,255,.72)22» y ECharts caía a su celeste
+     por defecto.
 
-  /* --- etiquetas de estado --- */
-  --chip-pend-b: #e4e8f0; --chip-pend-t: #5c6b86;
-  --chip-corr-b: #d7e8fd; --chip-corr-t: #12558f;
-  --chip-ok-b:   #d6f2e2; --chip-ok-t:   #12794a;
-  --chip-err-b:  #fbdde3; --chip-err-t:  #b32744;
-  --chip-oro-b:  #fbeccc; --chip-oro-t:  #8a5a06;
+     EL ACENTO ES AZUL MARINO, y se gasta en tres lugares nada más: la acción
+     primaria, lo que está seleccionado, y lo que está corriendo. En el chrome no
+     va nunca — ni un botón secundario, ni un filete de caja, ni un fondo de
+     sección. Esa es la regla que hace que un solo color alcance: si aparece, algo
+     pasa ahí.
 
-  /* --- nodos del mapa de ramas --- */
-  --nodo-listo-b: #dce9fa; --nodo-listo-l: #7aa9dd;
-  --nodo-corr-b:  #bcd8fa;
-  --nodo-err-b:   #fbdde3;
+     VA PARTIDO EN DOS ALTURAS, y no es un capricho: un marino de verdad es
+     demasiado oscuro para leerse SOBRE negro. Si se usa una sola ficha, o el
+     relleno del botón queda tan claro que no es marino, o la tinta de un enlace
+     queda ilegible. Son dos trabajos:
 
-  /* --- escenografía espacial --- */
-  --estrellas-op: 0;                        /* de día no hay estrellas */
-  --orbita-cielo: rgba(198, 218, 244, .5);  /* disco de cielo detrás del globo */
-  --orbita-anillo: #b3c6e0;
+       --acento        TINTA. Enlaces, chevrones, el número del paso, el nodo
+                       seleccionado del mapa, la pestaña activa, el anillo de la
+                       marca, el foco del teclado. 8,1:1 contra el lienzo y
+                       7,6:1 sobre una tarjeta.
+       --acento-hondo  RELLENO. Botón primario, número de fase, interruptor
+                       encendido. Lleva `--sobre-acento` encima: blanco, a 10,0:1.
+
+     Las dos comparten matiz (252° en OKLCh) y solo cambian de luminosidad: eso es
+     lo que las hace leerse como UN azul en dos alturas y no como dos azules
+     parecidos, que es el error habitual al hacer esto a ojo.
+
+     `--acento` va en HEX porque `grafico.js` lo concatenaba con '22'; hoy ya no lo
+     hace (ver la nota del slider ahí), pero la restricción se respeta igual para
+     no dejar una trampa puesta. */
+  --acento: #7fa8d6;
+  --acento-hondo: #154473;   /* relleno pleno: el primario es plano, sin degradado */
+  --acento-2: #f4f6f8;       /* los valores: el dato es lo más fuerte de la pantalla */
+  --sobre-acento: #ffffff;   /* texto encima del relleno marino */
+  --oro: #ffc86b;            /* la marca de la configuración de la tesis */
+
+  /* --- los tres que significan ---
+     Éxito verde, error rojo, información y ayuda memoria naranja claro. El rojo
+     era `#ff5c7a`, que es rosa, y el naranja era `#ff8a5b`, que es fuerte y no
+     claro. Contrastes medidos sobre este lienzo: verde 11,2:1, rojo 6,5:1,
+     naranja 11,3:1. Sobre una tarjeta el más bajo es el rojo a 5,6:1, y dentro
+     de su propio chip ninguna tinta baja de 6,2:1. */
+  --ok:      #65ca7e;
+  --peligro: #ff8987;
+  --alerta:  #e3a42e;
+
+  /* --- matices derivados ---
+     Los rellenos de interacción no se invierten uno a uno respecto de un lienzo
+     claro: un lavado claro sobre un entorno oscuro es un paso perceptual más
+     chico, así que van alrededor de 1,5× los valores del claro. */
+  --barra-fondo: rgba(7, 8, 11, .72);
+  --boton-hover: rgba(255, 255, 255, .09);
+  --fila-hover: rgba(127, 168, 214, .07);
+  --opcion-activa: rgba(21, 68, 115, .30);
+  /* Las dos variantes de aviso comparten matiz —la información va en naranja
+     claro— y se separan por intensidad: la advertencia lleva el filete pleno, la
+     informativa lo lleva a media tinta. Ver `.aviso.info`. */
+  --aviso-fondo: rgba(227, 164, 46, .10);
+  --aviso-info-fondo: rgba(227, 164, 46, .07);
+
+  /* --- etiquetas de estado ---
+     «pendiente» y «corriendo» son neutros: no son ni éxito ni error, y el chrome
+     es monocromo. Los otros tres llevan su color porque es lo que dicen. */
+  --chip-pend-b: rgba(255, 255, 255, .08); --chip-pend-t: rgba(255, 255, 255, .62);
+  --chip-corr-b: rgba(255, 255, 255, .13); --chip-corr-t: #ffffff;
+  --chip-ok-b:   rgba(101, 202, 126, .13); --chip-ok-t:   #65ca7e;
+  --chip-err-b:  rgba(255, 137, 135, .14); --chip-err-t:  #ff8987;
+  --chip-oro-b:  rgba(255, 200, 107, .13); --chip-oro-t:  #ffc86b;
+
+  /* --- nodos del mapa de ramas ---
+     «listo» es el estado de casi todos los nodos del mapa: es el sustrato, no un
+     cartel de estado, así que va neutro. Un color que lo lleva todo deja de
+     distinguir algo. El error sí va rojo, porque eso siempre es noticia. */
+  --nodo-listo-b: rgba(255, 255, 255, .07); --nodo-listo-l: rgba(255, 255, 255, .30);
+  --nodo-corr-b:  rgba(21, 68, 115, .55);
+  --nodo-err-b:   rgba(255, 137, 135, .13);
+
+  /* --- escenografía espacial ---
+     Las estrellas quedan más tenues que antes (.45 → .22) porque ahora son la
+     única escenografía: la nebulosa y la vía láctea del héroe se sacaron, así
+     que el campo ya no compite con nada y no necesita el volumen que tenía para
+     hacerse oír por encima de ellas. */
+  --estrellas-op: .22;
+  --orbita-anillo: rgba(255, 255, 255, .22);
 
   /* --- series de los gráficos (las lee `grafico.js`, no las repite) ---
-     Estos cinco no se eligieron a ojo: están verificados con un validador de paletas para que
-     cada par vecino se distinga también en daltonismo. La versión anterior tenía un naranja y un
-     ámbar a ΔE 1,1 en deuteranopía y 8,5 con visión normal — o sea, dos series que ni con visión
-     de color completa se separaban. Si se tocan, hay que volver a validarlos, no confiar en el ojo. */
-  --serie-1: #1a6fc4;
-  --serie-2: #0e8a63;
-  --serie-3: #b3760a;
-  --serie-4: #c02d84;
-  --serie-5: #6b46c1;
+     Estos cinco no se eligieron a ojo: están verificados con un validador de paletas para que cada
+     par vecino se distinga también en daltonismo, y validados contra ESTE fondo oscuro — no son el
+     juego claro aclarado, porque sobre fondo oscuro los tonos muy claros se salen de la banda de
+     luminosidad y dejan de separarse. Si se tocan, hay que volver a validarlos, no confiar en el
+     ojo. */
+  /* PALETA NUEVA, y el motivo es medible. Las cinco de antes tenían luminosidad
+     casi constante (0,64 a 0,66 en OKLCh) y se distinguían solo por matiz — y en
+     dicromatismo el matiz es justo lo que se pierde. Medido con un validador
+     propio sobre los diez pares y las tres dicromatías, el peor par daba 0,018:
+     `#4a93e8` y `#8f74e8` colapsaban en deuteranopía, a pesar de que el comentario
+     de este archivo afirmaba lo contrario.
 
-  --sombra: 0 6px 22px rgba(22, 40, 72, .09);
-  --radio: 12px;
+     Estas cinco tienen croma fijo en 0,105 y RAMPA de luminosidad de 0,60 a 0,92,
+     con el matiz espaciado parejo desde 210°. Así, cuando el matiz no está
+     disponible, queda la luz. Peor par: 0,077 — 4,3 veces mejor. Contraste contra
+     el lienzo de 5,3:1 la más oscura a 16,3:1 la más clara.
+
+     Si se tocan, hay que volver a pasarlas por el validador y no confiar en el
+     ojo: eso es exactamente lo que había fallado antes. */
+  --serie-1: #0091a3;
+  --serie-2: #8e90d8;
+  --serie-3: #e695b6;
+  --serie-4: #fabd7f;
+  --serie-5: #c2f6b1;
+
+  /* El color de un gráfico de UNA SOLA serie: la barra horizontal de «mediciones
+     por hoja» y el secuencial del mapa de codetección.
+
+     Va como ficha aparte y no como `serie(0)` escrito en el JS, porque son dos
+     cosas distintas: `--serie-1` significa «la primera de cinco categorías» y
+     esto significa «no hay categorías, hay una magnitud». Con `serie(0)` el color
+     de estos gráficos quedaba amarrado a la POSICIÓN dentro de la paleta, así que
+     reordenar las cinco los cambiaba de color sin que nadie lo pidiera.
+
+     VERDE MATE, y el «mate» no es un adjetivo: es croma 0,050 en OKLCh contra los
+     0,145 de `--ok`. Ahí está el problema que había que resolver, porque el verde
+     en este sitio YA significa éxito, y una barra verde brillante se leería como
+     un estado y no como una magnitud. Los dos comparten matiz (150°) y se separan
+     por saturación: el estado grita, el dato no. Distancia percibida entre los
+     dos: 0,152, y 0,286 contra `--serie-5`, que es el otro verde de la casa.
+
+     No es un alias de ninguna serie. Antes lo era —apuntaba a `--serie-4`— y esto
+     es un valor propio porque ya no coincide con ningún color de la paleta
+     categórica. La ficha existe justamente para que cambiarlo sea una línea: es lo
+     que acabó de pasar, de naranja a verde, sin tocar una sola línea de JS.
+
+     Contrastes: 5,9:1 sobre la caja del gráfico, 5,7:1 sobre una tarjeta. */
+  --grafico-unico: #77957c;
+
+  /* El tope de una RAMPA secuencial —el mapa de codetección, que va del color de
+     la caja a este verde—. Mismo matiz y mismo croma que `--grafico-unico`, más
+     oscuro, y son dos fichas porque son dos restricciones distintas:
+
+     La barra horizontal lleva su número AFUERA, así que el relleno puede ser tan
+     claro como convenga. El mapa de calor lleva el número ENCIMA de cada celda, y
+     una rampa que sube hasta #77957c tiene una zona muerta alrededor del 80 % del
+     recorrido donde el blanco llega a 4,3:1 y el oscuro a 4,3:1 — ninguna de las
+     dos tintas alcanza. Invertir la etiqueta pasado un umbral no resuelve eso:
+     mueve el problema, no lo saca.
+
+     Con el tope en L=0,52 el blanco aguanta 4,99:1 en el punto más flojo de toda
+     la rampa, así que la etiqueta es blanca siempre y no hay umbral que calibrar.
+     Verificado midiendo los once pasos de la interpolación, no el extremo. */
+  --grafico-rampa: #54715a;
+
+  /* Los dos POLOS de una escala divergente: el mapa de correlación, que va de −1 a
+     +1 pasando por cero. El cero es el color de la caja, así que la escala se lee
+     como «cuánto se aleja del centro, y hacia qué lado».
+
+     UNA DIVERGENTE NECESITA DOS MATICES y no se puede hacer «toda verde»: con un
+     solo matiz habría que distinguir −0,9 de +0,9 por luminosidad, y entonces el
+     cero deja de poder ser el punto neutro, que es justo lo que una correlación
+     necesita que sea.
+
+     VERDE Y AZUL, y el azul NO es simétrico en luz con el verde. Ese es el punto
+     fino. Verde contra azul a la misma luminosidad es el peor par para tritanopía
+     —colapsa a 0,028 en el mejor caso del barrido, porque la tritanopía junta
+     justamente esos dos matices—. Rompiendo la simetría, lo que queda para
+     distinguir los polos cuando el matiz se pierde es la LUZ, y ahí el par se
+     recupera del todo.
+
+     Barrido conjunto de las dos luminosidades y los dos matices, midiendo la
+     separación en visión normal y en las tres dicromatías, y pidiendo el mínimo
+     desbalance entre polos: verde a L=0,84 y azul a L=0,74 dan 0,141 en el peor
+     caso de las cuatro vistas. Para referencia, verde contra magenta —el opuesto
+     «natural» del verde y el error clásico— colapsa a 0,053, y un lila en 310°
+     llegaba a 0,117. Este par es mejor que los dos.
+
+     EL COSTO, dicho: el polo positivo pesa un 29 % más que el negativo contra el
+     centro (12,2:1 contra 8,6:1), así que una correlación de +0,9 se lee algo más
+     fuerte que una de −0,9. Es el precio de la asimetría de luz, y es lo que la
+     hace legible para quien no distingue verde de azul. */
+  --div-mas:   #9edcaa;   /* correlación positiva */
+  --div-menos: #56b9dd;   /* correlación negativa */
+
+  /* --- forma ---
+     `--radio` es para contenedores; `--radio-2`, para lo que va anidado adentro (celdas, campos,
+     botones chicos). Sin esa distinción una caja de 9 px dentro de otra de 12 px deja una esquina
+     que se ve mal cortada. */
+  /* Radios grandes. 14 px en el contenedor y 9 px en lo anidado mantiene la
+     distinción que este archivo ya tenía —sin ella una caja chica dentro de una
+     grande deja una esquina mal cortada— pero en la escala de Órbita, que es
+     donde las superficies dejan de parecer cajas y empiezan a parecer paneles. */
+  --radio: 14px;
+  --radio-2: 9px;
+  /* Elevación solo para lo que flota sobre el resto (el modal del gráfico). Las tarjetas son
+     planas: ver la nota en `.tarjeta`. */
+  --sombra: 0 1px 2px rgba(0, 0, 0, .6), 0 12px 40px rgba(0, 0, 0, .55);
   --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
 
-/* Tema oscuro: «sala de control». El proyecto es telemetría satelital y la estética acompaña. */
-:root[data-tema="oscuro"] {
-  color-scheme: dark;
+* { box-sizing: border-box; }
 
-  --fondo: #080b14;
-  --fondo-brillo: #16203a;
-  --fondo-2: #0e1424;
-  --panel: #131c30;
-  --panel-2: #1a2540;
-  --borde: #24324f;
+/* ---------------------------------------------------------------------------
+   Íconos.
+   Antes eran glifos escritos en el contenido: ★ para la configuración de la tesis, ＋ ／ － para los
+   pliegues, ▸ para los cortes, → para el flujo de una etapa a la otra. Cuatro problemas con eso:
+   cada sistema los dibuja distinto, no heredan el grosor de la fuente, quedan mal alineados con la
+   línea de base, y en algunas plataformas la ★ sale coloreada como emoji.
 
-  --texto: #e6edf7;
-  --texto-2: #93a4c0;
-
-  --acento: #4ea8ff;
-  --acento-hondo: #2f7ddb;
-  --acento-2: #7ef0c0;
-  --sobre-acento: #04101f;
-  --oro: #ffc86b;
-  --alerta: #ff8a5b;
-  --peligro: #ff5c7a;
-  --ok: #55d98d;
-
-  --barra-fondo: rgba(8, 11, 20, .82);
-  --boton-hover: #223054;
-  --fila-hover: rgba(78, 168, 255, .07);
-  --opcion-activa: #17263f;
-  --aviso-fondo: rgba(255, 138, 91, .09);
-  --aviso-info-fondo: rgba(78, 168, 255, .09);
-
-  --chip-pend-b: #2a2f45; --chip-pend-t: #a9b6d4;
-  --chip-corr-b: #2b3d63; --chip-corr-t: #8fc4ff;
-  --chip-ok-b:   #17402c; --chip-ok-t:   #55d98d;
-  --chip-err-b:  #451c28; --chip-err-t:  #ff5c7a;
-  --chip-oro-b:  #3a2c12; --chip-oro-t:  #ffc86b;
-
-  --nodo-listo-b: #14304d; --nodo-listo-l: #2f6ea8;
-  --nodo-corr-b:  #23406b;
-  --nodo-err-b:   #3d1725;
-
-  --estrellas-op: .5;
-  --orbita-cielo: rgba(18, 30, 56, .55);
-  --orbita-anillo: #2a3c5e;
-
-  /* Validados aparte contra el fondo oscuro: no es el mismo juego aclarado, porque sobre fondo
-     oscuro los tonos muy claros se salen de la banda de luminosidad y dejan de separarse. */
-  --serie-1: #4a93e8;
-  --serie-2: #22a87f;
-  --serie-3: #b0861f;
-  --serie-4: #d95fa0;
-  --serie-5: #8f74e8;
-
-  --sombra: 0 8px 32px rgba(0, 0, 0, .45);
+   Van como máscaras y no como imágenes de fondo a propósito: una máscara toma el color de quien la
+   usa (`background: currentColor`), así el ícono queda dentro de la paleta y cambia con su contexto.
+   --------------------------------------------------------------------------- */
+:root {
+  --ico-mas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  --ico-menos: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  --ico-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E");
 }
 
-* { box-sizing: border-box; }
+/* La estrella de la configuración de la tesis y la flecha del flujo, para usar en el marcado.
+   `.ico` se dimensiona con la tipografía de al lado, así que no hay que fijarle tamaño en cada uso. */
+.ico { width: 1em; height: 1em; flex: none; display: inline-block; vertical-align: -.13em; }
+.ico-estrella { color: var(--oro); }
+.ico-flecha { color: var(--acento); }
+
 
 /* ---------------------------------------------------------------------------
    Transición entre páginas.
@@ -173,44 +336,75 @@
 
 body {
   margin: 0;
-  background: radial-gradient(ellipse at 20% -10%, var(--fondo-brillo) 0%, var(--fondo) 55%) fixed;
+  /* Plano. Antes había un degradado radial con un centro más claro en la esquina
+     de arriba a la izquierda: era decoración, y era además la superficie que más
+     hacía que el sitio se leyera «azulado», porque el centro del degradado era el
+     azul más claro de la paleta. Un lienzo oscuro no tiene disponible el recurso
+     de «una banda muy tenue» que sí tiene uno claro; el equivalente es una única
+     banda genuinamente clara usada como interrupción, o nada. Acá: nada. */
+  background: var(--fondo);
   color: var(--texto);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Al cambiar de tema, que las superficies grandes se fundan en vez de saltar.
-   Solo el fondo y el borde: animar el color del texto lo hace ver borroso. */
-body, .barra, .tarjeta { transition: background-color .22s ease, border-color .22s ease; }
+/* Campo de estrellas del fondo, en todo el sitio y muy tenue: es lo que hace que el
+   universo sea la identidad y no un adorno del inicio. Es también la ÚNICA
+   escenografía que quedó: el héroe tenía además un degradado azul, una nebulosa y la
+   banda de la vía láctea, y las tres se fueron por decorativas (ver la nota al
+   principio del `<style>` de `index.html`). El héroe conserva un campo de estrellas
+   más denso que este, desvanecido abajo con una máscara para que no se vea la
+   costura donde cambia la densidad.
 
-/* Campo de estrellas del fondo (solo en el tema oscuro: ver `--estrellas-op`).
-   Sin titileo a propósito: al cambiar de página la animación se reiniciaba desde
-   el principio, y como recorre de 0,35 a 0,7 de opacidad, el fondo entero
-   cambiaba de brillo de golpe. Eso se veía como un parpadeo en cada navegación. */
+   Sin titileo a propósito: al cambiar de página la animación se reiniciaba desde el
+   principio, y como recorría de 0,35 a 0,7 de opacidad, el fondo entero cambiaba de
+   brillo de golpe. Eso se veía como un parpadeo en cada navegación.
+
+   Todas las estrellas son BLANCAS. Antes había cuatro celestes (#cfe3ff, #bcd6ff,
+   #dbe8ff) entre las blancas: sobre el fondo azulado de antes no se notaban, sobre
+   un neutro sí. Una estrella teñida de celeste no es una estrella, es el tinte de
+   la paleta vieja escondido en la escenografía. */
 .estrellas {
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  opacity: var(--estrellas-op); transition: opacity .22s ease;
+  opacity: var(--estrellas-op);
   background-image:
     radial-gradient(1px 1px at 12% 18%, #fff, transparent),
-    radial-gradient(1px 1px at 33% 72%, #cfe3ff, transparent),
+    radial-gradient(1px 1px at 33% 72%, #fff, transparent),
     radial-gradient(1px 1px at 58% 26%, #fff, transparent),
-    radial-gradient(1px 1px at 71% 61%, #bcd6ff, transparent),
+    radial-gradient(1px 1px at 71% 61%, #fff, transparent),
     radial-gradient(2px 2px at 86% 34%, #fff, transparent),
-    radial-gradient(1px 1px at 45% 89%, #dbe8ff, transparent),
+    radial-gradient(1px 1px at 45% 89%, #fff, transparent),
     radial-gradient(1px 1px at 92% 78%, #fff, transparent);
 }
 
 .envoltorio { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
-a { color: var(--acento); }
+/* Un enlace en un chrome monocromo pierde lo único que lo distinguía del texto,
+   así que se re-codifica con subrayado en lugar de confirmar que «hay una
+   diferencia». El subrayado va tenue y se enciende al pasar por encima. La
+   navegación de la barra queda afuera: ahí la posición y el fondo ya dicen que es
+   un enlace, y seis subrayados en fila se leen como una regla. */
+a { color: var(--texto); text-decoration: underline;
+    text-decoration-color: var(--borde-fuerte); text-underline-offset: .18em; }
+a:hover { text-decoration-color: currentColor; }
 
-h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; font-weight: 650; letter-spacing: -.01em; }
-h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
-h2 { font-size: clamp(1.4rem, 3vw, 2rem); margin-top: 0; }
-h3 { font-size: 1.1rem; }
+/* Jerarquía por tamaño y espacio, no por peso. Los títulos grandes van en 300:
+   a 2 rem o más, el peso 500 compite con el cuerpo en negrita y el tamaño ya
+   alcanza para decir qué es un título. El h3 se queda en 500 porque a 1,05 rem
+   un 300 se lee delgado y pierde contra el párrafo que tiene debajo. */
+h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; text-wrap: balance; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.3rem); font-weight: 300; letter-spacing: -.03em; line-height: 1.05; }
+h2 { font-size: clamp(1.45rem, 3.2vw, 2.1rem); font-weight: 300; letter-spacing: -.025em; margin-top: 0; }
+h3 { font-size: 1.05rem; font-weight: 500; letter-spacing: -.01em; }
 
-p { margin: 0 0 1em; }
+p { margin: 0 0 1em; text-wrap: pretty; }
+
+/* Foco visible, de 2 px y EN EL ACENTO. El acento marca lo seleccionado, y el foco
+   del teclado es exactamente eso; usar tinta blanca acá lo dejaba indistinguible de
+   un borde cualquiera. Sobre un lienzo oscuro un hairline no tiene campo de luz
+   alrededor contra el que registrarse, de ahí los 2 px. */
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 .tenue { color: var(--texto-2); }
 .mono { font-family: var(--mono); font-size: .9em; }
 
@@ -223,80 +417,149 @@ p { margin: 0 0 1em; }
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--borde);
 }
-.barra .marca { font-weight: 700; letter-spacing: .02em; display: flex; align-items: center; gap: 9px; }
-.barra .marca span.punto { width: 9px; height: 9px; border-radius: 50%; background: var(--acento-2);
-  box-shadow: 0 0 12px var(--acento-2); animation: latido 3s ease-in-out infinite; }
-/* Pulso deliberadamente leve (1 → 0,72): al navegar la animación se reinicia, y
-   un rango amplio se notaría como un salto en la barra, que justamente queremos
-   que se perciba fija entre pantallas. */
+.barra .marca { font-weight: 500; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+/* La marca es un anillo con un satélite arriba: la misma figura que el dibujo del
+   héroe, a escala de barra. Dos trazos y un punto, sin resplandor y sin latido —
+   el halo era decoración y el pulso era movimiento perpetuo que no informaba nada.
+   Es lo único del chrome que lleva el acento, y se lo gana por ser la identidad. */
+.barra .marca span.punto {
+  width: 20px; height: 20px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--acento); background: none; position: relative;
+}
+.barra .marca span.punto::after {
+  content: ''; position: absolute; top: -2px; left: 50%;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--acento);
+  transform: translateX(-50%);
+}
+/* `latido` sigue vivo para `.chip.corriendo`, que es lo único que lo necesita: ahí
+   el movimiento SÍ dice algo, que es que el paso está corriendo ahora. */
 @keyframes latido { 50% { opacity: .72 } }
 .barra nav { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
-.barra nav a { padding: 7px 14px; border-radius: 8px; text-decoration: none; color: var(--texto-2);
-  font-size: .92rem; position: relative; transition: color .18s ease, background .18s ease; }
+/* Las DOS pestañas llevan recuadro, y lo único que las distingue es el relleno.
+   Antes solo la activa tenía caja, así que la inactiva no se leía como algo
+   clickeable: parecía una etiqueta al lado de un botón. Con las dos enmarcadas se
+   leen como un par —dos destinos, uno de los cuales es donde estás—, y el estado
+   queda a cargo de una sola variable en lugar de dos. Por eso el filete es el
+   mismo en las dos: si además cambiara de color, habría dos señales diciendo lo
+   mismo y ninguna sería la señal. */
+.barra nav a {
+  padding: 7px 14px; border-radius: var(--radio-2);
+  border: 1px solid var(--borde);
+  text-decoration: none !important; color: var(--texto-2);
+  font-size: .92rem;
+  transition: color .18s ease, background .18s ease;
+}
+/* El hover aclara la tinta y nada más: el relleno queda reservado para «acá
+   estás», y si el hover también rellenara, pasar el mouse por la pestaña
+   inactiva la haría parecer la activa. */
 .barra nav a:hover { color: var(--texto); }
 .barra nav a.activo { background: var(--panel-2); color: var(--texto); }
-/* Marca de la pestaña activa. Sin `view-transition-name` a propósito: que se
-   desplace de una pestaña a la otra durante la navegación llamaba la atención
-   más de lo necesario. Cambia junto con el resto, sin animación propia. */
-.barra nav a.activo::after {
-  content: ''; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 2px;
-  background: var(--acento-2); border-radius: 2px;
-}
+/* La pestaña activa se marca con su propio relleno y no con un subrayado colgando
+   de la barra. El subrayado obligaba a calcular un `bottom` negativo contra el alto
+   de la barra, y se desalineaba en cuanto cambiaba el padding; el relleno viaja con
+   el elemento. Sigue sin `view-transition-name` a propósito: que se desplace de una
+   pestaña a la otra llamaba la atención más de lo necesario. */
 
-/* --- Interruptor de tema --- */
-/* Un solo botón que muestra el ícono del tema al que se va a cambiar (sol si estás
-   en oscuro, luna si estás en claro): dice a dónde lleva, no dónde estás. */
-.btn-tema {
-  margin-left: 6px; width: 34px; height: 34px; flex: none;
-  display: grid; place-items: center;
-  border: 1px solid var(--borde); border-radius: 9px;
-  background: var(--panel-2); color: var(--texto-2);
-  cursor: pointer; padding: 0;
-  transition: color .18s ease, border-color .18s ease, background .18s ease;
+/* --- Rótulo de sección ---
+   Una sola señal, repetida, para decir «acá empieza un bloque». Antes convivían `h3` a .95rem,
+   `h4` a .92rem y `.grafico-titulo` a .85rem haciendo el mismo trabajo con tres tamaños distintos,
+   y ninguno se distinguía del texto que venía abajo. El patrón ya existía en `.metrica .rotulo` y
+   en las celdas del resumen: esto lo generaliza. */
+/* Sin versalitas. Estaban acá y en otros seis lugares, y una mayúscula forzada por
+   CSS es una decisión de estilo pegada encima de una cadena que ya venía escrita:
+   rompe los acrónimos, no se puede seleccionar como se lee, y el peso 700 sumado al
+   tracking hacía que un rótulo de apoyo pesara más que el título que encabezaba. */
+.rotulo-seccion {
+  font-size: .74rem; font-weight: 500; letter-spacing: normal;
+  color: var(--texto-2); margin: 0 0 6px;
 }
-.btn-tema:hover { color: var(--texto); border-color: var(--acento); }
-.btn-tema svg { width: 17px; height: 17px; display: block; }
-/* Cada ícono se muestra solo en su tema. Los dos están siempre en el DOM para que
-   la barra tenga exactamente el mismo marcado en las dos páginas (ver la nota de
-   `view-transition-name` más arriba). */
-.btn-tema .ico-sol { display: none; }
-:root[data-tema="oscuro"] .btn-tema .ico-sol { display: block; }
-:root[data-tema="oscuro"] .btn-tema .ico-luna { display: none; }
 
 /* --- Botones --- */
+/* TRES PESOS, y el orden importa: `.boton` a secas es el FANTASMA —filete y nada
+   más—, `.primario` es el relleno de acento, y `.plano` es solo texto. Antes el
+   botón por defecto venía con relleno de superficie, así que tres botones juntos
+   pesaban los tres lo mismo y no se leía cuál era la acción. Un peso por nivel de
+   importancia, y como máximo un primario por pantalla. */
 .boton {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 18px; border-radius: 10px; border: 1px solid var(--borde);
-  background: var(--panel-2); color: var(--texto);
-  font: inherit; font-size: .94rem; cursor: pointer; text-decoration: none;
-  transition: transform .12s ease, background .15s ease, border-color .15s ease;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 12px 20px; border-radius: var(--radio-2);
+  border: 1px solid var(--borde-fuerte); background: none; color: var(--texto);
+  font: inherit; font-size: .94rem; font-weight: 500; cursor: pointer; text-decoration: none;
+  transition: background .16s ease, border-color .16s ease, opacity .16s ease;
 }
-.boton:hover { background: var(--boton-hover); border-color: var(--acento); transform: translateY(-1px); }
-.boton.primario { background: linear-gradient(135deg, var(--acento), var(--acento-hondo));
-  border-color: transparent; color: var(--sobre-acento); font-weight: 650; }
-.boton.primario:hover { filter: brightness(1.08); }
-.boton:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+/* Sin desplazamiento al pasar por encima: el movimiento no informaba nada. Lo
+   reemplaza un lavado de superficie, que es lo que corresponde a un estado de
+   interacción. */
+.boton:hover { background: var(--panel); }
+/* Relleno plano y no degradado: un degradado entre dos fichas introduce todos los
+   pasos intermedios, que no son ninguna de las dos. */
+.boton.primario { background: var(--acento-hondo);
+  border-color: transparent; color: var(--sobre-acento); }
+/* Al pasar por encima aclara en lugar de transparentar: un `opacity` sobre un
+   relleno oscuro lo acerca al lienzo, así que el botón se apagaba en vez de
+   responder. */
+.boton.primario:hover { background: var(--acento-hondo); filter: brightness(1.35); }
+/* El tercer peso: sin filete y sin relleno, para acciones que están pero no
+   compiten — «volver», «cancelar», «ver el detalle». */
+.boton.plano { border-color: transparent; color: var(--texto-2); padding-left: 8px; padding-right: 8px; }
+.boton.plano:hover { color: var(--texto); background: none; }
+.boton:disabled { opacity: .4; cursor: not-allowed; }
 
-/* --- Tarjetas / paneles --- */
+/* La flecha del botón toma `--acento`, que es tinta, y sobre un relleno pleno
+   desaparecía. Los íconos son máscaras: alcanza con devolverle `currentColor`. La
+   estrella NO entra acá — es la marca de la configuración de la tesis y conserva
+   su oro incluso encima de un relleno blanco. */
+.boton .ico-flecha { color: currentColor; }
+
+/* --- Tarjetas / paneles ---
+   Planas y sin sombra a propósito. El taller apila tres o cuatro tarjetas, y con degradado más
+   sombra cada panel compite por atención con los gráficos que tiene adentro. Un fondo parejo y un
+   filete de 1 px alcanzan para separar: así lo único con contraste fuerte en la pantalla es el
+   dato. La elevación queda reservada para lo que de verdad flota, que es el modal del gráfico. */
 .tarjeta {
-  background: linear-gradient(180deg, var(--panel), var(--fondo-2));
+  background: var(--panel);
   border: 1px solid var(--borde); border-radius: var(--radio);
-  padding: 20px; box-shadow: var(--sombra);
+  padding: 22px;
 }
 .rejilla { display: grid; gap: 18px; }
 .rejilla.c2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .rejilla.c3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
 /* --- Métricas --- */
-.metrica { text-align: center; }
-.metrica .valor { font-size: 1.9rem; font-weight: 700; color: var(--acento-2);
-  font-family: var(--mono); letter-spacing: -.02em; }
-.metrica .rotulo { font-size: .8rem; color: var(--texto-2); text-transform: uppercase;
-  letter-spacing: .06em; }
+/* A la izquierda como todo lo demás. Centradas eran el único bloque centrado de la
+   página, y una fila de tres bloques centrados al lado de texto en bandera se lee
+   como resto de otro diseño más que como una decisión. */
+.metrica { text-align: left; }
+.metrica .valor { font-size: 2.1rem; font-weight: 300; color: var(--acento-2);
+  font-family: var(--mono); letter-spacing: -.04em; line-height: 1.1; }
+/* Sin versalitas, y con mayúscula inicial recuperada: las cadenas del marcado son
+   «registros», «hojas usadas», «señales», todas en minúscula, así que quitar la
+   transformación a secas dejaba el rótulo todo en minúscula, que es el mismo error
+   en el otro sentido. Son frases cortas, sin acrónimos, así que `::first-letter`
+   es seguro acá; en `th` no lo es, porque ahí las cadenas vienen del backend y
+   pueden ser nombres de señal como «Vbat (V)». */
+.metrica .rotulo { font-size: .8rem; color: var(--texto-2); font-weight: 500;
+  letter-spacing: normal; text-transform: lowercase; }
+.metrica .rotulo::first-letter { text-transform: uppercase; }
 
 /* --- Etiquetas de estado --- */
-.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .76rem;
-  font-weight: 600; letter-spacing: .03em; }
+/* El chip lleva un punto además del color, así que el estado no depende del matiz:
+   quien no distingue rojo de verde sigue leyendo la etiqueta, y el punto le da al
+   chip una forma reconocible de un vistazo aunque no se lea la palabra. */
+.chip { display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px; border-radius: 999px; font-size: .76rem;
+  font-weight: 500; letter-spacing: .01em; }
+.chip::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: currentColor;
+}
+/* Un chip sin texto no es un chip: `#fase-estado` se vacía en el estado sin
+   selección, y con el punto agregado quedaba un lunar suelto al lado del título.
+   Salió en la captura, no leyendo el código. */
+.chip:empty { display: none; }
+/* El pulso del chip «corriendo» se queda: es lo único del sitio donde el
+   movimiento indica un estado en curso, y quitarlo dejaría el estado dependiendo
+   solo del texto. */
 .chip.pendiente { background: var(--chip-pend-b); color: var(--chip-pend-t); }
 .chip.corriendo { background: var(--chip-corr-b); color: var(--chip-corr-t); animation: latido 1.2s infinite; }
 .chip.listo     { background: var(--chip-ok-b);   color: var(--chip-ok-t); }
@@ -306,16 +569,26 @@ p { margin: 0 0 1em; }
 /* --- Tablas --- */
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
-th { color: var(--texto-2); font-weight: 600; text-transform: uppercase; font-size: .72rem;
-  letter-spacing: .06em; position: sticky; top: 0; background: var(--panel); }
+/* Sin versalitas, y sin recuperar mayúscula inicial: las cabeceras salen del
+   backend y pueden ser nombres de señal («Vbat (V)») o rótulos traducidos
+   («métodos», «hoja»). Una transformación a minúscula corrompería los primeros;
+   una a mayúscula inicial, ninguno de los dos de forma consistente. Que las
+   cabeceras queden desparejas en caja es un hallazgo sobre la capa de datos, no
+   algo que el CSS deba tapar. */
+th { color: var(--texto-2); font-weight: 500; letter-spacing: normal; font-size: .74rem;
+  position: sticky; top: 0; background: var(--panel); }
 tbody tr:hover { background: var(--fila-hover); }
 td.num { text-align: right; font-family: var(--mono); }
-.tabla-scroll { overflow: auto; max-height: 460px; border-radius: 10px; border: 1px solid var(--borde); }
+.tabla-scroll { overflow: auto; max-height: 460px; border-radius: var(--radio); border: 1px solid var(--borde); }
 
 /* --- Aviso --- */
 .aviso { border-left: 3px solid var(--alerta); background: var(--aviso-fondo);
-  padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: .92rem; }
-.aviso.info { border-color: var(--acento); background: var(--aviso-info-fondo); }
+  padding: 12px 16px; border-radius: 0 var(--radio) var(--radio) 0; font-size: .92rem; }
+/* El aviso informativo tomaba su filete de `--acento`, que ahora es tinta: dejaba
+   de decir «esto es una ayuda memoria». La información va en naranja claro igual
+   que la advertencia, y las dos se separan por intensidad y no por matiz — filete
+   pleno la advertencia, a media tinta la informativa. */
+.aviso.info { border-color: rgba(255, 178, 107, .6); background: var(--aviso-info-fondo); }
 
 /* --- Gráficos ---------------------------------------------------------------
    El motor vive en `grafico.js`, sobre ECharts. Estos estilos son solo el marco:
@@ -325,8 +598,8 @@ td.num { text-align: right; font-family: var(--mono); }
 .grafico-acciones { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-bottom: 4px; min-height: 20px; }
 .grafico-titulo { margin: 0; font-size: .85rem; font-weight: 650; }
-.grafico-caja { position: relative; border: 1px solid var(--borde); border-radius: 9px;
-  background: var(--fondo-2); padding: 4px; }
+.grafico-caja { position: relative; border: 1px solid var(--borde); border-radius: var(--radio);
+  background: var(--fondo-2); padding: 6px; }
 .grafico-pie { margin: 5px 2px 0; font-size: .72rem; color: var(--texto-2); }
 
 /* La tabla que abre la herramienta «Datos» de ECharts se dibuja con estilos propios
@@ -335,12 +608,12 @@ td.num { text-align: right; font-family: var(--mono); }
 .grafico-caja table { background: var(--panel) !important; color: var(--texto) !important; }
 
 /* Botón propio del marco del gráfico (los de ECharts van dibujados dentro del lienzo). */
-.grafico-btn { font: inherit; font-size: .76rem; padding: 4px 10px; border-radius: 7px;
+.grafico-btn { font: inherit; font-size: .76rem; padding: 4px 10px; border-radius: var(--radio-2);
   border: 1px solid var(--borde); background: var(--panel-2); color: var(--texto-2);
   cursor: pointer; white-space: nowrap; }
-.grafico-btn:hover { color: var(--texto); border-color: var(--acento); }
+.grafico-btn:hover { color: var(--texto); border-color: var(--borde-fuerte); }
 
-.grafico-modal { border: none; border-radius: 12px; padding: 14px 16px; width: min(1400px, 95vw);
+.grafico-modal { border: none; border-radius: var(--radio); padding: 14px 16px; width: min(1400px, 95vw);
   background: var(--panel); color: var(--texto); box-shadow: var(--sombra); }
 .grafico-modal::backdrop { background: rgba(0, 0, 0, .55); }
 
@@ -370,9 +643,7 @@ td.num { text-align: right; font-family: var(--mono); }
   .envoltorio { padding: 0 10px; }
   .barra { flex-wrap: wrap; }
   .barra nav { margin-left: 0; width: 100%; }
-  .barra nav a.activo::after { bottom: -10px; }
-  .btn-tema { margin-left: auto; }
-  .tarjeta { padding: 14px 12px; border-radius: 10px; }
+  .tarjeta { padding: 14px 12px; }
   .boton { padding: 9px 14px; font-size: .88rem; }
   th, td { padding: 6px 7px; font-size: .82rem; }
 }

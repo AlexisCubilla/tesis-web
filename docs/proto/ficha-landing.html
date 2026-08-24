@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ficha · El proyecto</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+/* ===========================================================================
+   FICHA — papel editorial.
+
+   LA IDEA. Minimalismo por tipografía y por reglas, no por color ni por aire
+   vacío. El referente es una publicación impresa: una retícula visible, medidas
+   de lectura cortas, cifras alineadas en columna, y el color reservado para las
+   figuras. Es la dirección más DENSA de las tres y a la vez la más callada — que
+   son dos cosas distintas y suelen confundirse.
+
+   POR QUÉ SANS Y NO SERIF, que es la pregunta obvia en una dirección editorial:
+   el skill que venimos usando prohíbe introducir tipografía serif de display, y
+   además una serif de sistema es lotería —cada plataforma resuelve `serif` a una
+   cosa distinta— y traer una licenciada es una dependencia nueva. El carácter
+   editorial acá lo hacen la retícula, la escala y las reglas, no el remate.
+
+   Los neutros son CÁLIDOS a propósito: #f6f3ec con tinta #2b2724, unos ocho
+   puntos de separación de canal hacia el amarillo. Blanco puro con negro puro en
+   pantalla es justamente el contraste chocante que hay que evitar; el papel real
+   nunca es blanco puro.
+
+   Las cinco series van MÁS OSCURAS que el lienzo, con croma 0,075 y rampa de
+   luminosidad: peor par de los diez 0,065 en las cuatro vistas, 3,6× la paleta
+   del sitio actual.
+
+   EL LENGUAJE DE COMPONENTES: radio 2 px (casi cuadrado), sin rellenos de
+   superficie, reglas de 1 px como único separador, botones de texto con
+   subrayado y UN solo botón relleno por pantalla, y numeración explícita —las
+   figuras y los pasos van numerados como en un paper.
+   =========================================================================== */
+:root {
+  --papel: #f6f3ec;
+  --papel-2: #efebe2;
+  --tinta: #2b2724;
+  --tinta-2: #6b655e;
+  --tinta-3: #948d84;
+  --regla: rgba(43,39,36,.16);
+  --regla-fuerte: rgba(43,39,36,.42);
+  --acento: #1d4d87;
+
+  --ok: #0f6a31;
+  --error: #8f3738;
+  --info: #7c4d00;
+
+  /* L de 0,28 a 0,54 · matiz base 350° · arco 340° */
+  --s1: #43162e; --s2: #552e09; --s3: #405221; --s4: #156968; --s5: #576f9b;
+
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+body {
+  background: var(--papel); color: var(--tinta);
+  font: 400 16.5px/1.58 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.hoja { max-width: 1000px; margin: 0 auto; padding: 0 40px; }
+
+/* --- cabecera: un membrete, no una barra de app -------------------------- */
+.membrete {
+  border-bottom: 2px solid var(--tinta);
+  padding: 22px 0 12px; margin-bottom: 0;
+  display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+}
+.membrete .titulo { font-size: 1.02rem; font-weight: 600; letter-spacing: -.01em; }
+.membrete .sello { font: 400 .78rem var(--mono); color: var(--tinta-2); }
+.membrete nav { margin-left: auto; display: flex; gap: 20px; }
+.membrete nav a {
+  text-decoration: none; color: var(--tinta-2); font-size: .92rem;
+  padding-bottom: 3px; border-bottom: 2px solid transparent;
+}
+.membrete nav a[aria-current] { color: var(--tinta); border-bottom-color: var(--tinta); }
+
+/* --- botones: texto subrayado, y uno solo relleno ----------------------- */
+.b {
+  display: inline-flex; align-items: baseline; gap: 8px;
+  font: inherit; font-size: .95rem; cursor: pointer; text-decoration: none;
+  border: none; background: none; padding: 0; color: var(--tinta);
+}
+.b-texto {
+  border-bottom: 1px solid var(--regla-fuerte); padding-bottom: 2px;
+}
+.b-texto:hover { border-bottom-color: var(--tinta); }
+/* Un solo relleno por pantalla, y rectangular: es la acción que cierra el ciclo. */
+.b-lleno {
+  background: var(--tinta); color: var(--papel);
+  padding: 12px 20px; border-radius: 2px; font-weight: 500;
+}
+.b-lleno:hover { background: var(--acento); }
+
+/* --- bloque de portada -------------------------------------------------- */
+.portada { padding: 56px 0 44px; border-bottom: 1px solid var(--regla); }
+.portada .clase { font: 400 .8rem var(--mono); color: var(--tinta-2); margin-bottom: 20px; }
+.portada h1 {
+  margin: 0 0 26px; font-size: clamp(2rem, 4.6vw, 3rem); font-weight: 500;
+  line-height: 1.1; letter-spacing: -.025em; max-width: 26ch;
+}
+.portada .resumen { columns: 2; column-gap: 44px; max-width: 74ch; color: var(--tinta-2); }
+.portada .resumen p { margin: 0 0 .9em; }
+.portada .resumen p:first-child::first-letter {
+  /* Capitular. Es el guiño editorial de la dirección, y va una sola vez en toda
+     la página: dos capitulares dejan de ser una convención y pasan a ser adorno. */
+  float: left; font-size: 3.1em; line-height: .84; font-weight: 500;
+  margin: .06em .09em 0 0; color: var(--tinta);
+}
+.portada .acciones { margin-top: 30px; display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 760px) { .portada .resumen { columns: 1; } }
+
+/* --- tabla de cifras, alineada en columna ------------------------------- */
+.datos { padding: 34px 0; border-bottom: 1px solid var(--regla); }
+.datos table { width: 100%; border-collapse: collapse; }
+.datos th {
+  text-align: left; font-weight: 400; color: var(--tinta-2); font-size: .82rem;
+  padding: 0 0 8px; border-bottom: 1px solid var(--regla);
+}
+.datos td { padding: 11px 0; border-bottom: 1px solid var(--regla); font-size: .95rem; }
+.datos tr:last-child td { border-bottom: none; }
+.datos td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.datos td.nota { color: var(--tinta-2); font-size: .88rem; }
+
+/* --- secciones numeradas ------------------------------------------------ */
+section { padding: 44px 0; border-bottom: 1px solid var(--regla); }
+section > h2 {
+  margin: 0 0 20px; font-size: 1.28rem; font-weight: 500; letter-spacing: -.015em;
+  display: flex; align-items: baseline; gap: 14px;
+}
+section > h2 .num { font: 400 .82rem var(--mono); color: var(--tinta-3); }
+section > .intro { max-width: 66ch; color: var(--tinta-2); margin: 0 0 26px; }
+
+/* --- método: lista numerada con su salida a la derecha ------------------ */
+.metodo { border-top: 1px solid var(--regla); }
+.metodo > li {
+  display: grid; grid-template-columns: 34px 1fr 200px; gap: 20px;
+  padding: 16px 0; border-bottom: 1px solid var(--regla); align-items: baseline;
+}
+.metodo { list-style: none; margin: 0; padding: 0; }
+.metodo .i { font: 400 .84rem var(--mono); color: var(--tinta-3); }
+.metodo h3 { margin: 0 0 3px; font-size: .98rem; font-weight: 500; }
+.metodo p { margin: 0; color: var(--tinta-2); font-size: .9rem; max-width: 56ch; }
+.metodo .sal {
+  font: 400 .86rem var(--mono); color: var(--tinta); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .metodo > li { grid-template-columns: 26px 1fr; }
+  .metodo .sal { grid-column: 2; text-align: left; }
+}
+
+/* --- figura con epígrafe numerado -------------------------------------- */
+figure { margin: 0; }
+figure .marco-fig { border: 1px solid var(--regla); border-radius: 2px; padding: 12px; background: #fbf9f5; }
+figcaption {
+  margin-top: 10px; font-size: .84rem; color: var(--tinta-2);
+  padding-left: 0; max-width: 72ch;
+}
+figcaption b { color: var(--tinta); font-weight: 500; }
+
+/* --- colofón ------------------------------------------------------------ */
+footer { padding: 32px 0 100px; color: var(--tinta-2); font-size: .86rem; }
+footer p { margin: 0 0 6px; max-width: 76ch; }
+footer .ref { font-family: var(--mono); font-size: .78rem; color: var(--tinta-3); margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<div class="hoja">
+
+  <header class="membrete">
+    <span class="titulo">Detección de anomalías en baterías satelitales</span>
+    <span class="sello">Etapa 1 · BIRDS-4 / TSURU · UNA–FPUNA</span>
+    <nav>
+      <a href="ficha-landing.html" aria-current="page">El proyecto</a>
+      <a href="ficha-taller.html">Taller</a>
+    </nav>
+  </header>
+
+  <div class="portada">
+    <div class="clase">Material didáctico · etapa 1 de 3</div>
+    <h1>Encontrar fallas en una batería sin saber cómo se ven</h1>
+    <div class="resumen">
+      <p>Un CubeSat en órbita baja manda a Tierra tres señales de batería —voltaje,
+      corriente y temperatura— cada 10 u 11 segundos. Nadie marcó nunca cuáles de
+      esas 25.024 mediciones son anómalas, y sin etiquetas no hay porcentaje de
+      acierto que se pueda calcular.</p>
+      <p>Esta etapa reemplaza la respuesta correcta que no existe por dos cosas que
+      sí se pueden medir: el acuerdo entre cinco métodos con ideas distintas de
+      «raro», y la estabilidad de ese acuerdo al cambiar la muestra. El resultado
+      es una lista de 40 eventos que una persona puede revisar en una tarde.</p>
+    </div>
+    <div class="acciones">
+      <a class="b b-lleno" href="ficha-taller.html">Abrir el taller</a>
+      <a class="b b-texto" href="#metodo">Leer el método</a>
+    </div>
+  </div>
+
+  <div class="datos">
+    <table>
+      <thead><tr><th>Origen de los datos</th><th></th><th style="text-align:right">Cantidad</th></tr></thead>
+      <tbody>
+        <tr><td>Mediciones de telemetría</td><td class="nota">una cada 10–11 s</td><td class="n">25.024</td></tr>
+        <tr><td>Hojas del Excel utilizadas</td><td class="nota">de 45; tres quedan afuera</td><td class="n">42</td></tr>
+        <tr><td>Señales por medición</td><td class="nota">Vbat, Ibat, Tbat</td><td class="n">3</td></tr>
+        <tr><td>Duración de una órbita</td><td class="nota">medido en los datos</td><td class="n">≈ 87 min</td></tr>
+        <tr><td>Eventos entregados al experto</td><td class="nota">salida de esta etapa</td><td class="n">40</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section>
+    <h2><span class="num">§ 1</span> Por qué el problema no tiene respuesta</h2>
+    <p class="intro">Los paneles solares cargan la batería mientras el satélite está
+    al sol; la batería alimenta todo cuando entra en la sombra de la Tierra. Ese
+    ciclo se repite cada hora y media, y si la batería se degrada, el satélite muere
+    — no se puede mandar a nadie a arreglarlo. El problema es que nadie etiquetó
+    nunca esta telemetría: no se puede afirmar «mi método acierta el 90 %» porque no
+    se sabe cuál era el 100 %.</p>
+    <p class="intro">De ahí el criterio de esta etapa: no busca acertar. Busca
+    coincidencia entre métodos distintos, y resultados que se repitan al cambiar la
+    muestra. Tres hojas del Excel quedan afuera — dos son pruebas de laboratorio y
+    la tercera, llamada <span class="mono">Anomalous data</span>, resultó ser una
+    anomalía de paneles solares y no de batería.</p>
+  </section>
+
+  <section id="metodo">
+    <h2><span class="num">§ 2</span> El método, en seis pasos</h2>
+    <ol class="metodo">
+      <li><span class="i">2.1</span>
+        <div><h3>Leer y limpiar</h3><p>Se juntan las 42 hojas y se descartan las filas
+        vacías o en cero: son huecos del decodificador, no telemetría.</p></div>
+        <div class="sal">25.024 → 24.138 filas</div></li>
+      <li><span class="i">2.2</span>
+        <div><h3>Cortar en ventanas</h3><p>Una anomalía es un comportamiento en el
+        tiempo y no un valor suelto. Tramos de 50 mediciones, unos 9 minutos, que se
+        deslizan de a una.</p></div>
+        <div class="sal">→ 22.080 ventanas</div></li>
+      <li><span class="i">2.3</span>
+        <div><h3>Quitar lo repetido</h3><p>Dos ventanas vecinas comparten 49 de sus
+        50 datos. Las casi idénticas se descartan por umbral de similitud.</p></div>
+        <div class="sal">22.080 → 6.102</div></li>
+      <li><span class="i">2.4</span>
+        <div><h3>Resumir cada ventana</h3><p>24 números por señal: cuánto vale,
+        cuánto varía, hacia dónde va y cuál es su ritmo.</p></div>
+        <div class="sal">→ 72 características</div></li>
+      <li><span class="i">2.5</span>
+        <div><h3>Quedarse con lo que informa</h3><p>Se descartan las características
+        de varianza casi nula y las que están correlacionadas con otra.</p></div>
+        <div class="sal">72 → ~45</div></li>
+      <li><span class="i">2.6</span>
+        <div><h3>Cinco buscadores y un consenso</h3><p>Isolation Forest, ECOD, COPOD,
+        PCA y HDBSCAN-GLOSH puntúan cada ventana. Las marcas se consolidan en eventos
+        con su tramo temporal.</p></div>
+        <div class="sal">310 marcas → 40 eventos</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="num">§ 3</span> El embudo</h2>
+    <figure>
+      <div class="marco-fig"><div id="g-embudo" style="height:290px"></div></div>
+      <figcaption><b>Figura 1.</b> Reducción por paso, en escala logarítmica —
+      en escala lineal los tres últimos peldaños quedarían pegados al cero y no se
+      podrían comparar entre sí. De 25.024 mediciones a 40 eventos hay tres órdenes
+      de magnitud.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="num">§ 4</span> Qué se lleva el experto</h2>
+    <p class="intro">Un Excel con una fila por evento: dónde ocurrió, cuántos de los
+    cinco detectores lo marcan, y qué características se desviaron y cuánto. Ese
+    archivo es la entrada de la etapa 2, donde una persona revisa y etiqueta; con
+    esas etiquetas, la etapa 3 entrena un clasificador. Las dos son trabajo futuro.</p>
+    <a class="b b-texto" href="ficha-taller.html">Ver una corrida en el taller</a>
+  </section>
+
+  <footer>
+    <p>Detección y clasificación de anomalías en el consumo de baterías satelitales
+    mediante un enfoque híbrido no supervisado–supervisado.</p>
+    <p>Universidad Nacional de Asunción · Facultad Politécnica.</p>
+    <p class="ref">Material didáctico. El registro canónico —código, decisiones y
+    resultados— vive en el repositorio de la tesis.</p>
+  </footer>
+</div>
+
+<script src="/estatico/vendor/echarts.min.js"></script>
+<script>
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TINTA = css('--tinta'), T2 = css('--tinta-2'), T3 = css('--tinta-3'), REGLA = css('--regla');
+const S = [css('--s1'), css('--s2'), css('--s3'), css('--s4'), css('--s5')];
+const etapas = ['Mediciones','Ventanas','Sin repetir','Marcas','Candidatas','Eventos'];
+const valores = [25024, 22080, 6102, 310, 151, 40];
+echarts.init(document.getElementById('g-embudo')).setOption({
+  animation: false,
+  textStyle: { fontFamily: 'system-ui, -apple-system, sans-serif', color: TINTA, fontSize: 11 },
+  grid: { left: 8, right: 58, top: 8, bottom: 8, containLabel: true },
+  tooltip: { trigger: 'item', backgroundColor: '#fbf9f5', borderColor: REGLA, borderWidth: 1,
+             textStyle: { color: TINTA, fontSize: 12 },
+             formatter: (p) => `<b>${p.value.toLocaleString('es')}</b> · ${p.name}` },
+  xAxis: { type: 'log', min: 10, axisLine: { show: false }, axisTick: { show: false },
+           axisLabel: { color: T3 }, splitLine: { lineStyle: { color: REGLA } } },
+  yAxis: { type: 'category', inverse: true, data: etapas,
+           axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T2 } },
+  series: [{ type: 'bar', barMaxWidth: 16, data: valores,
+    itemStyle: { color: (p) => S[p.dataIndex % 5] },
+    label: { show: true, position: 'right', color: TINTA, fontFamily: 'ui-monospace, monospace',
+             fontSize: 11, formatter: (p) => p.value.toLocaleString('es') } }],
+});
+</script>
+<script src="_saltar.js"></script>
+</body>
+</html>

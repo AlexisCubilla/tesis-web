@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ficha · Taller</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+/* ===========================================================================
+   FICHA · TALLER — la corrida como hoja de registro.
+
+   POR QUÉ ESTA METÁFORA Y NO UN PANEL DE APP. El taller actual, y el de Órbita,
+   tratan la corrida como una sesión: se elige un paso y se lo mira. Acá la
+   corrida es un DOCUMENTO: tiene número, fecha, hash de configuración, una tabla
+   de parámetros usados y figuras numeradas con epígrafe. Se lee de arriba a
+   abajo y se puede imprimir.
+
+   Eso cambia dos cosas de fondo. Primero, el registro de corridas es una TABLA
+   —una fila por ejecución, ordenada por fecha, con su hash— y no un mapa de
+   ramas: una tabla se ordena, se busca y aguanta doscientas filas, cosa que un
+   mapa de nodos no hace. Segundo, los parámetros no viven en un formulario
+   aparte: van en la ficha, editables en su propia fila, porque en un documento
+   el parámetro y su valor son el contenido.
+
+   El formulario usa `<input>` sobre línea, sin caja: en una hoja de registro el
+   campo es un espacio para escribir, no un control con borde.
+   =========================================================================== */
+:root {
+  --papel: #f6f3ec;
+  --papel-2: #efebe2;
+  --tinta: #2b2724;
+  --tinta-2: #6b655e;
+  --tinta-3: #948d84;
+  --regla: rgba(43,39,36,.16);
+  --regla-fuerte: rgba(43,39,36,.42);
+  --acento: #1d4d87;
+  --ok: #0f6a31;
+  --error: #8f3738;
+  --info: #7c4d00;
+  --s1: #43162e; --s2: #552e09; --s3: #405221; --s4: #156968; --s5: #576f9b;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+body {
+  background: var(--papel); color: var(--tinta);
+  font: 400 15.5px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.hoja { max-width: 1060px; margin: 0 auto; padding: 0 40px 110px; }
+
+.membrete {
+  border-bottom: 2px solid var(--tinta); padding: 22px 0 12px;
+  display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+}
+.membrete .titulo { font-size: 1.02rem; font-weight: 600; letter-spacing: -.01em; }
+.membrete .sello { font: 400 .78rem var(--mono); color: var(--tinta-2); }
+.membrete nav { margin-left: auto; display: flex; gap: 20px; }
+.membrete nav a {
+  text-decoration: none; color: var(--tinta-2); font-size: .92rem;
+  padding-bottom: 3px; border-bottom: 2px solid transparent;
+}
+.membrete nav a[aria-current] { color: var(--tinta); border-bottom-color: var(--tinta); }
+
+.b {
+  display: inline-flex; align-items: baseline; gap: 8px; font: inherit; font-size: .92rem;
+  cursor: pointer; text-decoration: none; border: none; background: none; padding: 0; color: var(--tinta);
+}
+.b-texto { border-bottom: 1px solid var(--regla-fuerte); padding-bottom: 2px; }
+.b-texto:hover { border-bottom-color: var(--tinta); }
+.b-lleno { background: var(--tinta); color: var(--papel); padding: 11px 18px; border-radius: 2px; font-weight: 500; }
+.b-lleno:hover { background: var(--acento); }
+.b-lleno:disabled { background: var(--tinta-3); cursor: not-allowed; }
+
+/* --- registro de corridas ------------------------------------------------ */
+.seccion { padding: 34px 0 0; }
+.seccion > h2 {
+  margin: 0 0 4px; font-size: 1.18rem; font-weight: 500; letter-spacing: -.015em;
+  display: flex; align-items: baseline; gap: 13px;
+}
+.seccion > h2 .num { font: 400 .8rem var(--mono); color: var(--tinta-3); }
+.seccion > .intro { margin: 0 0 20px; color: var(--tinta-2); max-width: 68ch; font-size: .92rem; }
+
+.registro { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.registro th {
+  text-align: left; font-weight: 400; color: var(--tinta-2); font-size: .8rem;
+  padding: 0 12px 8px 0; border-bottom: 1px solid var(--regla-fuerte);
+}
+.registro td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--regla); }
+.registro td.h { font-family: var(--mono); font-size: .84rem; color: var(--tinta-2); }
+.registro td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.registro tr { cursor: pointer; }
+.registro tr:hover td { background: rgba(43,39,36,.035); }
+/* La fila abierta se marca con una regla gruesa a la izquierda y con peso, no con
+   un relleno de color: en una hoja impresa el subrayado es la marca disponible. */
+/* La marca va SOLO en la primera celda: aplicada a todas las celdas, el filete
+   de 3 px se dibujaba dentro de cada una y recortaba el texto de la izquierda.
+   Se vio en la captura. */
+.registro tr[aria-selected="true"] td { font-weight: 500; }
+.registro tr[aria-selected="true"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--tinta); padding-left: 13px;
+}
+.estado { font-size: .8rem; }
+.estado.ok { color: var(--ok); }
+.estado.err { color: var(--error); }
+.estado.corre { color: var(--info); }
+.oficial { font: 400 .74rem var(--mono); color: var(--info); border: 1px solid currentColor;
+           padding: 1px 6px; border-radius: 2px; margin-left: 7px; }
+
+/* --- la ficha de la corrida --------------------------------------------- */
+.ficha { border-top: 2px solid var(--tinta); margin-top: 40px; padding-top: 20px; }
+.ficha > header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.ficha > header h2 { margin: 0; font-size: 1.35rem; font-weight: 500; letter-spacing: -.02em; }
+.ficha > header .id { font: 400 .82rem var(--mono); color: var(--tinta-2); }
+.ficha > header .esp { flex: 1; }
+
+/* Dos columnas: los parámetros a la izquierda, los resultados a la derecha.
+   Es la disposición de una ficha de laboratorio — condiciones y observación. */
+.cuerpo { display: grid; grid-template-columns: 340px 1fr; gap: 44px; align-items: start; }
+@media (max-width: 900px) { .cuerpo { grid-template-columns: 1fr; gap: 30px; } }
+
+.bloque { margin-bottom: 30px; }
+.bloque > h3 {
+  margin: 0 0 2px; font-size: .82rem; font-weight: 500; color: var(--tinta-2);
+  padding-bottom: 7px; border-bottom: 1px solid var(--regla-fuerte);
+}
+
+/* --- parámetros: filas de una tabla, editables en el lugar -------------- */
+.pars { display: grid; }
+.pars > div {
+  display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--regla);
+}
+.pars label { font-size: .89rem; }
+.pars .u { font-size: .8rem; color: var(--tinta-3); }
+/* Campo sobre línea, sin caja: en una hoja de registro se escribe sobre el
+   renglón. El foco engrosa el renglón, que es la señal que corresponde acá. */
+.pars input[type=number] {
+  width: 76px; padding: 3px 2px; text-align: right;
+  font: 400 .9rem var(--mono); color: var(--tinta); background: none;
+  border: none; border-bottom: 1px solid var(--regla-fuerte);
+}
+.pars input[type=number]:focus {
+  outline: none; border-bottom: 2px solid var(--tinta); margin-bottom: -1px;
+}
+.pars input[type=checkbox] { accent-color: var(--tinta); width: 16px; height: 16px; }
+.pars .lista { font: 400 .84rem/1.5 var(--mono); color: var(--tinta-2); padding: 10px 0; }
+.acciones-ficha { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 6px; }
+
+/* --- figuras numeradas -------------------------------------------------- */
+figure { margin: 0 0 30px; }
+figure .marco-fig { border: 1px solid var(--regla); border-radius: 2px; padding: 12px; background: #fbf9f5; }
+figcaption { margin-top: 9px; font-size: .83rem; color: var(--tinta-2); max-width: 74ch; }
+figcaption b { color: var(--tinta); font-weight: 500; }
+
+.res { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.res th { text-align: left; font-weight: 400; color: var(--tinta-2); font-size: .78rem;
+          padding: 0 10px 7px 0; border-bottom: 1px solid var(--regla-fuerte); }
+.res td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--regla); }
+.res td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.nota {
+  border-left: 2px solid var(--info); padding: 10px 14px; margin: 0 0 22px;
+  background: rgba(124,77,0,.055); font-size: .88rem;
+}
+.nota b { color: var(--info); font-weight: 500; }
+
+.descargas { display: flex; gap: 22px; flex-wrap: wrap; align-items: center;
+             padding-top: 18px; border-top: 1px solid var(--regla); }
+</style>
+</head>
+<body>
+
+<div class="hoja">
+
+  <header class="membrete">
+    <span class="titulo">Detección de anomalías en baterías satelitales</span>
+    <span class="sello">Etapa 1 · BIRDS-4 / TSURU · UNA–FPUNA</span>
+    <nav>
+      <a href="ficha-landing.html">El proyecto</a>
+      <a href="ficha-taller.html" aria-current="page">Taller</a>
+    </nav>
+  </header>
+
+  <div class="seccion">
+    <h2><span class="num">§ 1</span> Registro de corridas</h2>
+    <p class="intro">Una fila por ejecución. El hash identifica la configuración
+    completa: dos corridas con el mismo hash produjeron lo mismo. Clic en una fila
+    para abrir su ficha.</p>
+    <table class="registro">
+      <thead>
+        <tr>
+          <th>n.º</th><th>fecha</th><th>hash</th><th>configuración</th>
+          <th style="text-align:right">eventos</th><th style="text-align:right">tiempo</th><th>estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr aria-selected="true">
+          <td class="n">12</td><td class="h">2026-08-21 14:02</td><td class="h">4b95f6e</td>
+          <td>ventana 50/1 · dedup 0,95 · 5 métodos<span class="oficial">tesis</span></td>
+          <td class="n">40</td><td class="n">3 m 41 s</td><td class="estado ok">completa</td>
+        </tr>
+        <tr>
+          <td class="n">11</td><td class="h">2026-08-21 11:37</td><td class="h">a12c9f0</td>
+          <td>ventana 90/30 · dedup 0,99 · 5 métodos</td>
+          <td class="n">28</td><td class="n">2 m 08 s</td><td class="estado ok">completa</td>
+        </tr>
+        <tr>
+          <td class="n">10</td><td class="h">2026-08-20 17:51</td><td class="h">7de4b31</td>
+          <td>ventana 50/2 · sin deduplicar · 5 métodos</td>
+          <td class="n">63</td><td class="n">9 m 55 s</td><td class="estado ok">completa</td>
+        </tr>
+        <tr>
+          <td class="n">09</td><td class="h">2026-08-20 16:14</td><td class="h">c03ba8d</td>
+          <td>ventana 50/1 · dedup 0,95 · 3 métodos</td>
+          <td class="n">31</td><td class="n">1 m 22 s</td><td class="estado ok">completa</td>
+        </tr>
+        <tr>
+          <td class="n">08</td><td class="h">2026-08-20 09:03</td><td class="h">e91f240</td>
+          <td>ventana 20/1 · dedup 0,90 · 5 métodos</td>
+          <td class="n">—</td><td class="n">0 m 12 s</td><td class="estado err">memoria insuficiente</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="ficha">
+    <header>
+      <h2>Corrida n.º 12</h2>
+      <span class="id">4b95f6e · 2026-08-21 14:02 · 3 m 41 s</span>
+      <span class="esp"></span>
+      <span class="estado ok">completa</span>
+    </header>
+
+    <div class="cuerpo">
+
+      <div>
+        <div class="bloque">
+          <h3>Condiciones de la corrida</h3>
+          <div class="pars">
+            <div><label for="a">Tamaño de ventana</label><span><input id="a" type="number" value="50"> <span class="u">med.</span></span></div>
+            <div><label for="b">Paso entre ventanas</label><span><input id="b" type="number" value="1"> <span class="u">med.</span></span></div>
+            <div><label for="c">Umbral de deduplicación</label><span><input id="c" type="number" step="0.01" value="0.95"></span></div>
+            <div><label for="d">Rezagos de autocorrelación</label><span><input id="d" type="number" value="5"></span></div>
+            <div><label for="e">Umbral de correlación</label><span><input id="e" type="number" step="0.01" value="0.95"></span></div>
+            <div><label for="f">Percentil de baja varianza</label><span><input id="f" type="number" step="0.5" value="5.0"> <span class="u">%</span></span></div>
+            <div><label for="g">Árboles del Isolation Forest</label><span><input id="g" type="number" value="300"></span></div>
+            <div><label for="h">Clúster mínimo (HDBSCAN)</label><span><input id="h" type="number" value="15"></span></div>
+            <div><label for="i">Fracción de candidatos</label><span><input id="i" type="number" step="0.005" value="0.01"></span></div>
+            <div><label for="j">Tope de ventanas por evento</label><span><input id="j" type="number" value="15"></span></div>
+            <div><label for="k">Limpiar filas vacías</label><input id="k" type="checkbox" checked></div>
+          </div>
+          <div class="lista">
+            métodos: isolation_forest, ecod, copod, pca, hdbscan_glosh<br>
+            hojas excluidas: Test1 w batt, Test2 wo batt, Anomalous data
+          </div>
+          <div class="acciones-ficha">
+            <button class="b b-lleno">Correr con estos valores</button>
+            <a class="b b-texto" href="#">Volver a los oficiales</a>
+          </div>
+        </div>
+
+        <div class="bloque">
+          <h3>Entregables</h3>
+          <div class="descargas" style="border-top:none;padding-top:6px">
+            <a class="b b-texto" href="#">Para el experto</a>
+            <a class="b b-texto" href="#">Presentable</a>
+            <a class="b b-texto" href="#">Contraste normal</a>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="nota">
+          <b>Cómo leer «métodos».</b> «4/5» quiere decir que cuatro de los cinco
+          marcaron al menos un tramo dentro del evento — no que coincidieran en el
+          mismo tramo. Un evento largo tiene más chances de juntar métodos distintos.
+        </div>
+
+        <figure>
+          <div class="marco-fig"><div id="g-tele" style="height:300px"></div></div>
+          <figcaption><b>Figura 1.</b> Telemetría de la ventana 4.881, la candidata
+          más marcada (5 de 5). El desvío está en la pendiente de Vbat: −9,1σ
+          respecto de lo normal para esa hora de órbita.</figcaption>
+        </figure>
+
+        <figure>
+          <div class="marco-fig"><div id="g-acuerdo" style="height:230px"></div></div>
+          <figcaption><b>Figura 2.</b> Cuántos métodos coinciden por tramo. Los 8
+          tramos marcados por los cinco son los candidatos más firmes; los 98 marcados
+          por uno solo se descartan salvo que caigan dentro de un evento ya formado.</figcaption>
+        </figure>
+
+        <div class="bloque">
+          <h3>Los cinco eventos más firmes</h3>
+          <table class="res">
+            <thead><tr><th>ev.</th><th>desde</th><th>hasta</th><th style="text-align:right">métodos</th><th>qué se desvió</th></tr></thead>
+            <tbody>
+              <tr><td class="n">01</td><td>2019-08-14 09:55</td><td>2019-08-14 10:04</td><td class="n">5/5</td><td>Vbat pendiente −9,1σ</td></tr>
+              <tr><td class="n">02</td><td>2019-07-09 22:40</td><td>2019-07-09 22:49</td><td class="n">5/5</td><td>Ibat máximo +7,4σ</td></tr>
+              <tr><td class="n">03</td><td>2019-09-03 18:27</td><td>2019-09-03 18:40</td><td class="n">4/5</td><td>Tbat varianza +5,2σ</td></tr>
+              <tr><td class="n">04</td><td>2019-07-02 03:11</td><td>2019-07-02 03:20</td><td class="n">4/5</td><td>Vbat mínimo −4,8σ</td></tr>
+              <tr><td class="n">05</td><td>2019-08-01 14:02</td><td>2019-08-01 14:11</td><td class="n">3/5</td><td>Ibat pendiente +3,1σ</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/estatico/vendor/echarts.min.js"></script>
+<script>
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TINTA = css('--tinta'), T2 = css('--tinta-2'), T3 = css('--tinta-3'), REGLA = css('--regla');
+const S = [css('--s1'), css('--s2'), css('--s3'), css('--s4'), css('--s5')];
+const base = {
+  animation: false,
+  textStyle: { fontFamily: 'system-ui, -apple-system, sans-serif', color: TINTA, fontSize: 11 },
+  tooltip: { backgroundColor: '#fbf9f5', borderColor: REGLA, borderWidth: 1,
+             textStyle: { color: TINTA, fontSize: 12 } },
+};
+const eje = { axisLine: { lineStyle: { color: REGLA } }, axisTick: { show: false },
+              axisLabel: { color: T3 }, splitLine: { lineStyle: { color: REGLA } } };
+
+const M = 180;
+const onda = (a, p, f, s) => Array.from({length: M}, (_, i) =>
+  +(a * Math.sin(i / p + f) + s * i + a * .22 * Math.sin(i / 3.7 + f)).toFixed(3));
+const hora = (i) => { const m = 11 * i, h = Math.floor(m / 60) % 24;
+  return String(h).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0'); };
+const paneles = [
+  ['Vbat (V)',  onda(.42, 26, 0, .0009).map(v => +(3.9 + v).toFixed(3))],
+  ['Ibat (mA)', onda(.36, 19, 1.1, .0016).map(v => +(120 + v * 90).toFixed(1))],
+  ['Tbat (°C)', onda(.30, 33, 2.3, .0004).map(v => +(18 + v * 11).toFixed(1))],
+];
+echarts.init(document.getElementById('g-tele')).setOption({ ...base,
+  tooltip: { ...base.tooltip, trigger: 'axis' },
+  axisPointer: { link: [{ xAxisIndex: 'all' }] },
+  grid: paneles.map((_, i) => ({ left: 62, right: 16, top: 26 + i * 92, height: 62 })),
+  xAxis: paneles.map((_, i) => ({ ...eje, type: 'category', gridIndex: i, boundaryGap: false,
+    data: Array.from({length: M}, (_, k) => hora(k)),
+    axisLabel: { show: i === 2, color: T3 }, splitLine: { show: false } })),
+  yAxis: paneles.map(([n], i) => ({ ...eje, type: 'value', gridIndex: i, scale: true, splitNumber: 3,
+    name: n, nameLocation: 'end', nameGap: 11, nameRotate: 0,
+    nameTextStyle: { color: T2, align: 'left', fontSize: 11, padding: [0, 0, 0, -48] } })),
+  series: paneles.map(([n, d], i) => ({ name: n, type: 'line', symbol: 'none', smooth: true,
+    xAxisIndex: i, yAxisIndex: i, lineStyle: { width: 1.5, color: S[i] }, data: d })),
+});
+
+echarts.init(document.getElementById('g-acuerdo')).setOption({ ...base,
+  grid: { left: 6, right: 30, top: 10, bottom: 24, containLabel: true },
+  tooltip: { ...base.tooltip, trigger: 'item',
+             formatter: (p) => `<b>${p.value}</b> tramos los marcan ${p.name} de 5` },
+  xAxis: { ...eje, type: 'category', data: ['1','2','3','4','5'], splitLine: { show: false },
+           name: 'métodos de acuerdo', nameLocation: 'middle', nameGap: 24, nameTextStyle: { color: T2 } },
+  yAxis: { ...eje, type: 'value' },
+  series: [{ type: 'bar', barMaxWidth: 40, data: [98, 61, 34, 19, 8],
+    itemStyle: { color: S[3] },
+    label: { show: true, position: 'top', color: T2, fontFamily: 'ui-monospace, monospace', fontSize: 10 } }],
+});
+</script>
+<script src="_saltar.js"></script>
+</body>
+</html>

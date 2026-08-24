@@ -17,3 +17,6 @@ data/ejecuciones.sqlite
 *.sqlite
 
 .pytest_cache/
+
+# Skill de terceros instalado para explorar diseño; no es parte de la tesis.
+.claude/

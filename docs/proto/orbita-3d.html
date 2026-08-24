@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo · la órbita en three.js</title>
+<style>
+/* ===========================================================================
+   PROTOTIPO — la órbita del héroe en three.js.
+
+   No es el sitio: es la escena aislada, con controles puestos en los tres lugares
+   donde hay una DECISIÓN real que tomar, para poder verlas en vez de discutirlas.
+
+     textura      la Tierra de la NASA, o la Tierra en la paleta del sitio
+     luz          terminador día/noche real, o plano sin luz
+     altitud      a escala de verdad, o exagerada para que se lea
+
+   Lo que este prototipo demuestra sin que haya que creerle a nadie:
+
+   1. UNA ÓRBITA BAJA A ESCALA CASI NO SE VE. A 400 km el radio orbital es 1,063
+      veces el de la Tierra: el satélite raspa la superficie. El dibujo actual del
+      sitio la pone bien afuera, y no por descuido — es la única forma de que se
+      lea. Poné «altitud: a escala» y se entiende de una.
+
+   2. EL PROBLEMA DE LOS 87 MINUTOS. El pie del sitio dice «una vuelta ≈ 87 min».
+      Como período orbital eso da 133 km de altitud, donde una órbita decae en
+      días. Está en el control de altitud para que se vea contra los 400 km reales
+      de un despliegue desde la ISS, que dan 92,4 min.
+
+   3. LO QUE EL 3D RESUELVE GRATIS. En el SVG actual, que el satélite pase por
+      detrás del planeta necesita dos copias del dibujo y dos animaciones de
+      opacidad sincronizadas —hay veinte líneas de comentario en `index.html`
+      explicando por qué—. Acá lo hace el buffer de profundidad y no hay nada que
+      escribir.
+
+   4. LO QUE NUNCA PUEDE IR A ESCALA. Un CubeSat 1U mide 10 cm contra 6.371 km de
+      radio terrestre: a escala son 0,0000016 del globo, o sea nada. El satélite
+      está exagerado ~40.000 veces y eso no tiene arreglo, en 3D ni en SVG. La
+      diferencia es que acá está dicho.
+   =========================================================================== */
+:root {
+  --lienzo: #07080b;
+  --sup-1: rgba(255,255,255,.032);
+  --sup-2: rgba(255,255,255,.058);
+  --linea: rgba(255,255,255,.085);
+  --linea-fuerte: rgba(255,255,255,.20);
+  --tinta: #f4f6f8;
+  --tinta-2: rgba(244,246,248,.58);
+  --tinta-3: rgba(244,246,248,.36);
+  --acento: #7fa8d6;
+  --acento-hondo: #154473;
+  --verde: #77957c;
+  --alerta: #e3a42e;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--lienzo); color: var(--tinta);
+  font: 400 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.marco { max-width: 1080px; margin: 0 auto; padding: 32px 24px 90px; }
+h1 { margin: 0 0 8px; font-size: 1.6rem; font-weight: 300; letter-spacing: -.025em; }
+.intro { margin: 0 0 26px; color: var(--tinta-2); max-width: 74ch; }
+
+.escena {
+  position: relative; border: 1px solid var(--linea); border-radius: 14px;
+  overflow: hidden; background: #050609;
+}
+#lienzo3d { display: block; width: 100%; height: 520px; }
+#sinwebgl {
+  display: none; padding: 60px 24px; text-align: center; color: var(--tinta-2);
+}
+/* Rótulo dentro de la escena, como el pie del dibujo del sitio. */
+.pie3d {
+  position: absolute; left: 16px; bottom: 14px;
+  font: 400 .78rem/1.5 var(--mono); color: var(--tinta-3);
+  pointer-events: none;
+}
+.pie3d b { color: var(--tinta-2); font-weight: 400; }
+
+/* --- controles: tres decisiones, un segmentado cada una ------------------ */
+.mandos { display: flex; flex-wrap: wrap; gap: 24px; margin: 20px 0 8px; }
+.mando .r { font-size: .74rem; color: var(--tinta-3); margin-bottom: 7px; }
+.seg { display: flex; }
+.seg button {
+  font: inherit; font-size: .86rem; cursor: pointer; padding: 8px 14px;
+  background: none; color: var(--tinta-2);
+  border: 1px solid var(--linea); border-right: none;
+}
+.seg button:first-child { border-radius: 9px 0 0 9px; }
+.seg button:last-child { border-radius: 0 9px 9px 0; border-right: 1px solid var(--linea); }
+.seg button:hover { color: var(--tinta); }
+.seg button[aria-pressed="true"] { background: var(--sup-2); color: var(--tinta); border-color: var(--linea-fuerte); }
+.seg button:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; z-index: 1; }
+
+/* --- lecturas ------------------------------------------------------------ */
+.lecturas {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 1px; background: var(--linea);
+  border: 1px solid var(--linea); border-radius: 14px; overflow: hidden;
+  margin-top: 22px;
+}
+.lecturas > div { background: var(--lienzo); padding: 14px 16px; }
+.lecturas .r { font-size: .72rem; color: var(--tinta-3); margin-bottom: 6px; }
+.lecturas .v { font: 300 1.32rem/1 var(--mono); letter-spacing: -.03em; }
+.lecturas .v small { font-size: .72rem; color: var(--tinta-3); }
+.lecturas .v.mal { color: var(--alerta); }
+
+.nota {
+  border-left: 2px solid var(--alerta); background: rgba(227,164,46,.08);
+  padding: 13px 16px; border-radius: 0 9px 9px 0; margin-top: 22px;
+  font-size: .9rem; color: var(--tinta-2);
+}
+.nota b { color: var(--alerta); font-weight: 500; }
+.nota + .nota { border-left-color: var(--linea-fuerte); background: var(--sup-1); }
+.nota + .nota b { color: var(--tinta); }
+
+.cuenta { margin-top: 26px; border-top: 1px solid var(--linea); padding-top: 18px; }
+.cuenta h2 { margin: 0 0 12px; font-size: 1rem; font-weight: 500; }
+.cuenta table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+.cuenta th { text-align: left; font-weight: 400; color: var(--tinta-3); font-size: .76rem;
+             padding: 0 12px 8px 0; border-bottom: 1px solid var(--linea-fuerte); }
+.cuenta td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--linea); color: var(--tinta-2); }
+.cuenta td.v { font-family: var(--mono); color: var(--tinta); text-align: right; }
+.cuenta td b { color: var(--tinta); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="marco">
+  <h1>La órbita en three.js</h1>
+  <p class="intro">Prototipo aislado. Los controles están en los tres lugares donde
+  hay una decisión de verdad: qué Tierra, qué luz, y a qué escala la órbita. El
+  satélite y la textura son lo mismo en todas las combinaciones.</p>
+
+  <div class="escena">
+    <canvas id="lienzo3d"></canvas>
+    <div id="sinwebgl">
+      Este navegador no tiene WebGL disponible. En el sitio real, acá iría el dibujo
+      SVG que ya existe — que es justamente el motivo por el que habría que
+      conservarlo.
+    </div>
+    <div class="pie3d" id="pie3d"></div>
+  </div>
+
+  <div class="mandos">
+    <div class="mando">
+      <div class="r">Textura</div>
+      <div class="seg" id="m-tex">
+        <button data-v="real" aria-pressed="true">Tierra de la NASA</button>
+        <button data-v="paleta" aria-pressed="false">En la paleta del sitio</button>
+      </div>
+    </div>
+    <div class="mando">
+      <div class="r">Luz</div>
+      <div class="seg" id="m-luz">
+        <button data-v="term" aria-pressed="true">Terminador día/noche</button>
+        <button data-v="plana" aria-pressed="false">Plana, sin luz</button>
+      </div>
+    </div>
+    <div class="mando">
+      <div class="r">Altitud de la órbita</div>
+      <div class="seg" id="m-alt">
+        <button data-v="400" aria-pressed="true">400 km · real</button>
+        <button data-v="133" aria-pressed="false">133 km · los «87 min»</button>
+        <button data-v="2600" aria-pressed="false">Exagerada · legible</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lecturas">
+    <div><div class="r">ALTITUD</div><div class="v" id="l-alt">400<small> km</small></div></div>
+    <div><div class="r">RADIO ORBITAL</div><div class="v" id="l-rad">1,063<small> R</small></div></div>
+    <div><div class="r">PERÍODO</div><div class="v" id="l-per">92,4<small> min</small></div></div>
+    <div><div class="r">INCLINACIÓN</div><div class="v">51,6<small>°</small></div></div>
+    <div><div class="r">SATÉLITE</div><div class="v" id="l-sat">×40.000</div></div>
+  </div>
+
+  <div class="nota" id="n-87" style="display:none">
+    <b>Esta es la que no cierra.</b> 87 minutos de período orbital exigen 133 km de
+    altitud, y por debajo de ~160 km una órbita decae en días — no da para dejar
+    25.024 mediciones. Ese número del sitio probablemente mide el ciclo de carga y
+    descarga de la batería, no una vuelta completa.
+  </div>
+
+  <div class="nota">
+    <b>El satélite está exagerado y no tiene arreglo.</b> Un CubeSat 1U mide 10 cm
+    contra 6.371 km de radio terrestre. A escala serían 0,0000016 del globo: menos
+    de una milésima de píxel. Está a ×40.000, y en el SVG actual también — la
+    diferencia es que acá está dicho.
+  </div>
+
+  <div class="cuenta">
+    <h2>Qué costaría llevarlo al sitio</h2>
+    <table>
+      <thead><tr><th>concepto</th><th>hoy, en SVG</th><th style="text-align:right">con three.js</th></tr></thead>
+      <tbody>
+        <tr><td>JavaScript</td><td>ninguno</td><td class="v" id="c-js">—</td></tr>
+        <tr><td>Textura</td><td>ninguna</td><td class="v" id="c-tex">—</td></tr>
+        <tr><td>Dibujo del satélite</td><td>SVG en línea, ~2 KB</td><td class="v">geometría, 0 KB</td></tr>
+        <tr><td>Pasar por detrás del planeta</td><td>2 copias + 2 animaciones sincronizadas</td><td class="v">gratis</td></tr>
+        <tr><td>Costo por cuadro</td><td>compositor, ~0</td><td class="v">bucle WebGL</td></tr>
+        <tr><td>Si falla</td><td>no falla</td><td class="v">hay que conservar el SVG</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const RT = 6371;                 // km, radio medio terrestre
+  const MU = 398600.4418;          // km^3/s^2
+  const INCL = 51.64;              // grados; despliegue desde la ISS
+  const EXAG_SAT = 40000;          // el satélite, aumentado. Ver la nota de la página.
+
+  const periodoMin = (altKm) => {
+    const a = RT + altKm;
+    return 2 * Math.PI * Math.sqrt(a * a * a / MU) / 60;
+  };
+
+  const cv = document.getElementById('lienzo3d');
+  const pie = document.getElementById('pie3d');
+
+  // --- respaldo si no hay WebGL -------------------------------------------
+  let render;
+  try {
+    render = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false });
+  } catch (e) {
+    cv.style.display = 'none';
+    document.getElementById('sinwebgl').style.display = 'block';
+    return;
+  }
+  // El pixel ratio se capa en 2: por encima de eso no se ve la diferencia y el
+  // costo por cuadro crece con el cuadrado.
+  render.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  render.setClearColor(0x050609, 1);
+
+  const escena = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+  cam.position.set(0, 1.15, 4.4);
+  cam.lookAt(0, 0, 0);
+
+  // --- la Tierra ----------------------------------------------------------
+  const geoTierra = new THREE.SphereGeometry(1, 96, 64);
+  const cargador = new THREE.TextureLoader();
+  const texReal = cargador.load('vendor/tierra-2048.jpg', () => { texturaLista(); construirPaleta(); pedirCuadro(); });
+  texReal.colorSpace = THREE.SRGBColorSpace;
+  texReal.anisotropy = Math.min(4, render.capabilities.getMaxAnisotropy());
+
+  /* La Tierra en la paleta del sitio. Se construye en un <canvas> a partir de la
+     misma textura de la NASA: se clasifica cada píxel en océano o tierra y se
+     repinta con dos colores planos de las fichas del sitio. Así la geografía es
+     real y el color es el del sitio, que era la pregunta de diseño.
+
+     El criterio es `b > r`: en el Blue Marble el océano es azul oscuro y la tierra
+     va de verde a ocre, así que el canal azul por encima del rojo separa bien los
+     dos. No es una clasificación científica; es una máscara para un dibujo. */
+  let texPaleta = null;
+  function construirPaleta() {
+    const img = texReal.image;
+    if (!img || !img.width) return;
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height);
+    const p = d.data;
+    const oc = [0x0e, 0x1c, 0x2c];   // océano: azul marino profundo
+    const ti = [0x77, 0x95, 0x7c];   // tierra: el verde mate de los gráficos
+    for (let i = 0; i < p.length; i += 4) {
+      const esOceano = p[i + 2] > p[i];
+      const col = esOceano ? oc : ti;
+      // Se conserva algo de la variación original como sombreado suave, para que
+      // no queden dos manchas planas: 12 % del brillo del píxel encima del color.
+      const luz = (p[i] + p[i + 1] + p[i + 2]) / 765;
+      const k = 0.88 + luz * 0.24;
+      p[i]     = Math.min(255, col[0] * k);
+      p[i + 1] = Math.min(255, col[1] * k);
+      p[i + 2] = Math.min(255, col[2] * k);
+    }
+    x.putImageData(d, 0, 0);
+    texPaleta = new THREE.CanvasTexture(c);
+    texPaleta.colorSpace = THREE.SRGBColorSpace;
+    aplicarTextura();
+  }
+
+  /* Material MATE: `roughness: 1` y `metalness: 0`, sin mapa especular. Un océano
+     con brillo especular sería el objeto más renderizado de un sitio cuyo chrome es
+     monocromo y cuyas superficies son planas. */
+  const matTierra = new THREE.MeshStandardMaterial({ map: texReal, roughness: 1, metalness: 0 });
+  const matPlano = new THREE.MeshBasicMaterial({ map: texReal });
+  /* Mientras la textura viaja, un mapa sin imagen se muestrea en negro y el globo
+     queda indistinguible del fondo. Un color de base tapa ese hueco.
+
+     Y OJO CON ESTO, que es la trampa: en three.js `material.color` MULTIPLICA al
+     `map`, no lo reemplaza. Dejar el azul de base puesto después de que la textura
+     carga oscurece la Tierra entera — la primera versión se veía casi negra por
+     esto, no por la luz. Así que el color vuelve a blanco en cuanto la imagen
+     llega. Se encontró en la captura; leyendo el código parecía correcto. */
+  const BASE = 0x24384d;
+  matTierra.color = new THREE.Color(BASE);
+  matPlano.color = new THREE.Color(BASE);
+  function texturaLista() {
+    matTierra.color.set(0xffffff);
+    matPlano.color.set(0xffffff);
+    matTierra.needsUpdate = matPlano.needsUpdate = true;
+  }
+  const tierra = new THREE.Mesh(geoTierra, matTierra);
+  escena.add(tierra);
+
+  // --- luz: terminador real -----------------------------------------------
+  /* La posición del sol se elige desde la CÁMARA, no desde el origen: la cámara
+     mira desde +z, así que la luz necesita componente +z o ilumina la cara que no
+     se ve. La primera versión estaba en (−3,2 · 0,9 · 2,2) y dejaba el planeta
+     casi entero en sombra con el terminador pegado al borde derecho. Se vio en la
+     captura. Ahora entra por la izquierda-frente y deja unas tres cuartas partes
+     del disco visible iluminadas, con el terminador cruzando a la derecha. */
+  const sol = new THREE.DirectionalLight(0xffffff, 3.4);
+  sol.position.set(-1.7, 0.85, 2.9);
+  escena.add(sol);
+  // Ambiente muy bajo: la cara nocturna tiene que quedar oscura, no gris.
+  const ambiente = new THREE.AmbientLight(0xffffff, 0.13);
+  escena.add(ambiente);
+
+  // --- la órbita ----------------------------------------------------------
+  const grupoOrbita = new THREE.Group();
+  grupoOrbita.rotation.z = THREE.MathUtils.degToRad(INCL);
+  escena.add(grupoOrbita);
+
+  let radio = (RT + 400) / RT;
+
+  const matAnillo = new THREE.LineDashedMaterial({
+    color: 0x7fa8d6, dashSize: 0.055, gapSize: 0.045, transparent: true, opacity: 0.75,
+  });
+  let anillo = null;
+  function rehacerAnillo() {
+    if (anillo) { grupoOrbita.remove(anillo); anillo.geometry.dispose(); }
+    const pts = [];
+    for (let i = 0; i <= 256; i++) {
+      const t = i / 256 * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(t) * radio, 0, Math.sin(t) * radio));
+    }
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    anillo = new THREE.Line(g, matAnillo);
+    anillo.computeLineDistances();   // sin esto el guionado no se dibuja
+    grupoOrbita.add(anillo);
+  }
+  rehacerAnillo();
+
+  /* El satélite: un CubeSat 1U, o sea un cubo, con dos antenas. NO es el satélite
+     de paneles grandes que dibuja el SVG del sitio — un 1U no los tiene, y eso es
+     un dato de la tesis, no un detalle de estilo. */
+  const sat = new THREE.Group();
+  const cubo = new THREE.Mesh(
+    new THREE.BoxGeometry(0.062, 0.062, 0.062),
+    new THREE.MeshStandardMaterial({ color: 0xb9c4d2, roughness: .85, metalness: .15 })
+  );
+  sat.add(cubo);
+  // Una cara distinta, para que se vea que gira.
+  const cara = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.05, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x154473, roughness: .9, metalness: 0 })
+  );
+  cara.position.z = 0.0315;
+  sat.add(cara);
+  const matAnt = new THREE.MeshBasicMaterial({ color: 0x9fb0c2 });
+  [[-1, 0], [1, 0]].forEach(([sx]) => {
+    const a = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0022, 0.085, 6), matAnt);
+    a.rotation.z = Math.PI / 2;
+    a.position.x = sx * 0.072;
+    sat.add(a);
+  });
+  grupoOrbita.add(sat);
+
+  // --- campo de estrellas --------------------------------------------------
+  /* Determinista a propósito: sin `Math.random` dos capturas del prototipo son
+     comparables, que es todo el punto de un prototipo. */
+  (function estrellas() {
+    const N = 900, pos = new Float32Array(N * 3);
+    let s = 12345;
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    for (let i = 0; i < N; i++) {
+      const th = rnd() * Math.PI * 2, ph = Math.acos(2 * rnd() - 1), r = 30 + rnd() * 18;
+      pos[i * 3]     = r * Math.sin(ph) * Math.cos(th);
+      pos[i * 3 + 1] = r * Math.cos(ph);
+      pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    /* `sizeAttenuation: false` y tamaño en PÍXELES. Con atenuación, un punto de
+       0,13 unidades a 30-48 de distancia queda por debajo de un píxel y no se ve
+       ninguna estrella: eso fue lo primero que me hizo pensar que la escena no
+       renderizaba. Acá el tamaño es en pantalla, que es lo que corresponde a un
+       campo de estrellas —una estrella no se ve más grande por estar más cerca. */
+    escena.add(new THREE.Points(g, new THREE.PointsMaterial({
+      color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: .5,
+    })));
+  })();
+
+  // ======================================================================
+  // controles
+  // ======================================================================
+  /* Estado en la URL. Sirve para dos cosas: compartir una combinación concreta al
+     discutirla, y poder capturarla desde un navegador sin cabeza, que no puede
+     hacer clic en un botón. */
+  const q = new URLSearchParams(location.search);
+  let textura = q.get('tex') === 'paleta' ? 'paleta' : 'real';
+  let luz = q.get('luz') === 'plana' ? 'plana' : 'term';
+  let altitud = [133, 400, 2600].includes(+q.get('alt')) ? +q.get('alt') : 400;
+
+  function marcar(id, v) {
+    for (const b of document.querySelectorAll('#' + id + ' button'))
+      b.setAttribute('aria-pressed', String(b.dataset.v === v));
+  }
+
+  function aplicarTextura() {
+    const t = (textura === 'paleta' && texPaleta) ? texPaleta : texReal;
+    matTierra.map = t; matTierra.needsUpdate = true;
+    matPlano.map = t; matPlano.needsUpdate = true;
+    pedirCuadro();
+  }
+  function aplicarLuz() {
+    tierra.material = luz === 'plana' ? matPlano : matTierra;
+    pedirCuadro();
+  }
+  function aplicarAltitud() {
+    radio = (RT + altitud) / RT;
+    rehacerAnillo();
+    const T = periodoMin(altitud);
+    const coma = (n, d) => n.toFixed(d).replace('.', ',');
+    document.getElementById('l-alt').innerHTML = `${altitud.toLocaleString('es')}<small> km</small>`;
+    document.getElementById('l-rad').innerHTML = `${coma(radio, 3)}<small> R</small>`;
+    const per = document.getElementById('l-per');
+    per.innerHTML = `${coma(T, 1)}<small> min</small>`;
+    per.classList.toggle('mal', altitud < 160);
+    document.getElementById('n-87').style.display = altitud === 133 ? 'block' : 'none';
+    pie.innerHTML = altitud === 2600
+      ? 'órbita <b>exagerada</b> para que se lea · el satélite, ×40.000'
+      : `una vuelta = <b>${coma(T, 1)} min</b> a ${altitud.toLocaleString('es')} km`
+        + ` · inclinación 51,6° · el satélite, ×40.000`;
+    pedirCuadro();
+  }
+
+  function mando(id, alElegir) {
+    const c = document.getElementById(id);
+    c.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      for (const x of c.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+      alElegir(b.dataset.v);
+    });
+  }
+  mando('m-tex', (v) => { textura = v; aplicarTextura(); });
+  mando('m-luz', (v) => { luz = v; aplicarLuz(); });
+  mando('m-alt', (v) => { altitud = +v; aplicarAltitud(); });
+  marcar('m-tex', textura); marcar('m-luz', luz); marcar('m-alt', String(altitud));
+  /* El arranque —`aplicarAltitud()`— va al FINAL del archivo y no acá, y es por un
+     error que costó encontrar: esa función llama a `pedirCuadro()`, que lee la
+     variable `pedido`. La función está hoisteada y se puede llamar antes de su
+     definición, pero `let pedido` NO se hoistea: queda en zona muerta temporal y
+     leerla antes de su declaración tira `ReferenceError`.
+
+     Lo peor no fue el error, fue el síntoma: la excepción abortaba el resto del
+     script, así que `medir()` nunca corría, el lienzo se quedaba en los 300×150
+     por defecto, el bucle nunca arrancaba, y la escena salía vacía SIN un error
+     visible en la consola. Se encontró leyendo `canvas.width` desde la página, no
+     mirando el código. */
+
+  // ======================================================================
+  // bucle: solo cuando hace falta
+  // ======================================================================
+  function medir() {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    render.setSize(w, h, false);
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+  }
+  new ResizeObserver(() => { medir(); pedirCuadro(); }).observe(cv);
+  medir();
+
+  const quieto = matchMedia('(prefers-reduced-motion: reduce)');
+  let visible = true, pedido = false;
+
+  /* Movimiento reducido: se dibuja UN cuadro en una posición elegida —el satélite
+     en la mitad cercana, donde se lo ve entero— y no se vuelve a dibujar. Parar
+     una animación es devolverla al reposo, no congelarla donde quedó. */
+  const FASE_QUIETA = Math.PI * 1.35;
+
+  function pedirCuadro() {
+    if (pedido) return;
+    pedido = true;
+    requestAnimationFrame(() => { pedido = false; dibujar(performance.now()); });
+  }
+
+  function dibujar(ms) {
+    const t = ms / 1000;
+    const fase = quieto.matches ? FASE_QUIETA : (t * 0.42) % (Math.PI * 2);
+    sat.position.set(Math.cos(fase) * radio, 0, Math.sin(fase) * radio);
+    sat.rotation.y = -fase + Math.PI / 2;
+    tierra.rotation.y = quieto.matches ? 0.6 : t * 0.035;
+    render.render(escena, cam);
+  }
+
+  function bucle(ms) {
+    if (!visible || quieto.matches) return;      // el bucle se detiene solo
+    dibujar(ms);
+    requestAnimationFrame(bucle);
+  }
+
+  /* El bucle se corta cuando la escena sale de pantalla. Sin esto, una pestaña
+     abierta en otra sección sigue quemando GPU y batería para dibujar algo que
+     nadie está mirando. */
+  new IntersectionObserver((ents) => {
+    const antes = visible;
+    visible = ents[0].isIntersecting;
+    if (visible && !antes) requestAnimationFrame(bucle);
+    if (visible) pedirCuadro();
+  }, { threshold: 0 }).observe(cv);
+
+  quieto.addEventListener('change', () => { pedirCuadro(); if (!quieto.matches) requestAnimationFrame(bucle); });
+
+  // Arranque. Acá ya está todo declarado: ver la nota junto a los mandos.
+  aplicarLuz();
+  aplicarAltitud();
+  requestAnimationFrame(bucle);
+
+  // --- el costo, medido y no estimado -------------------------------------
+  fetch('vendor/three.min.js', { method: 'HEAD' })
+    .then((r) => { const n = +r.headers.get('content-length');
+      if (n) document.getElementById('c-js').textContent = Math.round(n / 1024) + ' KB sin comprimir'; })
+    .catch(() => {});
+  fetch('vendor/tierra-2048.jpg', { method: 'HEAD' })
+    .then((r) => { const n = +r.headers.get('content-length');
+      if (n) document.getElementById('c-tex').textContent = Math.round(n / 1024) + ' KB · 2048×1024'; })
+    .catch(() => {});
+})();
+</script>
+<script src="_saltar.js"></script>
+</body>
+</html>

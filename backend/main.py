@@ -15,6 +15,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
@@ -39,6 +40,14 @@ class PeticionEjecutar(BaseModel):
 # --------------------------------------------------------------------------------------
 # API
 # --------------------------------------------------------------------------------------
+
+# Compresión. `StaticFiles` no comprime nada por su cuenta, así que hasta acá
+# `echarts.min.js` viajaba en 1,03 MB por la red: es el archivo más grande del
+# sitio por un orden de magnitud y es texto, o sea que comprime muy bien. El
+# umbral de 900 bytes es el de la biblioteca: por debajo de eso el encabezado y el
+# trabajo de comprimir cuestan más que lo que se ahorra.
+app.add_middleware(GZipMiddleware, minimum_size=900)
+
 
 @app.get("/api/etapas")
 def get_etapas():
@@ -214,13 +223,11 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
         from tesis import filtering
         from tesis.config import CONFIG
 
-        cfg = dataclasses.replace(
-            CONFIG.filtering,
-            correlation_threshold=float(nodo["parametros"].get("umbral_correlacion",
-                                                               CONFIG.filtering.correlation_threshold)),
-            lowvar_percentile=float(nodo["parametros"].get("percentil_baja_var",
-                                                           CONFIG.filtering.lowvar_percentile)),
-        )
+        # La MISMA función que usó la ejecución. Antes esto armaba la config por su
+        # cuenta, duplicando la lógica: bastaba con que una de las dos cambiara para
+        # que el gráfico de motivos siguiera pareciendo correcto y dijera que se
+        # descartó algo que no se descartó. Ver la nota de `etapas.config_filtrado`.
+        cfg = etapas.config_filtrado(nodo["parametros"])
         # El motivo del descarte se saca corriendo el primer filtro por separado, con las mismas
         # funciones del paquete de la tesis. Importa distinguirlos: los dos filtros van en cadena,
         # así que lo que se cae por IQR ni siquiera llega a evaluarse por correlación.

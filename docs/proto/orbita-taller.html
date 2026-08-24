@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Órbita · Taller</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+/* ===========================================================================
+   ÓRBITA · TALLER
+
+   POR QUÉ ESTE LAYOUT Y NO EL ACTUAL. Hoy el taller pone un mapa de ramas
+   horizontal arriba y el detalle de la fase abajo, así que hay que bajar para
+   ver lo que se acaba de elegir, y con siete ramas el mapa ya se desplaza a lo
+   ancho. Acá el pipeline es un CARRIL VERTICAL fijo a la izquierda —seis etapas,
+   siempre visibles, con su estado— y el detalle ocupa el lienzo entero a la
+   derecha. Elegir no mueve la página.
+
+   La rama se elige aparte, arriba del carril, porque son dos preguntas
+   distintas: «qué configuración» y «qué paso de esa configuración».
+
+   Los componentes propios de esta pantalla: el carril con sus puntos de estado,
+   la tira de lecturas, el formulario de parámetros en dos columnas con su ayuda
+   al lado, y el botón de correr fijo abajo del carril para que no haya que
+   buscarlo.
+   =========================================================================== */
+:root {
+  --lienzo: #07080b;
+  --sup-1: rgba(255,255,255,.032);
+  --sup-2: rgba(255,255,255,.058);
+  --linea: rgba(255,255,255,.085);
+  --linea-fuerte: rgba(255,255,255,.20);
+  --tinta: #f4f6f8;
+  --tinta-2: rgba(244,246,248,.58);
+  --tinta-3: rgba(244,246,248,.36);
+  --acento: #00b7ed;
+  --sobre-acento: #04121a;
+  --ok: #65ca7e;
+  --error: #ff8987;
+  --info: #e3a42e;
+  --s1: #0091a3; --s2: #8e90d8; --s3: #e695b6; --s4: #fabd7f; --s5: #c2f6b1;
+  --r: 14px;
+  --r-chico: 9px;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+body {
+  background: var(--lienzo); color: var(--tinta);
+  font: 400 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* --- barra ---------------------------------------------------------------- */
+.barra {
+  display: flex; align-items: center; gap: 20px; padding: 14px 24px;
+  border-bottom: 1px solid var(--linea);
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(7,8,11,.78); backdrop-filter: blur(14px);
+}
+.barra .logo { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+.barra .logo i {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  border: 1.5px solid var(--acento); position: relative;
+}
+.barra .logo i::after {
+  content: ''; position: absolute; top: -2px; left: 50%; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--acento); transform: translateX(-50%);
+}
+.barra nav { margin-left: auto; display: flex; gap: 4px; }
+.barra nav a {
+  padding: 8px 14px; border-radius: var(--r-chico); text-decoration: none;
+  color: var(--tinta-2); font-size: .94rem;
+}
+.barra nav a[aria-current] { background: var(--sup-2); color: var(--tinta); }
+
+/* --- botones ------------------------------------------------------------- */
+.b {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 11px 18px; border-radius: var(--r-chico); border: 1px solid transparent;
+  font: inherit; font-size: .92rem; font-weight: 500; cursor: pointer; text-decoration: none;
+  transition: background .16s ease, border-color .16s ease, opacity .16s ease;
+}
+.b-1 { background: var(--acento); color: var(--sobre-acento); }
+.b-1:hover { opacity: .88; }
+.b-2 { border-color: var(--linea-fuerte); color: var(--tinta); background: none; }
+.b-2:hover { background: var(--sup-1); }
+.b-3 { padding: 8px 10px; color: var(--tinta-2); background: none; font-size: .86rem; }
+.b-3:hover { color: var(--tinta); background: var(--sup-1); }
+.b svg { width: 15px; height: 15px; flex: none; }
+
+/* --- estructura: carril + lienzo ---------------------------------------- */
+.taller {
+  display: grid; grid-template-columns: 296px 1fr;
+  gap: 0; align-items: start;
+  min-height: calc(100vh - 57px);
+}
+.carril {
+  position: sticky; top: 57px;
+  border-right: 1px solid var(--linea);
+  padding: 22px 20px 120px;
+  height: calc(100vh - 57px); overflow-y: auto;
+}
+.lienzo { padding: 28px 32px 120px; min-width: 0; }
+
+/* --- selector de rama ---------------------------------------------------- */
+.rama { margin-bottom: 26px; }
+.rotulo {
+  font-size: .72rem; color: var(--tinta-3); margin-bottom: 9px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.rama select {
+  width: 100%; padding: 11px 13px; border-radius: var(--r-chico);
+  border: 1px solid var(--linea); background: var(--sup-1); color: var(--tinta);
+  font: inherit; font-size: .9rem;
+}
+.rama .meta { margin-top: 9px; font: 400 .78rem var(--mono); color: var(--tinta-3); }
+
+/* --- el carril de etapas ------------------------------------------------- */
+.etapas { display: grid; gap: 2px; }
+.paso {
+  display: grid; grid-template-columns: 22px 1fr; gap: 12px; align-items: start;
+  padding: 12px 12px; border-radius: var(--r-chico);
+  cursor: pointer; border: 1px solid transparent; text-align: left;
+  background: none; font: inherit; color: inherit; width: 100%;
+  position: relative;
+}
+.paso:hover { background: var(--sup-1); }
+.paso[aria-current] { background: var(--sup-2); border-color: var(--linea); }
+/* El punto de estado. El color acá SÍ significa: hecho, corriendo, error o
+   pendiente. Y nunca va solo — el subtítulo dice lo mismo en palabras. */
+.paso .punto {
+  width: 10px; height: 10px; border-radius: 50%; margin-top: 6px;
+  border: 1.5px solid var(--tinta-3); justify-self: center;
+}
+.paso.hecho    .punto { background: var(--ok);     border-color: var(--ok); }
+.paso.corre    .punto { background: var(--acento); border-color: var(--acento); }
+.paso.falla    .punto { background: var(--error);  border-color: var(--error); }
+/* La línea que une las etapas: se dibuja desde el punto, no como fondo de la
+   fila, así queda alineada al centro del punto y no al del texto. */
+.paso:not(:last-child) .punto::after {
+  content: ''; position: absolute; top: 16px; left: 50%; width: 1px;
+  height: calc(100% + 2px); background: var(--linea); transform: translateX(-50%);
+  z-index: -1;
+}
+.paso .n { font: 400 .92rem/1.4 system-ui; }
+.paso .s { font: 400 .78rem/1.4 var(--mono); color: var(--tinta-3); }
+.paso[aria-current] .n { color: var(--tinta); }
+
+.correr { position: sticky; bottom: 0; padding-top: 18px; margin-top: 20px;
+          border-top: 1px solid var(--linea); background: var(--lienzo); }
+.correr .b { width: 100%; }
+
+/* --- cabecera del lienzo ------------------------------------------------- */
+.cabecera { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; margin-bottom: 6px; }
+.cabecera h1 { margin: 0; font-size: 1.55rem; font-weight: 400; letter-spacing: -.02em; }
+.cabecera .sub { color: var(--tinta-2); font-size: .92rem; margin-top: 2px; }
+.cabecera .esp { flex: 1; }
+.insignia {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: 999px; font-size: .78rem; font-weight: 500;
+}
+.insignia i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.insignia.ok    { color: var(--ok);    background: rgba(101,202,126,.13); }
+.insignia.corre { color: var(--acento);background: rgba(0,183,237,.14); }
+.insignia.falla { color: var(--error); background: rgba(255,137,135,.14); }
+.insignia.tesis { color: var(--info);  background: rgba(227,164,46,.14); }
+
+/* --- tira de lecturas ---------------------------------------------------- */
+.lecturas {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 1px; background: var(--linea);
+  border: 1px solid var(--linea); border-radius: var(--r);
+  overflow: hidden; margin: 22px 0 26px;
+}
+.lecturas > div { background: var(--lienzo); padding: 16px 18px; }
+.lecturas .v { font: 400 1.5rem/1.1 var(--mono); letter-spacing: -.03em; }
+.lecturas .v small { font-size: .78rem; color: var(--tinta-3); }
+.lecturas .r { color: var(--tinta-2); font-size: .78rem; margin-top: 5px; }
+
+/* --- pestañas ------------------------------------------------------------ */
+.pest { display: flex; gap: 3px; border-bottom: 1px solid var(--linea); margin-bottom: 22px; }
+.pest button {
+  font: inherit; font-size: .9rem; cursor: pointer; padding: 11px 15px;
+  border: none; background: none; color: var(--tinta-2);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.pest button:hover { color: var(--tinta); }
+.pest button[aria-selected="true"] { color: var(--tinta); border-bottom-color: var(--acento); }
+
+/* --- paneles y gráficos -------------------------------------------------- */
+.panel { border: 1px solid var(--linea); border-radius: var(--r); padding: 18px; margin-bottom: 18px; }
+.panel > h2 { margin: 0 0 4px; font-size: .96rem; font-weight: 500; }
+.panel > .pie { margin: 0 0 14px; color: var(--tinta-3); font-size: .82rem; }
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 1080px) { .duo { grid-template-columns: 1fr; } }
+.g { height: 260px; }
+
+/* --- formulario de parámetros ------------------------------------------- */
+.params { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 4px 28px; }
+.campo { padding: 12px 0; border-bottom: 1px solid var(--linea); }
+.campo:last-child { border-bottom: none; }
+.campo .fila { display: flex; align-items: center; gap: 14px; }
+.campo label { font-size: .9rem; flex: 1; }
+.campo input[type=number] {
+  width: 110px; padding: 8px 11px; border-radius: var(--r-chico);
+  border: 1px solid var(--linea); background: var(--sup-1); color: var(--tinta);
+  font: 400 .9rem var(--mono); text-align: right;
+}
+.campo input:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-color: transparent; }
+.campo .ayuda { color: var(--tinta-3); font-size: .8rem; margin-top: 5px; max-width: 58ch; }
+/* Interruptor propio, no un checkbox del sistema: es el control que más se toca
+   en esta pantalla y merece un blanco de clic grande. */
+.sw { position: relative; width: 40px; height: 23px; flex: none; }
+.sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.sw span {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--sup-2); border: 1px solid var(--linea); transition: background .16s;
+  pointer-events: none;
+}
+.sw span::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px;
+  border-radius: 50%; background: var(--tinta-2); transition: transform .16s, background .16s;
+}
+.sw input:checked + span { background: var(--acento); border-color: transparent; }
+.sw input:checked + span::after { transform: translateX(17px); background: var(--sobre-acento); }
+.sw input:focus-visible + span { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+/* --- fichas de selección múltiple (los cinco métodos) ------------------- */
+.metodos { display: flex; flex-wrap: wrap; gap: 8px; }
+.metodos label {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 13px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--linea); font-size: .85rem; color: var(--tinta-2);
+}
+.metodos label:has(input:checked) { border-color: var(--acento); color: var(--tinta); background: rgba(0,183,237,.1); }
+.metodos input { accent-color: var(--acento); }
+
+/* --- tabla --------------------------------------------------------------- */
+table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+th { color: var(--tinta-3); font-weight: 400; font-size: .8rem; }
+td.n { text-align: right; font-family: var(--mono); }
+tbody tr:hover { background: var(--sup-1); }
+
+.aviso {
+  border-left: 2px solid var(--info); background: rgba(227,164,46,.07);
+  padding: 13px 16px; border-radius: 0 var(--r-chico) var(--r-chico) 0;
+  font-size: .88rem; margin-bottom: 18px;
+}
+.aviso b { color: var(--info); font-weight: 500; }
+
+@media (max-width: 900px) {
+  .taller { grid-template-columns: 1fr; }
+  .carril { position: static; height: auto; border-right: none;
+            border-bottom: 1px solid var(--linea); padding-bottom: 22px; }
+  .lienzo { padding: 22px 18px 120px; }
+}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="logo"><i></i> Etapa 1 · BIRDS-4</div>
+  <nav>
+    <a href="orbita-landing.html">El proyecto</a>
+    <a href="orbita-taller.html" aria-current="page">Taller</a>
+  </nav>
+</header>
+
+<div class="taller">
+
+  <aside class="carril">
+    <div class="rama">
+      <div class="rotulo"><span>Rama</span><span class="insignia tesis"><i></i>tesis</span></div>
+      <select>
+        <option>tesis · 4b95f6e — configuración oficial</option>
+        <option>exp-1 · a12c9f0 — ventana 90, paso 30</option>
+        <option>exp-2 · 7de4b31 — sin deduplicar</option>
+        <option>+ Empezar una rama nueva</option>
+      </select>
+      <div class="meta">12 pasos · 3 ramas</div>
+    </div>
+
+    <div class="rotulo">Pipeline</div>
+    <div class="etapas">
+      <button class="paso hecho"><span class="punto"></span>
+        <span><span class="n">Datos</span><br><span class="s">24.138 filas</span></span></button>
+      <button class="paso hecho"><span class="punto"></span>
+        <span><span class="n">Ventaneo</span><br><span class="s">50/1 · dedup 0.95</span></span></button>
+      <button class="paso hecho"><span class="punto"></span>
+        <span><span class="n">Características</span><br><span class="s">5 rezagos · 72</span></span></button>
+      <button class="paso hecho"><span class="punto"></span>
+        <span><span class="n">Filtrado</span><br><span class="s">corr 0.95 · ~45</span></span></button>
+      <button class="paso hecho" aria-current="step"><span class="punto"></span>
+        <span><span class="n">Detección</span><br><span class="s">5 métodos · 310 marcas</span></span></button>
+      <button class="paso"><span class="punto"></span>
+        <span><span class="n">Eventos</span><br><span class="s">pendiente</span></span></button>
+    </div>
+
+    <div class="correr">
+      <a class="b b-1" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l12 8-12 8z"/></svg>
+        Correr desde acá
+      </a>
+    </div>
+  </aside>
+
+  <main class="lienzo">
+    <div class="cabecera">
+      <div>
+        <h1>Detección</h1>
+        <div class="sub">Cinco métodos puntúan cada una de las 6.102 ventanas.</div>
+      </div>
+      <span class="esp"></span>
+      <span class="insignia ok"><i></i>listo · 41 s</span>
+    </div>
+
+    <div class="lecturas">
+      <div><div class="v">6.102</div><div class="r">ventanas puntuadas</div></div>
+      <div><div class="v">5</div><div class="r">métodos</div></div>
+      <div><div class="v">310</div><div class="r">marcas totales</div></div>
+      <div><div class="v">151</div><div class="r">candidatas</div></div>
+      <div><div class="v">1,0<small> %</small></div><div class="r">fracción candidata</div></div>
+    </div>
+
+    <div class="pest">
+      <button aria-selected="true">Resultado</button>
+      <button>Parámetros</button>
+      <button>Telemetría</button>
+    </div>
+
+    <div class="aviso">
+      <b>Cómo leer «métodos».</b> «4/5» quiere decir que cuatro de los cinco marcaron
+      al menos un tramo dentro del evento — no que coincidieran en el mismo.
+    </div>
+
+    <div class="duo">
+      <div class="panel">
+        <h2>Cuántos métodos coinciden</h2>
+        <p class="pie">Un tramo marcado por más métodos es un candidato más firme.</p>
+        <div class="g" id="g-acuerdo"></div>
+      </div>
+      <div class="panel">
+        <h2>Distribución de puntajes</h2>
+        <p class="pie">Un panel por método. La cola derecha es lo que se marca.</p>
+        <div class="g" id="g-puntajes"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Telemetría de la ventana candidata más fuerte</h2>
+      <p class="pie">Ventana 4.881 · 2019-08-14 09:55 → 10:04 · marcada por 5 de 5.</p>
+      <div class="g" id="g-tele" style="height:300px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Parámetros de este paso</h2>
+      <p class="pie">Cambiar cualquiera crea una rama nueva; la original queda intacta.</p>
+      <div class="params">
+        <div class="campo">
+          <div class="fila">
+            <label for="p1">Árboles del Isolation Forest</label>
+            <input id="p1" type="number" value="300">
+          </div>
+          <div class="ayuda">Más árboles estabilizan el puntaje y cuestan tiempo.</div>
+        </div>
+        <div class="campo">
+          <div class="fila">
+            <label for="p2">Tamaño mínimo de clúster (HDBSCAN)</label>
+            <input id="p2" type="number" value="15">
+          </div>
+          <div class="ayuda">Un grupo más chico que esto se considera ruido.</div>
+        </div>
+        <div class="campo">
+          <div class="fila">
+            <label for="p3">Normalizar antes de puntuar</label>
+            <span class="sw"><input id="p3" type="checkbox" checked><span></span></span>
+          </div>
+          <div class="ayuda">PCA y HDBSCAN lo necesitan; los otros tres son indiferentes.</div>
+        </div>
+        <div class="campo">
+          <div class="fila">
+            <label>Métodos</label>
+          </div>
+          <div class="metodos" style="margin-top:8px">
+            <label><input type="checkbox" checked> Isolation Forest</label>
+            <label><input type="checkbox" checked> ECOD</label>
+            <label><input type="checkbox" checked> COPOD</label>
+            <label><input type="checkbox" checked> PCA</label>
+            <label><input type="checkbox" checked> HDBSCAN-GLOSH</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Las diez ventanas más marcadas</h2>
+      <table>
+        <thead><tr><th>ventana</th><th>desde</th><th>hasta</th><th class="n">métodos</th><th>qué se desvió</th></tr></thead>
+        <tbody>
+          <tr><td>4.881</td><td>2019-08-14 09:55</td><td>2019-08-14 10:04</td><td class="n">5/5</td><td>Vbat pend. −9,1σ</td></tr>
+          <tr><td>2.104</td><td>2019-07-09 22:40</td><td>2019-07-09 22:49</td><td class="n">5/5</td><td>Ibat máx. +7,4σ</td></tr>
+          <tr><td>5.663</td><td>2019-09-03 18:27</td><td>2019-09-03 18:36</td><td class="n">4/5</td><td>Tbat var. +5,2σ</td></tr>
+          <tr><td>1.077</td><td>2019-07-02 03:11</td><td>2019-07-02 03:20</td><td class="n">4/5</td><td>Vbat mín. −4,8σ</td></tr>
+          <tr><td>3.520</td><td>2019-08-01 14:02</td><td>2019-08-01 14:11</td><td class="n">3/5</td><td>Ibat pend. +3,1σ</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/estatico/vendor/echarts.min.js"></script>
+<script>
+/* Datos sintéticos deterministas: los prototipos no están conectados al backend,
+   y sin `Math.random` dos capturas son comparables. */
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const S = [css('--s1'), css('--s2'), css('--s3'), css('--s4'), css('--s5')];
+const TINTA = css('--tinta'), T2 = css('--tinta-2'), T3 = css('--tinta-3'), LINEA = css('--linea');
+const base = {
+  animation: false,
+  textStyle: { fontFamily: 'system-ui, -apple-system, sans-serif', color: TINTA, fontSize: 11 },
+  tooltip: { backgroundColor: '#12141a', borderColor: LINEA, borderWidth: 1,
+             textStyle: { color: TINTA, fontSize: 12 } },
+};
+const eje = {
+  axisLine: { lineStyle: { color: LINEA } },
+  axisTick: { show: false },
+  axisLabel: { color: T3 },
+  splitLine: { lineStyle: { color: LINEA, opacity: .55 } },
+};
+
+echarts.init(document.getElementById('g-acuerdo')).setOption({ ...base,
+  grid: { left: 6, right: 14, top: 10, bottom: 26, containLabel: true },
+  tooltip: { ...base.tooltip, trigger: 'item',
+             formatter: (p) => `<b>${p.value}</b> tramos los marcan ${p.name} de 5` },
+  xAxis: { ...eje, type: 'category', data: ['1','2','3','4','5'], splitLine: { show: false } },
+  yAxis: { ...eje, type: 'value' },
+  series: [{ type: 'bar', barMaxWidth: 34, data: [98, 61, 34, 19, 8],
+             itemStyle: { color: S[0], borderRadius: [4,4,0,0] } }],
+});
+
+const N = 120;
+const dist = (mu, sg) => Array.from({length: N}, (_, i) => {
+  const x = i / N * 4;
+  return +(Math.exp(-((x - mu) ** 2) / (2 * sg * sg)) * 100).toFixed(2);
+});
+echarts.init(document.getElementById('g-puntajes')).setOption({ ...base,
+  grid: { left: 6, right: 14, top: 22, bottom: 26, containLabel: true },
+  tooltip: { ...base.tooltip, trigger: 'axis' },
+  legend: { top: 0, textStyle: { color: T3, fontSize: 10 }, icon: 'roundRect', itemHeight: 7 },
+  xAxis: { ...eje, type: 'category', boundaryGap: false,
+           data: Array.from({length: N}, (_, i) => (i / N * 4).toFixed(1)), splitLine: { show: false } },
+  yAxis: { ...eje, type: 'value', name: 'ventanas', nameTextStyle: { color: T3 } },
+  series: [
+    ['Isolation Forest', 1.1, .42], ['ECOD', 1.4, .5], ['COPOD', 1.3, .46],
+    ['PCA', 1.7, .58], ['HDBSCAN', 2.0, .66],
+  ].map(([n, mu, sg], i) => ({
+    name: n, type: 'line', symbol: 'none', smooth: true,
+    lineStyle: { width: 1.7, color: S[i] }, itemStyle: { color: S[i] }, data: dist(mu, sg),
+  })),
+});
+
+const M = 180;
+const onda = (a, p, f, s) => Array.from({length: M}, (_, i) =>
+  +(a * Math.sin(i / p + f) + s * i + a * .22 * Math.sin(i / 3.7 + f)).toFixed(3));
+const hora = (i) => { const m = 11 * i, h = Math.floor(m / 60) % 24;
+  return String(h).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0'); };
+const paneles = [
+  ['Vbat (V)',  onda(.42, 26, 0, .0009).map(v => +(3.9 + v).toFixed(3))],
+  ['Ibat (mA)', onda(.36, 19, 1.1, .0016).map(v => +(120 + v * 90).toFixed(1))],
+  ['Tbat (°C)', onda(.30, 33, 2.3, .0004).map(v => +(18 + v * 11).toFixed(1))],
+];
+echarts.init(document.getElementById('g-tele')).setOption({ ...base,
+  tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: 'cross',
+             lineStyle: { color: T2 }, crossStyle: { color: T2 } } },
+  axisPointer: { link: [{ xAxisIndex: 'all' }] },
+  /* El nombre de la señal va ARRIBA de su panel y no pegado al eje: con
+     `nameLocation: 'start'` caía sobre las etiquetas de los ticks y sobre el eje
+     x del panel de abajo. Se vio en la captura, no leyendo el código. */
+  grid: paneles.map((_, i) => ({ left: 62, right: 18, top: 30 + i * 92, height: 62 })),
+  xAxis: paneles.map((_, i) => ({ ...eje, type: 'category', gridIndex: i, boundaryGap: false,
+    data: Array.from({length: M}, (_, k) => hora(k)),
+    axisLabel: { show: i === 2, color: T3 }, splitLine: { show: false } })),
+  yAxis: paneles.map(([n], i) => ({ ...eje, type: 'value', gridIndex: i, scale: true,
+    splitNumber: 3,
+    name: n, nameLocation: 'end', nameGap: 12, nameRotate: 0,
+    nameTextStyle: { color: T2, align: 'left', fontSize: 11, padding: [0, 0, 0, -46] } })),
+  series: paneles.map(([n, d], i) => ({ name: n, type: 'line', symbol: 'none', smooth: true,
+    xAxisIndex: i, yAxisIndex: i, lineStyle: { width: 1.7, color: S[i] }, data: d })),
+});
+</script>
+<script src="_saltar.js"></script>
+</body>
+</html>

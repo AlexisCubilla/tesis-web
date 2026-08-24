@@ -1,12 +1,9 @@
 <!doctype html>
-<html lang="es" data-tema="claro">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Taller — Etapa 1</title>
-<!-- El tema se resuelve acá, antes de pintar nada: si esperara a `tema.js` (que va al final del
-     cuerpo) quien tiene el oscuro guardado vería un destello blanco en cada carga. -->
-<script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
 <link rel="stylesheet" href="estatico/estilos.css">
 <style>
   .envoltorio { max-width: 1320px; }
@@ -18,43 +15,53 @@
   #mapa .arista.viva { stroke: var(--acento); stroke-width: 2.5; }
   #mapa .nodo-g { cursor: pointer; }
   #mapa .nodo-c { fill: var(--panel-2); stroke: var(--borde); stroke-width: 2; transition: all .15s; }
-  #mapa .nodo-g:hover .nodo-c { stroke: var(--acento); }
+  #mapa .nodo-g:hover .nodo-c { stroke: var(--borde-fuerte); }
   #mapa .nodo-c.listo { fill: var(--nodo-listo-b); stroke: var(--nodo-listo-l); }
   #mapa .nodo-c.corriendo { fill: var(--nodo-corr-b); stroke: var(--acento); }
   #mapa .nodo-c.error { fill: var(--nodo-err-b); stroke: var(--peligro); }
-  #mapa .nodo-c.sel { stroke: var(--acento-2); stroke-width: 3.5; }
+  /* El nodo seleccionado se marca con el ACENTO, que es la ficha de «esto está
+     elegido». Antes usaba `--acento-2`, que hoy es tinta blanca, y quedaba
+     indistinguible del borde de un nodo cualquiera.
+     La ESTRUCTURA del mapa no se toca: mismas columnas, mismas aristas, mismo
+     recorrido. Lo único que cambia acá es de qué color se pinta. */
+  #mapa .nodo-c.sel { stroke: var(--acento); stroke-width: 3; }
   #mapa .nodo-t { font: 600 10px system-ui; fill: var(--texto); pointer-events: none; }
   #mapa .nodo-s { font: 9px ui-monospace, monospace; fill: var(--texto-2); pointer-events: none; }
   #mapa .fantasma { fill: none; stroke: var(--acento); stroke-width: 2; stroke-dasharray: 4 4;
                     opacity: .8; }
-  #mapa .col-t { font: 600 10px system-ui; fill: var(--texto-2); text-transform: uppercase;
-                 letter-spacing: .06em; }
+  /* Sin versalitas: la cadena es «1. Datos», ya viene en caja de frase. */
+  #mapa .col-t { font: 500 11px system-ui; fill: var(--texto-2); }
   #mapa .col-l { stroke: var(--borde); stroke-width: 1; stroke-dasharray: 2 6; opacity: .5; }
-  #mapa .estrella { font: 12px system-ui; fill: var(--oro); pointer-events: none; }
+  #mapa .estrella { fill: var(--oro); pointer-events: none; }
 
   /* ============ fase actual ============ */
   .cabecera-fase { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-  .num-fase { width: 54px; height: 54px; border-radius: 14px; flex: none;
-    display: grid; place-items: center; font-family: var(--mono); font-size: 1.5rem; font-weight: 700;
-    background: linear-gradient(135deg, var(--acento), var(--acento-hondo)); color: var(--sobre-acento); }
+  .num-fase { width: 54px; height: 54px; border-radius: var(--radio); flex: none;
+    display: grid; place-items: center; font-family: var(--mono); font-size: 1.5rem; font-weight: 400;
+    background: var(--acento-hondo); color: var(--sobre-acento); }
   .num-fase.pendiente { background: var(--panel-2); color: var(--texto-2); }
 
   .flujo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 16px 0 4px; }
-  .flujo .caja-f { background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 10px;
-                   padding: 10px 16px; min-width: 150px; }
-  .flujo .caja-f .et { font-size: .68rem; color: var(--texto-2); text-transform: uppercase;
-                       letter-spacing: .07em; }
+  .flujo .ico-flecha { color: var(--acento); }
+  .flujo .caja-f { background: var(--fondo-2); border: 1px solid var(--borde);
+                   border-radius: var(--radio); padding: 10px 16px; min-width: 150px; }
+  /* Sin versalitas. Las cadenas son «entra», «sale», «se van por poca variación»:
+     vienen del código en caja de frase y así se quedan. */
+  .flujo .caja-f .et { font-size: .7rem; color: var(--texto-2); font-weight: 500; }
   .flujo .caja-f .vl { font-family: var(--mono); font-size: 1.05rem; color: var(--texto); }
   .flujo .caja-f.sale .vl { color: var(--acento-2); }
-  .flujo .fl { font-size: 1.4rem; color: var(--acento); }
 
   .params-usados { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  .par { font-size: .76rem; padding: 4px 10px; border-radius: 7px; background: var(--fondo-2);
+  .par { font-size: .76rem; padding: 4px 10px; border-radius: var(--radio-2); background: var(--fondo-2);
          border: 1px solid var(--borde); }
   .par b { color: var(--acento-2); font-family: var(--mono); font-weight: 600; }
 
   .acciones-fase { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
     margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--borde); }
+  /* Sin esto, en el estado sin ningún paso seleccionado la fila queda vacía y su
+     filete dibuja una regla que no separa nada de nada. Un filete va entre pares,
+     nunca cruzando una relación ni colgando de la nada. */
+  .acciones-fase:empty { border-top: none; padding-top: 0; margin-top: 0; }
 
   /* ============ formulario ============ */
   #panel-form { display: none; }
@@ -62,37 +69,60 @@
   .campo { margin-bottom: 13px; }
   .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
   .campo .ayuda { font-size: .77rem; color: var(--texto-2); margin-top: 4px; line-height: 1.5; }
-  .campo input[type=number] { width: 100%; padding: 8px 11px; border-radius: 8px;
+  .campo input[type=number] { width: 100%; padding: 8px 11px; border-radius: var(--radio-2);
     border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
     font: inherit; font-family: var(--mono); font-size: .9rem; }
-  .campo input:focus { outline: none; border-color: var(--acento); }
-  .interruptor { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-  .interruptor input { width: 18px; height: 18px; accent-color: var(--acento); }
+  .campo input:focus { outline: none; border-color: var(--borde-fuerte); }
+  /* Interruptor dibujado, no el checkbox del sistema: es el control que más se toca
+     en esta pantalla, y una tilde de 18 px es un blanco de clic chico y un estado
+     que hay que interpretar. Acá la posición dice el estado y el acento dice que
+     está activo. */
+  .interruptor { display: flex; align-items: center; gap: 11px; cursor: pointer; }
+  .interruptor input {
+    appearance: none; margin: 0; flex: none; position: relative; cursor: pointer;
+    width: 40px; height: 23px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--borde);
+    transition: background .16s ease, border-color .16s ease;
+  }
+  .interruptor input::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px;
+    border-radius: 50%; background: var(--texto-2);
+    transition: transform .16s ease, background .16s ease;
+  }
+  .interruptor input:checked { background: var(--acento-hondo); border-color: transparent; }
+  .interruptor input:checked::after { transform: translateX(17px); background: var(--sobre-acento); }
   .opciones { display: flex; flex-wrap: wrap; gap: 7px; }
   .opciones label { display: flex; align-items: center; gap: 6px; padding: 5px 10px;
     background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 999px;
     font-size: .79rem; cursor: pointer; font-weight: 500; }
-  .opciones label:has(input:checked) { border-color: var(--acento); background: var(--opcion-activa); }
+  .opciones label:has(input:checked) { border-color: var(--acento); color: var(--texto);
+                                       background: rgba(21, 68, 115, .35); }
   .params-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 20px; }
 
   /* ============ inspección ============ */
-  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 9px;
-                  margin-top: 16px; }
-  .resumen-grid .celda { background: var(--fondo-2); border: 1px solid var(--borde);
-    border-radius: 9px; padding: 9px 11px; }
-  .resumen-grid .celda .v { font-family: var(--mono); font-size: 1.2rem; color: var(--acento-2); }
-  .resumen-grid .celda .r { font-size: .71rem; color: var(--texto-2); text-transform: uppercase;
-    letter-spacing: .05em; }
+  /* Tira de lecturas: una sola caja dividida por filetes de 1 px, en lugar de seis
+     cajitas separadas por aire. Con seis cajas el ojo cuenta seis bordes redondeados
+     antes de llegar a los números; así cuenta uno. El `gap: 1px` sobre un fondo de
+     `--borde` es lo que dibuja las divisiones, sin necesidad de un borde por celda. */
+  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+                  gap: 1px; background: var(--borde); margin-top: 16px;
+                  border: 1px solid var(--borde); border-radius: var(--radio); overflow: hidden; }
+  .resumen-grid .celda { background: var(--panel); padding: 13px 15px; }
+  .resumen-grid .celda .v { font-family: var(--mono); font-size: 1.3rem; font-weight: 300;
+    letter-spacing: -.03em; color: var(--acento-2); }
+  /* Sin versalitas: estas etiquetas salen de las claves del backend con los
+     guiones bajos cambiados por espacios, así que la caja es la que traen. */
+  .resumen-grid .celda .r { font-size: .73rem; color: var(--texto-2); font-weight: 500; }
   .mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 12px; }
-  .mini .caja { background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 9px;
-                padding: 9px; }
+  .mini .caja { background: var(--fondo-2); border: 1px solid var(--borde);
+                border-radius: var(--radio); padding: 9px; }
   .mini .caja h5 { margin: 0 0 6px; font-size: .74rem; color: var(--texto-2); font-weight: 600;
                    font-family: var(--mono); }
   .pildoras { display: flex; flex-wrap: wrap; gap: 5px; }
-  .pildora { font-family: var(--mono); font-size: .71rem; padding: 3px 8px; border-radius: 6px;
+  .pildora { font-family: var(--mono); font-size: .71rem; padding: 3px 8px; border-radius: var(--radio-2);
              background: var(--fondo-2); border: 1px solid var(--borde); color: var(--texto-2); }
   .pildora.baja { opacity: .45; text-decoration: line-through; }
-  select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--borde);
+  select { padding: 7px 10px; border-radius: var(--radio-2); border: 1px solid var(--borde);
     background: var(--fondo-2); color: var(--texto); font: inherit; font-size: .86rem; }
   .fila-sup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .fila-sup h3, .fila-sup h4 { margin: 0; }
@@ -103,52 +133,75 @@
      sola pestaña por vez: si no, la página se vuelve un scroll interminable. */
   .pestanas { display: flex; gap: 4px; margin-top: 20px;
               border-bottom: 1px solid var(--borde); }
+  /* `#fase-pestanas` lleva el atributo `hidden`, y no alcanzaba: una regla de autor
+     le gana al `display: none` que el navegador aplica por `hidden`, así que la
+     pestañera «oculta» seguía ocupando lugar y seguía pintando su `border-bottom`.
+     El `hidden` estaba escrito, se leía bien, y no hacía nada — de ahí la regla. */
+  .pestanas[hidden] { display: none; }
   .pestanas button { font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer;
     padding: 8px 16px; border: none; background: none; color: var(--texto-2);
     border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .pestanas button:hover { color: var(--texto); }
-  .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--acento); }
+  /* La pestaña activa no puede quedar distinguida solo por un hairline: eso conserva
+     técnicamente una diferencia y pierde el affordance. Va también con más peso. */
+  .pestanas button[aria-selected="true"] { color: var(--texto); font-weight: 600;
+                                           border-bottom-color: var(--acento); }
 
   /* Explicación bajo demanda.
      La interfaz tenía casi 2.000 palabras de prosa: un párrafo editorializando antes de cada
      gráfico. El sitio es didáctico, así que la explicación no sobra — sobraba que estuviera
      siempre puesta. Ahora queda una línea que dice qué mirar, y el porqué se despliega para quien
      lo necesite. Ver `interaction.md` de Distill: mantener la vista general y bajar al detalle. */
-  .pista { font-size: .82rem; color: var(--texto-2); margin: 0 0 8px; max-width: 90ch; }
+  .pista { font-size: .82rem; color: var(--texto-2); margin: 0 0 8px; max-width: 66ch; }
   .pista b { color: var(--texto); font-weight: 600; }
   .saber-mas { margin: -2px 0 12px; }
+  /* El signo va dibujado, no escrito. Los glifos ＋ ／ － ／ ▸ se dibujan distinto en cada
+     sistema, no heredan bien el grosor de la fuente y quedan mal alineados con la línea de base.
+     Enmascarando un SVG el ícono toma el color de `currentColor` y escala con el texto. */
   .saber-mas > summary { cursor: pointer; font-size: .78rem; color: var(--acento);
-    list-style: none; display: inline-block; padding: 2px 0; }
-  .saber-mas > summary::before { content: '＋ '; }
-  .saber-mas[open] > summary::before { content: '－ '; }
-  .saber-mas > p { font-size: .82rem; color: var(--texto-2); margin: 6px 0 0;
-    max-width: 78ch; border-left: 2px solid var(--borde); padding-left: 12px; }
+    list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .saber-mas > summary::before {
+    content: ''; width: .8em; height: .8em; flex: none; background: currentColor;
+    -webkit-mask: var(--ico-mas) center / contain no-repeat;
+            mask: var(--ico-mas) center / contain no-repeat;
+  }
+  .saber-mas[open] > summary::before {
+    -webkit-mask-image: var(--ico-menos); mask-image: var(--ico-menos);
+  }
+  /* Sin filete a la izquierda: el resumen y su explicación son una sola cosa, y una
+     línea entre los dos las separa justo donde tienen que leerse juntas. */
+  .saber-mas > p { font-size: .82rem; color: var(--texto-2); margin: 6px 0 0; max-width: 66ch; }
 
   /* Los cortes secundarios, plegados: están, pero no compiten con el argumento. */
-  .corte.plegado > summary { cursor: pointer; font-weight: 650; font-size: .9rem;
-    padding: 10px 0; list-style: none; }
-  .corte.plegado > summary::before { content: '▸ '; color: var(--acento); }
-  .corte.plegado[open] > summary::before { content: '▾ '; }
+  .corte.plegado > summary { cursor: pointer; font-weight: 600; font-size: .9rem;
+    padding: 10px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
+  .corte.plegado > summary::before {
+    content: ''; width: .7em; height: .7em; flex: none; background: var(--texto-2);
+    -webkit-mask: var(--ico-chevron) center / contain no-repeat;
+            mask: var(--ico-chevron) center / contain no-repeat;
+    transition: transform .15s ease;
+  }
+  .corte.plegado[open] > summary::before { transform: rotate(90deg); }
   .corte.plegado > summary:hover { color: var(--acento); }
   .corte.plegado > .corte:first-of-type { margin-top: 4px; padding-top: 0; border-top: none; }
 
   /* Cada corte del análisis, dentro de su pestaña. */
   .corte + .corte { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--borde); }
-  .explica { font-size: .84rem; color: var(--texto-2); margin: 0 0 12px; max-width: 88ch; }
+  .explica { font-size: .84rem; color: var(--texto-2); margin: 0 0 12px; max-width: 66ch; }
   .explica strong { color: var(--texto); }
   .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   @media (max-width: 900px) { .duo { grid-template-columns: 1fr; } }
 
   /* Descargas del entregable: la acción que cierra el ciclo, así que va con su explicación. */
   .descargas { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 10px;
+    background: var(--fondo-2); border: 1px solid var(--borde); border-radius: var(--radio);
     padding: 12px 14px; margin: 4px 0 16px; }
   .descargas .boton { padding: 7px 13px; font-size: .85rem; }
 
   /* --- pantallas chicas --- */
   @media (max-width: 720px) {
     .cabecera-fase { gap: 12px; }
-    .num-fase { width: 44px; height: 44px; font-size: 1.2rem; }
+  .num-fase { width: 44px; height: 44px; font-size: 1.2rem; }
     #fase-titulo { font-size: 1.1rem; }
     .flujo { gap: 8px; }
     .flujo .caja-f { min-width: 0; flex: 1 1 130px; padding: 8px 12px; }
@@ -169,17 +222,6 @@
   <nav>
     <a href=".">El proyecto</a>
     <a href="taller" class="activo">Taller</a>
-    <button class="btn-tema" type="button" title="Cambiar de tema">
-      <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="4.2"/>
-        <path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/>
-      </svg>
-      <svg class="ico-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linejoin="round" aria-hidden="true">
-        <path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/>
-      </svg>
-    </button>
   </nav>
 </header>
 
@@ -204,7 +246,7 @@
       correctas: nadie marcó nunca qué tramos son realmente anómalos. Ningún resultado de acá «acierta»
       o «falla». Lo que sí se puede ver es si varios métodos coinciden y si el resultado aguanta al
       cambiar la configuración. Los números que la tesis reporta salen de la configuración marcada
-      con ★.</p>
+      con <svg class="ico ico-estrella" viewBox="0 0 16 13" fill="currentColor" aria-hidden="true"><path d="M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z"/></svg>.</p>
     </div>
   </details>
 
@@ -216,7 +258,7 @@
       <span class="tenue mono" id="cuenta" style="font-size:.75rem"></span>
       <span class="tenue mono" id="sello" style="font-size:.75rem"></span>
       <button class="boton" id="btn-nueva" style="padding:6px 12px;font-size:.83rem">+ Empezar de cero</button>
-      <button class="boton" id="btn-oficial" style="padding:6px 12px;font-size:.83rem">★ Correr la de la tesis</button>
+      <button class="boton" id="btn-oficial" style="padding:6px 12px;font-size:.83rem"><svg class="ico ico-estrella" viewBox="0 0 16 13" fill="currentColor" aria-hidden="true"><path d="M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z"/></svg> Correr la de la tesis</button>
     </div>
     <div id="mapa-caja"><svg id="mapa" height="150"></svg></div>
     <p class="tenue" style="font-size:.76rem;margin:8px 0 0" id="pista-mapa"></p>
@@ -263,7 +305,6 @@
   </div>
 </div>
 
-<script src="estatico/tema.js" defer></script>
 <script src="estatico/vendor/echarts.min.js"></script>
 <script src="estatico/grafico.js"></script>
 <script src="estatico/analisis.js"></script>

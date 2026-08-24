@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consola · El proyecto</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+/* ===========================================================================
+   CONSOLA — oscura, densa, lenguaje de instrumento.
+
+   LA IDEA. Minimalismo por eliminación de ornamento, NO por eliminación de
+   información. Es la más densa de las tres y la que más color usa, y las dos
+   cosas son a propósito: un instrumento muestra todo lo que mide y usa el color
+   para que se lea de un vistazo. Cero degradados, cero sombras, cero radios
+   grandes; en su lugar, una retícula de 1 px y monoespaciado en todo lo que es
+   número.
+
+   SOBRE EL TINTE FRÍO DEL LIENZO, que contradice a propósito lo que hicimos en
+   el sitio actual: #0b0d10 tiene 5 puntos de separación de canal hacia el azul.
+   Ahí eso era un tinte que se había filtrado; acá es identidad declarada — el
+   referente es una pantalla de instrumentación, no una hoja. La diferencia entre
+   un tinte y una decisión es que la decisión está escrita y se aplica a toda la
+   escalera de forma consistente, que es lo que pasa acá.
+
+   Croma de las series 0,12 —el más alto de las tres direcciones— con rampa de
+   luminosidad: peor par de los diez 0,069, 3,8× la paleta del sitio actual.
+
+   EL LENGUAJE DE COMPONENTES: radio 3 px, filetes duros de 1 px, controles
+   segmentados en lugar de menús, botones compactos con corchetes, y una tira de
+   lecturas siempre visible arriba. La tipografía de interfaz es la del sistema;
+   todo número va en monoespaciado con cifras tabulares, para que las columnas se
+   alineen y una cifra que cambia no mueva a las de al lado.
+   =========================================================================== */
+:root {
+  --lienzo: #0b0d10;
+  --sup-1: #12151a;
+  --sup-2: #181c22;
+  --linea: #232830;
+  --linea-fuerte: #333a45;
+  --tinta: #e8ecf2;
+  --tinta-2: #97a1af;
+  --tinta-3: #626c7a;
+
+  --acento: #7ed86a;         /* «vivo»: lo que corre y lo que está seleccionado */
+  --sobre-acento: #08130a;
+  --ok: #5fd37f;
+  --error: #ff8a88;
+  --info: #efa810;
+
+  /* L de 0,62 a 0,91 · matiz base 310° · arco 280° */
+  --s1: #9c70bc; --s2: #da7b91; --s3: #e9a05e; --s4: #c3d577; --s5: #82fcdb;
+
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+  --r: 3px;
+}
+body {
+  background: var(--lienzo); color: var(--tinta);
+  font: 400 14.5px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.n, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.reja { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+
+/* --- barra de comando ---------------------------------------------------- */
+.cmd {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 20px; height: 46px;
+  border-bottom: 1px solid var(--linea); background: var(--sup-1);
+  position: sticky; top: 0; z-index: 30;
+}
+.cmd .id { font: 500 .84rem var(--mono); letter-spacing: .02em; }
+.cmd .id i { color: var(--acento); }
+.cmd .sep { width: 1px; height: 20px; background: var(--linea); }
+.cmd .dato { font: 400 .78rem var(--mono); color: var(--tinta-3); }
+.cmd nav { margin-left: auto; display: flex; }
+/* Control segmentado, no pestañas ni menú: dos opciones que se ven las dos. */
+.cmd nav a {
+  padding: 6px 14px; text-decoration: none; color: var(--tinta-2);
+  font-size: .86rem; border: 1px solid var(--linea); border-right: none;
+}
+.cmd nav a:first-child { border-radius: var(--r) 0 0 var(--r); }
+.cmd nav a:last-child { border-radius: 0 var(--r) var(--r) 0; border-right: 1px solid var(--linea); }
+.cmd nav a[aria-current] { background: var(--sup-2); color: var(--tinta); border-color: var(--linea-fuerte); }
+
+/* --- botones ------------------------------------------------------------- */
+.b {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px; border-radius: var(--r); border: 1px solid var(--linea-fuerte);
+  font: 500 .86rem var(--mono); letter-spacing: .02em;
+  background: var(--sup-2); color: var(--tinta); cursor: pointer; text-decoration: none;
+}
+.b:hover { border-color: var(--acento); }
+.b-1 { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.b-1:hover { filter: brightness(1.1); }
+
+/* --- encabezado ---------------------------------------------------------- */
+.encabezado { padding: 44px 0 34px; border-bottom: 1px solid var(--linea); }
+.encabezado h1 {
+  margin: 0 0 14px; font-size: clamp(1.7rem, 3.6vw, 2.5rem); font-weight: 500;
+  letter-spacing: -.025em; line-height: 1.12; max-width: 26ch;
+}
+.encabezado p { margin: 0 0 22px; color: var(--tinta-2); max-width: 66ch; }
+.encabezado .acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* --- tira de lecturas: la firma de esta dirección ----------------------- */
+.tira {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea);
+}
+.tira > div { padding: 14px 16px; border-right: 1px solid var(--linea); }
+.tira > div:last-child { border-right: none; }
+.tira .r { font-size: .7rem; color: var(--tinta-3); letter-spacing: .04em; margin-bottom: 6px; }
+.tira .v { font: 500 1.32rem/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.tira .v small { font-size: .7rem; color: var(--tinta-3); }
+.tira .v.vivo { color: var(--acento); }
+
+/* --- rejilla de celdas -------------------------------------------------- */
+section { padding: 34px 0; }
+section > h2 {
+  margin: 0 0 6px; font: 500 .82rem var(--mono); letter-spacing: .06em;
+  color: var(--tinta-3);
+}
+section > h2::before { content: '// '; color: var(--linea-fuerte); }
+section > p.intro { margin: 0 0 22px; color: var(--tinta-2); max-width: 70ch; }
+
+.celdas {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 1px; background: var(--linea);
+  border: 1px solid var(--linea);
+}
+.celda { background: var(--lienzo); padding: 16px; }
+.celda .k { font: 400 .72rem var(--mono); color: var(--acento); margin-bottom: 8px; }
+.celda h3 { margin: 0 0 6px; font-size: .94rem; font-weight: 500; }
+.celda p { margin: 0 0 10px; color: var(--tinta-2); font-size: .86rem; }
+.celda .io { font: 400 .8rem var(--mono); color: var(--tinta); }
+.celda .io s { color: var(--tinta-3); text-decoration: none; }
+
+/* --- tabla de especificación ------------------------------------------- */
+.spec { width: 100%; border-collapse: collapse; font-size: .87rem; }
+.spec th {
+  text-align: left; font: 400 .72rem var(--mono); letter-spacing: .05em;
+  color: var(--tinta-3); padding: 0 14px 8px 0; border-bottom: 1px solid var(--linea-fuerte);
+}
+.spec td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--linea); }
+.spec td.v { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.spec td.c { color: var(--tinta-3); font-size: .82rem; }
+
+.grafico { border: 1px solid var(--linea); padding: 10px; }
+
+footer {
+  border-top: 1px solid var(--linea); padding: 26px 0 100px;
+  color: var(--tinta-3); font-size: .82rem;
+}
+footer p { margin: 0 0 5px; max-width: 78ch; }
+</style>
+</head>
+<body>
+
+<div class="cmd">
+  <span class="id"><i>●</i> ETAPA-1 / BIRDS-4-TSURU</span>
+  <span class="sep"></span>
+  <span class="dato">25.024 med · 42/45 hojas · 3 señales</span>
+  <nav>
+    <a href="consola-landing.html" aria-current="page">proyecto</a>
+    <a href="consola-taller.html">taller</a>
+  </nav>
+</div>
+
+<div class="reja">
+  <div class="encabezado">
+    <h1>Detección de anomalías en batería, sin una sola etiqueta</h1>
+    <p>Telemetría real del CubeSat BIRDS-4 / TSURU: voltaje, corriente y temperatura,
+    una medición cada 10–11 segundos. El pipeline reduce 25.024 mediciones a 40
+    eventos revisables, y el criterio no es acertar sino que cinco métodos con ideas
+    distintas de «raro» coincidan y que el resultado se repita al cambiar la muestra.</p>
+    <div class="acciones">
+      <a class="b b-1" href="consola-taller.html">[ abrir el taller ]</a>
+      <a class="b" href="#pipeline">[ ver el pipeline ]</a>
+    </div>
+  </div>
+</div>
+
+<div class="reja">
+  <div class="tira">
+    <div><div class="r">MEDICIONES</div><div class="v">25.024</div></div>
+    <div><div class="r">TRAS LIMPIAR</div><div class="v">24.138</div></div>
+    <div><div class="r">VENTANAS</div><div class="v">22.080</div></div>
+    <div><div class="r">SIN REPETIR</div><div class="v">6.102</div></div>
+    <div><div class="r">CARACTERÍSTICAS</div><div class="v">~45<small>/72</small></div></div>
+    <div><div class="r">MÉTODOS</div><div class="v">5</div></div>
+    <div><div class="r">CANDIDATAS</div><div class="v">151</div></div>
+    <div><div class="r">EVENTOS</div><div class="v vivo">40</div></div>
+  </div>
+</div>
+
+<div class="reja">
+  <section id="pipeline">
+    <h2>pipeline · 6 etapas</h2>
+    <p class="intro">Cada etapa recibe la salida de la anterior y deja algo más chico.
+    Los números son de la configuración con la que la tesis reporta sus resultados.</p>
+    <div class="celdas">
+      <div class="celda">
+        <div class="k">01 · datos</div>
+        <h3>Leer y limpiar</h3>
+        <p>Se juntan las 42 hojas; se descartan filas vacías o en cero, que son huecos del decodificador.</p>
+        <div class="io">25.024 <s>→</s> 24.138 filas</div>
+      </div>
+      <div class="celda">
+        <div class="k">02 · ventaneo</div>
+        <h3>Cortar en ventanas</h3>
+        <p>Tramos de 50 mediciones (~9 min) que se deslizan de a una. Una anomalía es un comportamiento, no un valor.</p>
+        <div class="io">24.138 <s>→</s> 22.080 ventanas</div>
+      </div>
+      <div class="celda">
+        <div class="k">03 · dedup</div>
+        <h3>Quitar lo repetido</h3>
+        <p>Dos ventanas vecinas comparten 49 de 50 datos. Umbral de similitud 0,95.</p>
+        <div class="io">22.080 <s>→</s> 6.102 ventanas</div>
+      </div>
+      <div class="celda">
+        <div class="k">04 · features</div>
+        <h3>Resumir y filtrar</h3>
+        <p>24 números por señal. Se descartan varianza casi nula y correlación &gt; 0,95.</p>
+        <div class="io">72 <s>→</s> ~45 características</div>
+      </div>
+      <div class="celda">
+        <div class="k">05 · detección</div>
+        <h3>Cinco buscadores</h3>
+        <p>iforest · ecod · copod · pca · hdbscan-glosh. Cada uno puntúa las 6.102 ventanas.</p>
+        <div class="io">310 marcas <s>·</s> 151 candidatas</div>
+      </div>
+      <div class="celda">
+        <div class="k">06 · eventos</div>
+        <h3>Agrupar en eventos</h3>
+        <p>Ventanas solapadas de una misma anomalía se consolidan con su tramo temporal.</p>
+        <div class="io">151 <s>→</s> 40 eventos</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>reducción por etapa</h2>
+    <p class="intro">Escala logarítmica: de la primera a la última hay tres órdenes de magnitud.</p>
+    <div class="grafico"><div id="g-embudo" style="height:260px"></div></div>
+  </section>
+
+  <section>
+    <h2>configuración de referencia</h2>
+    <p class="intro">La que produce los resultados que reporta la tesis. Está fijada por
+    decisiones documentadas; el taller permite cambiarla y comparar.</p>
+    <table class="spec">
+      <thead><tr><th>parámetro</th><th>etapa</th><th style="text-align:right">valor</th><th>por qué</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">tamano_ventana</td><td class="c">ventaneo</td><td class="v">50</td><td class="c">~9 min, algo menos de un ciclo de sombra</td></tr>
+        <tr><td class="mono">paso</td><td class="c">ventaneo</td><td class="v">1</td><td class="c">solape máximo; nada se parte al medio</td></tr>
+        <tr><td class="mono">umbral_dedup</td><td class="c">ventaneo</td><td class="v">0,95</td><td class="c">deja fuera lo casi idéntico</td></tr>
+        <tr><td class="mono">rezagos_autocorr</td><td class="c">features</td><td class="v">5</td><td class="c">captura el ritmo dentro del tramo</td></tr>
+        <tr><td class="mono">umbral_correlacion</td><td class="c">filtrado</td><td class="v">0,95</td><td class="c">una de cada par redundante</td></tr>
+        <tr><td class="mono">arboles_iforest</td><td class="c">detección</td><td class="v">300</td><td class="c">puntaje estable sin costo grande</td></tr>
+        <tr><td class="mono">min_cluster_hdbscan</td><td class="c">detección</td><td class="v">15</td><td class="c">debajo de eso es ruido</td></tr>
+        <tr><td class="mono">fraccion_candidatos</td><td class="c">eventos</td><td class="v">0,01</td><td class="c">el 1 % más raro</td></tr>
+        <tr><td class="mono">max_ventanas_evento</td><td class="c">eventos</td><td class="v">15</td><td class="c">corta eventos que se van de largo</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<footer>
+  <div class="reja">
+    <p>Detección y clasificación de anomalías en el consumo de baterías satelitales
+    mediante un enfoque híbrido no supervisado–supervisado · UNA–FPUNA.</p>
+    <p>Material didáctico. El registro canónico vive en el repositorio de la tesis.</p>
+  </div>
+</footer>
+
+<script src="/estatico/vendor/echarts.min.js"></script>
+<script>
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TINTA = css('--tinta'), T2 = css('--tinta-2'), T3 = css('--tinta-3'), LINEA = css('--linea');
+const S = [css('--s1'), css('--s2'), css('--s3'), css('--s4'), css('--s5')];
+const etapas = ['mediciones','ventanas','sin repetir','marcas','candidatas','eventos'];
+const valores = [25024, 22080, 6102, 310, 151, 40];
+echarts.init(document.getElementById('g-embudo')).setOption({
+  animation: false,
+  textStyle: { fontFamily: 'ui-monospace, monospace', color: TINTA, fontSize: 11 },
+  grid: { left: 8, right: 62, top: 8, bottom: 8, containLabel: true },
+  tooltip: { trigger: 'item', backgroundColor: '#12151a', borderColor: LINEA, borderWidth: 1,
+             textStyle: { color: TINTA, fontSize: 12 },
+             formatter: (p) => `${p.name} · <b>${p.value.toLocaleString('es')}</b>` },
+  xAxis: { type: 'log', min: 10, axisLine: { show: false }, axisTick: { show: false },
+           axisLabel: { color: T3 }, splitLine: { lineStyle: { color: LINEA } } },
+  yAxis: { type: 'category', inverse: true, data: etapas,
+           axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T2 } },
+  series: [{ type: 'bar', barMaxWidth: 14, data: valores,
+    itemStyle: { color: (p) => S[p.dataIndex % 5] },
+    label: { show: true, position: 'right', color: TINTA, fontFamily: 'ui-monospace, monospace',
+             fontSize: 11, formatter: (p) => p.value.toLocaleString('es') } }],
+});
+</script>
+<script src="_saltar.js"></script>
+</body>
+</html>

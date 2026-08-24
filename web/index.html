@@ -1,90 +1,98 @@
 <!doctype html>
-<html lang="es" data-tema="claro">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etapa 1 — Anomalías en baterías satelitales</title>
-<!-- El tema se resuelve acá, antes de pintar nada: si esperara a `tema.js` (que va al final del
-     cuerpo) quien tiene el oscuro guardado vería un destello blanco en cada carga. -->
-<script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||'claro'}catch(e){}</script>
 <link rel="stylesheet" href="estatico/estilos.css">
+
+<!-- Sonda de WebGL y arranque de las descargas DURANTE el parseo del HTML.
+
+     Esto estaba abajo, dentro de `orbita3d.js`, que va con `defer`: no empezaba a
+     pedir nada hasta terminar de parsear los 43 KB de HTML —con el SVG del globo
+     adentro— y encima esperaba a que un IntersectionObserver confirmara que el
+     globo estaba a la vista. Para un dibujo que está en la primera pantalla eso es
+     latencia pura, y era la segunda causa del destello.
+
+     Acá arriba, la descarga de three.js y de la textura arranca junto con la del
+     CSS. La sonda se mantiene: si no hay WebGL no se pide nada, y un equipo sin
+     WebGL sigue sin bajar los 654 KB. El script es minúsculo y no bloquea el
+     pintado. -->
+<script>
+window.__globo3d = (function () {
+  try {
+    const c = document.createElement('canvas');
+    if (!(c.getContext('webgl2') || c.getContext('webgl'))) return null;
+  } catch (e) { return null; }
+  /* La clave para que no se vea el dibujo viejo: marcar el <html> ACÁ, durante el
+     parseo y ANTES de que el navegador llegue al SVG. Con la clase puesta, el SVG
+     nunca se pinta — no es que se pinte y se reemplace, es que no se pinta.
+
+     Antes el SVG se veía todo el tiempo que tardaba three.js en llegar e
+     inicializarse. Quitar el fundido ayudó, pero el problema de fondo era ese
+     tramo, y la única forma de eliminarlo es no dibujar el SVG desde el arranque.
+
+     La clase se QUITA si algo falla más adelante —la librería no llega, la
+     textura no carga, WebGL pierde el contexto— y entonces el SVG aparece. Por eso
+     se oculta con la clase y no se borra el elemento: el respaldo sigue existiendo,
+     y cuesta 4 KB comprimidos. */
+  document.documentElement.classList.add('globo3d');
+  // La textura en paralelo con la librería, no después: son dos viajes distintos.
+  const l = document.createElement('link');
+  l.rel = 'preload'; l.as = 'image'; l.href = 'estatico/vendor/tierra.png';
+  document.head.appendChild(l);
+  return new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = 'estatico/vendor/three.min.js';
+    s.async = true;
+    s.onload = ok; s.onerror = mal;
+    document.head.appendChild(s);
+  });
+})();
+</script>
 <style>
   /* ===========================================================================
      El cielo del héroe.
 
-     El fondo de universo vive SOLO acá, en la primera pantalla del inicio. No se
-     extiende al resto de la página ni al taller: ahí hay tablas, formularios y
-     cinco curvas por gráfico, y un fondo con textura compite con el dato justo
-     donde hay que leerlo — además de imprimir mal en las capturas que van al
-     documento, que es la razón por la que el tema claro es el de por defecto.
+     Queda el campo de estrellas y nada más. Antes había cuatro capas: el degradado
+     azul del espacio, una nebulosa de tres manchas de color con `blur`, la banda de
+     la vía láctea y las estrellas. Las tres primeras se fueron.
 
-     Dentro del cielo manda la paleta oscura, sea cual sea el tema de la página.
-     No es una excepción a la regla de que los colores viven en un solo lugar: se
-     REDEFINEN las mismas variables, acotadas a este bloque. Así el h1, la bajada
-     y los botones siguen escritos con `var(--texto)` y compañía, sin enterarse de
-     que están sobre el espacio.
+     POR QUÉ. Eran degradados y texturas decorativos, y eran además casi todo el
+     color saturado de la página: entre el degradado del cuerpo y estas capas, el
+     100 % de la superficie del sitio estaba teñida y no quedaba un solo neutro
+     puro en ninguna parte. El criterio que quedó es que el color que sobrevive es
+     el que codifica algo —los tres estados, las cinco series de los gráficos y el
+     oro de la configuración de la tesis—, y una nube de gas no codifica nada.
+
+     Lo que hace que el fondo no se lea como un negro plano ya no es la nebulosa: es
+     el campo de estrellas, el globo con su órbita, y el hecho de que la escalera de
+     grises tenga cuatro peldaños por encima del lienzo.
+
+     Este bloque no redefine la paleta: hereda de `estilos.css`.
      =========================================================================== */
-  .cielo {
-    position: relative; overflow: hidden;
-    /* Redefinir `--texto` no alcanza para los títulos: `body` resuelve
-       `color: var(--texto)` una sola vez y los hijos heredan el color YA
-       calculado, no la variable. Por eso el color se vuelve a fijar acá. */
-    color: var(--texto);
-
-    --texto: #eaf1fb;
-    --texto-2: #a9bdd9;
-    --acento: #6cb8ff;
-    --acento-hondo: #2f7ddb;
-    --acento-2: #7ef0c0;
-    --sobre-acento: #04101f;
-    --borde: rgba(152, 186, 235, .22);
-    --panel-2: rgba(126, 165, 225, .16);
-    --boton-hover: rgba(126, 165, 225, .3);
-    --sombra: 0 10px 34px rgba(0, 0, 0, .45);
-    /* El disco de cielo que lleva la órbita ya no hace falta: está sobre el espacio. */
-    --orbita-cielo: transparent;
-    --orbita-anillo: #46618c;
-  }
+  .cielo { position: relative; overflow: hidden; }
 
   .cielo .capa { position: absolute; inset: 0; pointer-events: none; }
 
-  /* Todas las capas del espacio van juntas dentro de `.espacio` para poder
-     desvanecerlas de una sola vez con una máscara, dejando el texto intacto.
+  /* `.espacio` ya no pinta fondo: es solo el contenedor de las estrellas del héroe.
 
-     La máscara es mejor que superponer un degradado hacia el color de la página:
-     ese degradado, sobre un fondo oscuro, deja una banda gris que se ve como
-     niebla sucia. Desvaneciendo el espacio en cambio aparece el fondo real de la
-     página, sea el tema que sea, y el corte no existe. En el tema oscuro directamente
-     no se ve la costura. Los últimos 150 px son la zona de disolución, y el héroe
-     reserva abajo un espacio parecido para no meter texto ahí adentro. */
+     LA MÁSCARA SE QUEDA, y la primera versión de esta pasada la había sacado junto
+     con el degradado. Estaba mal: la máscara no era parte de la decoración, era lo
+     que evita una costura. El héroe tiene su propio campo de estrellas, mucho más
+     denso que el global de `.estrellas`, y sin el desvanecido ese campo termina de
+     golpe: queda una línea horizontal a media pantalla donde la densidad cambia de
+     sesenta estrellas a siete. Se vio en la captura, no leyendo el código.
+
+     Los últimos 150 px son la zona de disolución, y el héroe reserva abajo un
+     espacio parecido para no meter texto ahí adentro. */
   .espacio {
-    background: radial-gradient(120% 92% at 72% 10%,
-                #172d52 0%, #0c1a35 40%, #060d1d 76%, #04080f 100%);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent 100%);
             mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent 100%);
   }
 
-  /* Nubes de gas: manchas grandes y difusas. Son lo que evita que el fondo se vea
-     como un negro plano con puntos encima. */
-  .nebulosa {
-    background:
-      radial-gradient(42% 52% at 80% 16%, rgba(72, 132, 255, .22), transparent 70%),
-      radial-gradient(34% 44% at 20% 76%, rgba(126, 240, 192, .10), transparent 70%),
-      radial-gradient(30% 38% at 52% 44%, rgba(150, 104, 255, .14), transparent 70%);
-    filter: blur(10px);
-  }
-
-  /* La banda de la vía láctea, cruzada en diagonal. */
-  .via-lactea {
-    background: linear-gradient(101deg, transparent 34%, rgba(130, 165, 235, .07) 42%,
-                rgba(190, 210, 255, .14) 49%, rgba(150, 180, 245, .09) 56%, transparent 65%);
-    filter: blur(16px);
-  }
-
-  /* Estrellas en dos capas. La densa va quieta; solo titila el puñado de medianas,
-     y con poco recorrido: animar el campo entero hace que al volver a esta página
-     se reinicie la animación y el fondo cambie de brillo de golpe, que fue el
-     motivo por el que las estrellas del resto del sitio quedaron estáticas. */
+  /* Estrellas en dos capas, todas blancas. La densa va quieta; la de medianas
+     tampoco titila más — ver la nota en `.titilan`. */
   .polvo {
     background-image:
     radial-gradient(0.84px 0.84px at 3.1% 3.7%, rgba(255,255,255,0.58), transparent),
@@ -146,8 +154,13 @@
     radial-gradient(2.48px 2.48px at 37.8% 53.4%, rgba(255,255,255,0.99), transparent),
     radial-gradient(2.87px 2.87px at 74.3% 67.4%, rgba(255,255,255,0.94), transparent);
   }
+  /* Sin titileo. Era movimiento perpetuo decorativo, y la opacidad queda fijada en
+     el valor de reposo que el propio sitio ya consideraba correcto cuando alguien
+     pide movimiento reducido (.85): parar una animación es devolverla al reposo, no
+     congelarla donde la dejó el último fotograma. Con esto `@keyframes titilar` deja
+     de usarse y también se va. */
   .titilan {
-    animation: titilar 7s ease-in-out infinite alternate;
+    opacity: .85;
     background-image:
     radial-gradient(1.66px 1.66px at 11.0% 25.2%, rgba(255,255,255,0.88), transparent),
     radial-gradient(1.47px 1.47px at 23.4% 31.6%, rgba(255,255,255,0.82), transparent),
@@ -168,13 +181,21 @@
     radial-gradient(1.5px 1.5px at 72.0% 88.7%, rgba(255,255,255,0.76), transparent),
     radial-gradient(1.43px 1.43px at 94.5% 90.9%, rgba(255,255,255,0.78), transparent);
   }
-  @keyframes titilar { from { opacity: .68 } to { opacity: 1 } }
-
   .heroe { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center;
            padding: 66px 0 120px; }
-  .heroe .kicker { color: var(--acento-2); font-family: var(--mono); font-size: .85rem;
-                   letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
-  .heroe p.bajada { font-size: 1.12rem; color: var(--texto-2); max-width: 52ch; }
+  /* Sin versalitas, sin monoespaciado y sin tracking: la cadena es «Tesis · UNA–FPUNA»
+     y tiene acrónimos, así que la caja del marcado se respeta tal cual está escrita.
+     Queda como lo que es, un rótulo de apoyo. */
+  .heroe .kicker { color: var(--texto-2); font-size: .8rem; margin-bottom: 14px; }
+  /* 52ch era angosto para el cuerpo del héroe; 58 entra en la banda de 55 a 68
+     caracteres, que es donde el ojo encuentra el renglón siguiente sin buscarlo. */
+  .heroe p.bajada { font-size: 1.06rem; color: var(--texto-2); max-width: 58ch; }
+  /* La usa la sección de cierre. El héroe tenía acá dos botones —«Abrir el taller»
+     y «Ver cómo funciona»— y se fueron los dos: el segundo era un ancla a un
+     capítulo que está tres pantallas más abajo en una página que se lee entera de
+     una sentada, y el primero repetía lo que la pestaña «Taller» de la barra ya
+     ofrece desde cualquier punto. La acción vive una sola vez, al final, donde ya
+     se leyó de qué se trata. */
   .acciones { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
 
   /* ===========================================================================
@@ -209,10 +230,43 @@
      movimiento se note sin marear. `--fase` lo arranca ya entrado en la mitad
      cercana, para que se vea apenas carga la página en vez de aparecer después.
      =========================================================================== */
-  .orbita { position: relative; aspect-ratio: 1; max-width: 380px; margin: 0 auto;
-            --periodo: 26s; --fase: calc(var(--periodo) * -0.3);
-            background: radial-gradient(circle at 50% 50%, var(--orbita-cielo) 0%, transparent 68%); }
+  /* Sin disco de cielo detrás: era el degradado que sostenía al globo sobre el
+     fondo espacial, y sin fondo espacial no sostiene nada. */
+  /* `.orbita` es el bloque entero —dibujo más pie—; `.orbita-dibujo` es solo el
+     cuadrado del dibujo, y es el que sostiene la proporción. Estaban juntos, con
+     el `aspect-ratio` en `.orbita` y el pie adentro: funcionaba mientras el SVG
+     estuviera en flujo, pero al retirarlo el pie quedaba como único hijo en flujo
+     y se iba arriba del lienzo, que va absoluto. Se vio en la captura. */
+  .orbita { position: relative; max-width: 380px; margin: 0 auto;
+            --periodo: 26s; --fase: calc(var(--periodo) * -0.3); }
+  .orbita-dibujo { position: relative; aspect-ratio: 1; }
   .orbita svg { width: 100%; height: 100%; overflow: visible; }
+
+  /* El lienzo de `orbita3d.js`. Va superpuesto y en opacidad 0 hasta que la escena
+     dibujó su primer cuadro; en ese mismo cuadro aparece y el SVG se retira.
+
+     SIN FUNDIDO, y esto se cambió por un defecto real: había medio segundo de
+     `transition: opacity .5s`, y durante ese medio segundo el SVG seguía debajo a
+     opacidad plena. O sea que el «destello del dibujo viejo» que se veía al
+     recargar no era el tiempo de carga: era mi propia transición mostrando las dos
+     cosas a la vez. Un intercambio en un solo cuadro no tiene destello posible —
+     el lienzo ya tiene su imagen dibujada antes de hacerse visible.
+
+     `aspect-ratio: 1` en el contenedor y el lienzo al 100 %: el 3D hereda
+     exactamente la caja que ya tenía el dibujo, incluidas las dos consultas de
+     medios que lo bajan a 260 y 210 px. No hay una medida nueva que mantener. */
+  .orbita-3d {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0;
+  }
+  .orbita-3d.visible { opacity: 1; }
+
+  /* Con `globo3d` puesta —solo la pone el script del `<head>`, y solo si hay
+     WebGL— el SVG no se dibuja nunca. Sin JavaScript, sin WebGL, o si algo falla
+     después, la clase no está y el SVG es el dibujo. El `display: none` es
+     deliberado y no `visibility`: así el navegador tampoco corre las cuatro
+     animaciones CSS de la órbita para algo que no se ve. */
+  html.globo3d .orbita-dibujo > svg { display: none; }
 
   /* Las cuatro animaciones comparten período y desfase: si se separaran, el
      satélite se deformaría o cambiaría de capa en el lugar equivocado.
@@ -246,10 +300,16 @@
 
   .anillo { fill: none; stroke: var(--orbita-anillo); stroke-width: 1.4;
             stroke-dasharray: 4 7; }
+  /* La mitad cercana del anillo va en el acento: es la misma figura que la marca
+     de la barra —anillo con satélite— a escala de dibujo, así que comparte su
+     color. Es el único lugar del inicio donde el acento aparece sin ser un botón,
+     y se lo gana por ser identidad y no decoración. */
+  .anillo.cerca { stroke: var(--acento); }
   /* La mitad cercana del anillo se dibuja encima del globo y sin guiones: es la
      pista principal de que la órbita rodea al planeta y no está detrás. */
   .anillo.cerca { stroke-width: 1.8; stroke-dasharray: none; opacity: .8; }
-  .globo { filter: drop-shadow(0 0 26px rgba(96, 170, 245, .45)); }
+  /* Sin resplandor. Era un `drop-shadow` azul de 26 px alrededor del planeta:
+     decoración, no elevación, y el único azul que quedaba fuera de la paleta. */
 
   /* Con movimiento reducido no hay vuelta: el satélite queda quieto en la mitad
      cercana, que es donde se lo ve entero. Sin esto la regla global de
@@ -258,46 +318,92 @@
     .gira      { animation: none !important; transform: rotate(148deg); }
     .antigira  { animation: none !important; transform: rotate(-148deg); }
     .capa-suelo, .capa-nubes { animation: none !important; }
-    .titilan { animation: none !important; opacity: .85; }
     .tras   { animation: none !important; opacity: 0; }
     .frente { animation: none !important; opacity: 1; }
   }
 
-  .pasos { counter-reset: paso; display: grid; gap: 14px; }
-  .paso { display: grid; grid-template-columns: 46px 1fr; gap: 16px; align-items: start;
-          padding: 16px 18px; background: var(--panel); border: 1px solid var(--borde);
-          border-radius: var(--radio); transition: border-color .2s, transform .2s; }
-  .paso:hover { border-color: var(--acento); transform: translateX(3px); }
+  /* Ocho pasos que eran ocho cajas del mismo peso, sin ninguna dominante: una
+     rejilla de tarjetas idénticas donde el ojo no tiene dónde entrar. Ahora son
+     filas editoriales separadas por un filete fino. La información es la misma y el
+     peso visual es la mitad; el número además deja de necesitar su propia cajita,
+     porque la columna ya dice que es un número de orden.
+
+     Tampoco se desplazan al pasar por encima: ese movimiento no informaba nada. */
+  .pasos { counter-reset: paso; display: grid; gap: 0; }
+  .paso { display: grid; grid-template-columns: 40px 1fr; gap: 16px; align-items: start;
+          padding: 22px 0; border-top: 1px solid var(--borde); }
+  .paso:first-child { border-top: none; }
+  /* El número en el acento y no en gris: es lo que ordena la lectura de los ocho
+     pasos, y en Órbita ese ordinal es lo único coloreado de la tarjeta de etapa. */
   .paso::before { counter-increment: paso; content: counter(paso);
-    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
-    background: var(--panel-2); color: var(--acento); font-family: var(--mono); font-weight: 700; }
+    color: var(--acento); font-family: var(--mono); font-weight: 500; font-size: .88rem;
+    padding-top: .2em; }
   .paso h3 { margin: 0 0 4px; }
-  .paso p { margin: 0; color: var(--texto-2); font-size: .93rem; }
+  .paso p { margin: 0; color: var(--texto-2); font-size: .93rem; max-width: 66ch; }
   .paso .cifra { font-family: var(--mono); color: var(--acento-2); font-size: .82rem; }
 
   .embudo { display: grid; gap: 6px; margin-top: 8px; }
   .embudo .nivel { display: grid; grid-template-columns: 190px 1fr 90px; align-items: center; gap: 12px;
                    font-size: .88rem; }
-  .embudo .barra-e { height: 22px; border-radius: 6px;
-    background: linear-gradient(90deg, var(--acento), var(--acento-2)); }
+  /* Verde mate plano: es una sola magnitud, así que toma `--grafico-unico`, la
+     misma ficha que la barra horizontal del taller y el mapa de codetección.
+
+     LA RAMPA DE OPACIDAD SE ACORTÓ, y no es cosmético. Iba de 1 a 0,22 y el último
+     peldaño quedaba a 1,31:1 contra el lienzo — el umbral para un objeto gráfico
+     es 3:1. O sea: «40 eventos», que es el resultado de toda la etapa y el número
+     más importante del gráfico, era la barra menos visible de las seis. Medido,
+     no estimado.
+
+     Ahora va de 1 a 0,72 y el peldaño más tenue queda sobre 3:1. La secuencia se
+     sigue leyendo —la opacidad baja parejo— y el largo, que es lo que codifica la
+     magnitud, no depende de ella para nada. */
+  .embudo .barra-e { height: 10px; border-radius: 5px; background: var(--grafico-unico); }
+  .embudo .nivel:nth-of-type(1) .barra-e { opacity: 1; }
+  .embudo .nivel:nth-of-type(2) .barra-e { opacity: .94; }
+  .embudo .nivel:nth-of-type(3) .barra-e { opacity: .89; }
+  .embudo .nivel:nth-of-type(4) .barra-e { opacity: .83; }
+  .embudo .nivel:nth-of-type(5) .barra-e { opacity: .77; }
+  .embudo .nivel:nth-of-type(6) .barra-e { opacity: .72; }
   .embudo .cant { font-family: var(--mono); text-align: right; color: var(--acento-2); }
 
-  section { padding: 44px 0; border-top: 1px solid var(--borde); }
-  section:first-of-type { border-top: none; }
+  /* El filete entre capítulos lo reemplaza el aire. 44 px no alcanzaban para que el
+     espacio hiciera de separador, así que el filete estaba compensando un espaciado
+     insuficiente y no una ambigüedad real: antes de dibujar una línea hay que poder
+     nombrar qué quedaría ambiguo sin ella, y acá no quedaba nada.
 
+     52 y no 104: el relleno se suma con el de la sección vecina, así que 104 por
+     lado daba 208 px de hueco y eso se leía como página sin terminar. Medido en
+     captura, no estimado. */
+  section { padding: 52px 0; }
+  section:first-of-type { padding-top: 0; }
+  /* El título pertenece a lo que viene debajo cuando el hueco de arriba es como tres
+     veces el de abajo. Con esa proporción el filete deja de hacer falta. */
+  section > .envoltorio > h2 { margin-bottom: 10px; }
+
+  /* En el inicio la caja de la tarjeta sobra: es una superficie editorial y el aire
+     agrupa igual de bien con la mitad de peso visual. En el taller NO se hace esto:
+     es una pantalla operativa densa, apila tres o cuatro paneles con gráficos
+     adentro, y ahí el filete está comprando densidad. */
+  .tarjeta { background: none; border: none; padding: 0; }
+  .rejilla { gap: 40px; }
+
+  /* El viewport angosto lleva su propia pasada y no un chequeo: 52 px de transición
+     entre capítulos son una refinación a 1440 px y demasiado a 390. */
   @media (max-width: 900px) {
-    .heroe { grid-template-columns: 1fr; padding: 38px 0 110px; gap: 26px; }
+    .heroe { grid-template-columns: 1fr; padding: 38px 0 96px; gap: 26px; }
     .orbita { max-width: 260px; }
     .espacio { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 130px), transparent 100%);
                        mask-image: linear-gradient(to bottom, #000 calc(100% - 130px), transparent 100%); }
+    section { padding: 36px 0; }
+    .rejilla { gap: 30px; }
   }
   @media (max-width: 560px) {
     .orbita { max-width: 210px; }
-    .heroe { padding: 30px 0 92px; }
-    .paso { grid-template-columns: 36px 1fr; gap: 11px; padding: 13px 14px; }
-    .paso::before { width: 28px; height: 28px; font-size: .85rem; }
+    .heroe { padding: 30px 0 72px; }
+    .paso { grid-template-columns: 30px 1fr; gap: 11px; padding: 18px 0; }
     .embudo .nivel { grid-template-columns: 105px 1fr 62px; gap: 8px; font-size: .78rem; }
-    section { padding: 30px 0; }
+    section { padding: 28px 0; }
+    .rejilla { gap: 26px; }
   }
 </style>
 </head>
@@ -309,25 +415,12 @@
   <nav>
     <a href="." class="activo">El proyecto</a>
     <a href="taller">Taller</a>
-    <button class="btn-tema" type="button" title="Cambiar de tema">
-      <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="4.2"/>
-        <path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/>
-      </svg>
-      <svg class="ico-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linejoin="round" aria-hidden="true">
-        <path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/>
-      </svg>
-    </button>
   </nav>
 </header>
 
 <!-- El cielo es a todo el ancho, por eso queda fuera del envoltorio y lleva el suyo adentro. -->
 <div class="cielo">
   <div class="capa espacio">
-    <div class="capa nebulosa"></div>
-    <div class="capa via-lactea"></div>
     <div class="capa polvo"></div>
     <div class="capa titilan"></div>
   </div>
@@ -342,13 +435,10 @@
         Nadie marcó nunca cuáles de esos 25.024 registros son anómalos. Esta es la etapa que reduce esa
         pila a un puñado de tramos sospechosos para que un experto los revise.
       </p>
-      <div class="acciones">
-        <a class="boton primario" href="taller">Abrir el taller →</a>
-        <a class="boton" href="#pipeline">Ver cómo funciona</a>
-      </div>
     </div>
 
     <div class="orbita">
+      <div class="orbita-dibujo">
       <!-- Los colores del globo y del satélite son los únicos fijos del sitio: no salen de la
            paleta de `estilos.css` a propósito, porque son el color de un objeto físico. La Tierra
            es azul de día y de noche; lo que sí cambia con el tema es el cielo de atrás y el anillo
@@ -514,6 +604,7 @@
           </g>
         </g>
       </svg>
+      </div>
       <p class="tenue mono" style="text-align:center;font-size:.76rem;margin-top:6px">
         una vuelta ≈ 87 min · medido en los datos
       </p>
@@ -635,7 +726,7 @@
       oficial de la tesis está fijada por decisiones documentadas (ADR) y aparece siempre marcada como
       tal. Cambiar un parámetro en el taller no cambia la tesis.
     </div>
-    <div class="acciones"><a class="boton primario" href="taller">Abrir el taller →</a></div>
+    <div class="acciones"><a class="boton primario" href="taller">Abrir el taller <svg class="ico ico-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.15em;height:1.15em"><path d="M4 12h14M12.5 6l6 6-6 6"/></svg></a></div>
   </section>
 
   <footer style="padding:40px 0;border-top:1px solid var(--borde);color:var(--texto-2);font-size:.87rem">
@@ -646,6 +737,12 @@
   </footer>
 </div>
 
-<script src="estatico/tema.js" defer></script>
+<!-- El PRIMER script del inicio: hasta acá la página era HTML, CSS y un SVG, sin
+     una línea de JavaScript. Va con `defer` y al final por eso mismo — no debe
+     retrasar nada de lo que ya se ve. Y no carga `three.min.js`: eso lo pide él
+     mismo, y solo si hay WebGL y el globo está a la vista. Si este archivo no
+     llegara, la página queda exactamente como estaba. -->
+<script src="estatico/orbita3d.js" defer></script>
+
 </body>
 </html>

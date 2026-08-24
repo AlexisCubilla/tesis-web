@@ -167,8 +167,7 @@ web/
   app.js         formularios, árbol de ramas y qué se muestra en cada etapa
   analisis.js    los cuatro cortes de la pantalla de análisis
   grafico.js     el motor de gráficos, único que conoce la librería
-  estilos.css    la paleta entera, en variables: un bloque por tema
-  tema.js        el interruptor claro/oscuro (claro por defecto)
+  estilos.css    la paleta entera, en variables: un solo bloque, tema oscuro
   vendor/        ECharts, versionado acá adentro (ver web/vendor/LEEME.md)
 scripts/
   exportar_crudo.py   precalcula la tabla cruda desde el Excel de la tesis

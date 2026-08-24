@@ -176,43 +176,60 @@ exploratorios. La comparación es por valor, no por su texto, y hay tests que la
 
 ---
 
-## A8 — Dos temas, una sola paleta
+## A8 — Un solo tema oscuro, con el universo como identidad
 
-**Decisión.** Todo color del sitio es una variable CSS declarada en `web/estilos.css`, con dos
-bloques: `:root` (tema claro, el de por defecto) y `:root[data-tema="oscuro"]`. Ningún otro archivo
-escribe un color propio. Los `<canvas>`, que se pintan a mano y no heredan CSS, leen las mismas
-variables con `getComputedStyle` en cada dibujo.
+**Decisión (revisada).** El sitio tiene **un** tema, oscuro, y no hay interruptor. Todo color vive
+como variable CSS en un único bloque `:root` de `web/estilos.css`. Ningún otro archivo escribe un
+color propio. Los `<canvas>`, que se pintan a mano y no heredan CSS, leen las mismas variables con
+`getComputedStyle` en cada dibujo.
 
-**Por qué el claro por defecto.** El sitio se muestra sobre todo de día, proyectado en una defensa o
-recortado en capturas para el documento. Ahí el oscuro pierde. El oscuro queda como preferencia
-explícita, guardada en `localStorage`. A propósito **no** se mira `prefers-color-scheme`: el claro es
-el punto de partida para todos, no el que diga el sistema operativo.
+**Qué decía antes, y por qué se dio vuelta.** La primera versión tenía dos temas con el claro por
+defecto, y el argumento era razonable: el sitio se proyecta de día y se recorta en capturas para el
+documento, y ahí el oscuro pierde. Se revisó por dos motivos:
 
-**Trampa documentada (1).** El tema se aplica con un script inline en el `<head>` de cada página, no
-desde `tema.js`. `tema.js` se carga al final del cuerpo, cuando el navegador ya pintó un cuadro: si
-la decisión se tomara ahí, quien tiene el oscuro guardado vería un destello blanco en cada carga.
+1. **El claro no aportaba nada que el oscuro no diera.** Era una segunda paleta completa —cuarenta y
+   pico de variables duplicadas, más un juego de series validado aparte— manteniéndose al día para
+   que el sitio se viera *igual pero más claro*. Nadie leía nada mejor.
+2. **El interruptor traía una clase de errores propia**, y los tres se dieron: destello blanco al
+   cargar si el tema guardado era el oscuro; el tema viejo al volver con «atrás», porque el bfcache
+   restaura la página entera y el script del `<head>` no se vuelve a ejecutar; y dos pestañas
+   abiertas contradiciéndose. Cada uno se arregló con más código —script inline en el `<head>`,
+   `pageshow` con `event.persisted`, un escucha de `storage`—. Al no existir el interruptor,
+   desaparecen los tres y se van con él `tema.js`, el script inline de las dos páginas y el
+   `data-tema` del `<html>`.
 
-**Trampa documentada (2).** Como consecuencia de lo anterior, volver con «atrás» dejaba el tema
-viejo: el navegador restaura la página entera desde el bfcache y el script del `<head>` **no** se
-vuelve a ejecutar. Se veía como que el cambio funcionaba en una pantalla y en la otra no. `tema.js`
-escucha `pageshow` con `event.persisted` y reaplica lo guardado, que es lo que manda — no lo que
-quedó en el DOM. Por lo mismo escucha `storage`, para que dos pestañas abiertas no se contradigan.
+**Lo que se acepta a cambio.** Proyectar un sitio oscuro en un aula con luz se lee peor, y las
+capturas que van al documento entran en oscuro. Es el costo asumido a cambio de una sola paleta. El
+juego claro queda en el historial de git si alguna vez hace falta.
+
+**Dónde SÍ y dónde NO va la textura.** El campo de estrellas es global y muy tenue
+(`--estrellas-op: .45`): eso es lo que hace que el universo sea la identidad del sitio y no un adorno
+de la primera pantalla. La **nebulosa rica vive solo en el héroe** del inicio. Las superficies donde
+se lee un dato —tarjetas, tablas, cajas de gráfico— son planas a propósito: una textura detrás de
+cinco curvas compite con el dato justo donde hay que leerlo.
+
+**Las tarjetas son planas, y la elevación está reservada.** `.tarjeta` no lleva degradado ni sombra.
+El taller apila tres o cuatro, y con degradado más sombra cada panel competía por atención con los
+gráficos que tenía adentro; un fondo parejo y un filete de 1 px alcanzan para separar. `--sombra`
+sigue existiendo pero solo la usa el modal del gráfico, que es lo único que de verdad flota.
+
+**Dos radios, no uno.** `--radio: 6px` para contenedores y `--radio-2: 4px` para lo que va anidado
+adentro. Antes había un solo token de 12 px y media docena de valores sueltos entre 7 y 10: una caja
+de 9 px dentro de otra de 12 px deja una esquina que se ve mal cortada.
+
+**Los íconos van dibujados, no escritos.** Antes eran glifos en el contenido: `★` para la
+configuración de la tesis, `＋`/`－` para los pliegues, `▸` para los cortes, `→` para el flujo de una
+etapa a la otra. Cada sistema los dibuja distinto, no heredan el grosor de la fuente, quedan mal
+alineados con la línea de base, y en algunas plataformas la estrella sale coloreada como emoji. Ahora
+son SVG: como **máscara** (`--ico-mas`, `--ico-menos`, `--ico-chevron`) cuando el ícono lo pone un
+`::before`, y como marcado (`.ico`, y los ayudantes `icoEstrella()` / `icoFlecha()` de `app.js`)
+cuando va suelto. La máscara toma el color de quien la usa, así el ícono queda dentro de la paleta.
+La flecha **en prosa** —«25.024 → 24.138 filas»— sigue siendo texto: ahí el signo significa «pasa a
+ser», no es un ícono.
 
 **Excepción anotada.** El globo terráqueo y el satélite del inicio llevan colores fijos, fuera de la
-paleta. Son el color de un objeto físico —la Tierra es azul de día y de noche—, así que cambiarlos
-con el tema se vería mal. Lo que sí usa variables es el cielo de atrás y el anillo de la órbita.
-
-**El héroe del inicio va siempre sobre fondo de espacio**, en los dos temas, y termina disolviéndose
-en el fondo de la página. Eso no rompe la regla de un solo lugar para los colores: el bloque
-`.cielo` **redefine** las mismas variables acotadas a él, así que el `h1`, la bajada y los botones
-siguen escritos con `var(--texto)` sin enterarse de dónde están. La única salvedad es que `body`
-resuelve `color: var(--texto)` una sola vez y los hijos heredan el color ya calculado, no la
-variable: por eso `.cielo` también fija `color` explícitamente.
-
-**Dónde NO va el universo.** El resto del inicio y todo el taller quedan sobre la paleta plana. En
-el taller hay tablas, formularios y cinco curvas por gráfico: un fondo con textura compite con el
-dato justo donde hay que leerlo, y arruina las capturas que van al documento — que es la misma razón
-por la que el tema claro es el de por defecto.
+paleta. Son el color de un objeto físico —la Tierra es azul de día y de noche—, así que atarlos a las
+variables no tendría sentido. Lo que sí usa variables es el cielo de atrás y el anillo de la órbita.
 
 ---
 

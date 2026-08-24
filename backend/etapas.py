@@ -54,6 +54,15 @@ class Parametro:
     maximo: float | None = None
     opciones: tuple[str, ...] | None = None
     ayuda: str = ""
+    # Oculto como CONTROL, no como parámetro. Sigue existiendo, sigue teniendo su
+    # defecto, sigue viajando en `defectos()` y sigue quedando registrado en los
+    # parámetros del nodo —así el hash de la rama lo cubre y la ficha de la fase lo
+    # muestra—. Lo único que no hace es aparecer en el formulario.
+    #
+    # Es para lo que define el estudio en lugar de configurarlo: si no hay una
+    # pregunta de investigación que se responda cambiándolo, ofrecerlo solo invita a
+    # producir una rama que no se puede comparar con nada.
+    oculto: bool = False
 
 
 @dataclass(frozen=True)
@@ -115,8 +124,13 @@ ETAPA_DATOS = Etapa(
     titulo="Datos",
     descripcion=(
         "Punto de partida: la telemetría del satélite, una medición cada 10-11 segundos, repartida en "
-        "45 hojas del Excel original (cada hoja es una sesión de descarga distinta). Acá se elige qué "
-        "hojas entran al estudio y si se descartan las filas inválidas."
+        "45 hojas del Excel original (cada hoja es una sesión de descarga distinta). Entran 42. Dos de "
+        "las que quedan afuera son pruebas hechas en el laboratorio y no en vuelo. La tercera se llama "
+        "'Anomalous data' y parecía ser el dato ideal para validar, pero al decodificar sus paquetes se "
+        "vio que corresponde a una anomalía de los paneles solares y no de la batería: es otro problema, "
+        "de otra investigación. Las tres quedan afuera por definición del estudio y no por "
+        "configuración, así que no hay nada que elegir ahí. Lo que sí se elige acá es si se descartan "
+        "las filas inválidas."
     ),
     parametros=(
         Parametro(
@@ -134,10 +148,10 @@ ETAPA_DATOS = Etapa(
         Parametro(
             "hojas_excluidas", "Hojas que NO entran", "multiple",
             tuple(_ref("datos", "hojas_excluidas", ("Test1 w batt", "Test2 wo batt", "Anomalous data"))),
-            ayuda="Las dos primeras son pruebas hechas en el laboratorio, no en vuelo. La tercera se "
-                  "llama 'Anomalous data' y parecía ser el dato ideal para validar, pero al decodificar "
-                  "sus paquetes se vio que corresponde a una anomalía de los paneles solares, no de la "
-                  "batería: es otro problema.",
+            oculto=True,
+            ayuda="Dos son pruebas de laboratorio, no de vuelo. La tercera, 'Anomalous data', resultó "
+                  "ser una anomalía de paneles solares y no de batería. Las tres quedan afuera por "
+                  "definición del estudio: se registran acá, pero no se ofrecen como opción.",
         ),
     ),
     ejecutar=_ejecutar_datos,
@@ -273,16 +287,58 @@ ETAPA_FEATURES = Etapa(
 # Etapa 4 — filtrado
 # --------------------------------------------------------------------------------------
 
-def _ejecutar_filtrado(entrada, params):
-    """Descarta features de baja variabilidad y redundantes, y estandariza las que quedan."""
-    from tesis import filtering
+def config_filtrado(params) -> "FilterConfig":  # noqa: F821
+    """La configuración del filtrado a partir de los parámetros de un nodo.
+
+    EXISTE PARA QUE HAYA UN SOLO LUGAR. La ejecución la usa para filtrar, y la
+    pantalla de análisis la usa para reconstruir POR QUÉ se descartó cada
+    característica —volviendo a correr el primer filtro por separado—. Si las dos
+    armaran la config por su cuenta, alcanzaría con que una cambiara para que el
+    gráfico de motivos empezara a mentir: seguiría pareciendo correcto y diría que
+    se descartó algo que no se descartó. Ese es exactamente el modo de falla que el
+    ADR A1 quiere evitar, y la forma de evitarlo no es un comentario pidiendo
+    cuidado, es que la función sea una sola.
+
+    Con `descartar=False` devuelve una config NEUTRA: no descarta nada y sigue
+    estandarizando. Los tres valores neutros son deliberados y cada uno apaga un
+    camino distinto de descarte:
+
+      lowvar_percentile = 0     apaga el corte por percentil de IQR
+      iqr_min           = 0     apaga el piso absoluto de IQR, que se aplica
+                                SIEMPRE y aparte del percentil (ver
+                                `filter_low_variance`): sin esto, «no descartar»
+                                seguiría descartando las casi constantes
+      correlation_threshold = 1.0001   ninguna correlación absoluta puede alcanzarlo,
+                                así que no cae ningún par redundante
+
+    Queda un caso que sí se descarta igual: una característica cuyo IQR sea NaN
+    —una columna entera sin datos—, porque `NaN >= 0` es falso. No tiene arreglo
+    desde acá y tampoco convendría: una columna así no se puede estandarizar.
+    """
     from tesis.config import CONFIG
 
-    cfg = dataclasses.replace(
-        CONFIG.filtering,
+    base = CONFIG.filtering
+    if not params.get("descartar", True):
+        return dataclasses.replace(
+            base, lowvar_percentile=0.0, iqr_min=0.0, correlation_threshold=1.0001,
+        )
+    return dataclasses.replace(
+        base,
         correlation_threshold=float(params["umbral_correlacion"]),
         lowvar_percentile=float(params["percentil_baja_var"]),
     )
+
+
+def _ejecutar_filtrado(entrada, params):
+    """Descarta features de baja variabilidad y redundantes, y estandariza las que quedan.
+
+    Con `descartar=False` no descarta ninguna, pero SÍ estandariza. Esa separación es
+    el punto de la opción: el paso hace dos trabajos, y solo uno de los dos es el que
+    se quiere poder apagar. Ver la nota de `config_filtrado`.
+    """
+    from tesis import filtering
+
+    cfg = config_filtrado(params)
     antes = entrada["features"].shape[1] - 1
     tabla, _escalador = filtering.filter_and_scale(entrada["features"], cfg)
 
@@ -300,12 +356,22 @@ ETAPA_FILTRADO = Etapa(
     nombre="filtrado",
     titulo="Filtrado",
     descripcion=(
-        "De las 72 características calculadas, muchas no sirven para distinguir un tramo de otro. Acá "
-        "se descartan dos tipos: las que dan casi siempre el mismo valor (no informan nada) y las que "
-        "suben y bajan junto con otra (dicen lo mismo dos veces). Las que quedan se llevan a una escala "
-        "común, para que ninguna pese más solo porque sus números son más grandes."
+        "Este paso hace DOS cosas, y conviene tenerlas separadas. Primero descarta características: las "
+        "que dan casi siempre el mismo valor (no informan nada) y las que suben y bajan junto con otra "
+        "(dicen lo mismo dos veces). Después lleva las que quedan a una escala común, para que ninguna "
+        "pese más solo porque sus números son más grandes. El descarte se puede apagar; la escala "
+        "común, no —PCA y HDBSCAN-GLOSH la necesitan, y sin ella el paso 5 cambiaría por un motivo que "
+        "no tiene nada que ver con el filtrado."
     ),
     parametros=(
+        Parametro(
+            "descartar", "Descartar características", "booleano", True,
+            ayuda="Apagarlo deja pasar las 72 al paso 5, estandarizadas igual. Sirve para responder "
+                  "una pregunta concreta: ¿el filtrado mejora la detección, o solo la abarata? "
+                  "Los dos umbrales de abajo quedan sin efecto cuando está apagado, y el paso sigue "
+                  "existiendo en la rama con «sin descartar» anotado, así que la decisión queda "
+                  "registrada en lugar de perderse.",
+        ),
         Parametro("umbral_correlacion", "Cuándo dos características son redundantes", "decimal",
                   _ref("filtrado", "umbral_correlacion", 0.95), 0.5, 0.999,
                   ayuda="Va de 0 a 1. Si dos características se mueven juntas por encima de este valor, "

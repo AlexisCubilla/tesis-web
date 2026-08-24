@@ -138,11 +138,18 @@ window.Analisis = (function () {
         yAxis: { type: 'category', data: n, splitArea: { show: true }, inverse: true,
                  axisLabel: { color: c.tenue, fontSize: 10 },
                  axisLine: { lineStyle: { color: c.borde } }, axisTick: { show: false } },
-        // Secuencial de un solo tono, claro → oscuro: es magnitud, no polaridad.
+        // Secuencial de un solo tono, oscuro → verde mate: es magnitud, no polaridad.
+        // El tope es `--grafico-rampa` y no `--grafico-unico`: la celda lleva su
+        // número encima, así que la rampa entera tiene que aguantar tinta blanca.
+        // Ver la nota de las dos fichas en `estilos.css`.
         visualMap: { min: 0, max, show: false,
-                     inRange: { color: [V.varCss('--fondo-2'), V.serie(0)] } },
+                     inRange: { color: [V.varCss('--fondo-2'), V.varCss('--grafico-rampa')] } },
         series: [{
           type: 'heatmap', data: celdas,
+          // Etiqueta blanca en toda la rampa, sin umbral: con el tope acotado el
+          // peor punto del recorrido queda a 4,99:1. Antes era blanca sobre un
+          // tope claro y el número más importante del gráfico —la celda más
+          // alta— era el menos legible: 1,5:1 con el naranja que había.
           label: { show: true, color: c.tinta, fontSize: 11, fontFamily: 'ui-monospace, monospace',
                    formatter: (p) => p.data[2] },
           itemStyle: { borderColor: V.varCss('--panel'), borderWidth: 2 },

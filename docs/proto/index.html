@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tres direcciones · prototipos</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+:root { --mono: ui-monospace, "JetBrains Mono", Consolas, monospace; }
+body { background: #101216; color: #e8ecf2;
+       font: 400 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.m { max-width: 1000px; margin: 0 auto; padding: 56px 28px 130px; }
+h1 { margin: 0 0 14px; font-size: 2rem; font-weight: 400; letter-spacing: -.025em; }
+.intro { color: #97a1af; max-width: 70ch; margin: 0 0 12px; }
+.intro b { color: #e8ecf2; font-weight: 500; }
+.nota { color: #626c7a; font-size: .88rem; max-width: 70ch; margin: 0 0 44px; }
+.d { border-top: 1px solid #232830; padding: 30px 0; display: grid;
+     grid-template-columns: 190px 1fr 210px; gap: 30px; align-items: start; }
+@media (max-width: 820px) { .d { grid-template-columns: 1fr; gap: 14px; } }
+.d h2 { margin: 0 0 6px; font-size: 1.16rem; font-weight: 500; letter-spacing: -.015em; }
+.d .tag { font: 400 .76rem var(--mono); color: #626c7a; }
+.d p { margin: 0 0 10px; color: #97a1af; }
+.d ul { margin: 0; padding-left: 18px; color: #97a1af; font-size: .9rem; }
+.d li { margin-bottom: 4px; }
+.d .coste { color: #efa810; font-size: .88rem; margin-top: 10px; }
+.d .coste b { font-weight: 500; }
+.enl { display: grid; gap: 8px; }
+.enl a { display: block; padding: 10px 13px; border: 1px solid #333a45; border-radius: 4px;
+         text-decoration: none; color: #e8ecf2; font-size: .89rem; }
+.enl a:hover { border-color: #7ed86a; }
+.enl a span { color: #626c7a; font-size: .8rem; }
+.muestra { display: flex; gap: 4px; margin-top: 12px; }
+.muestra i { width: 100%; height: 22px; border-radius: 2px; display: block; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: 8px; }
+th { text-align: left; font: 400 .74rem var(--mono); color: #626c7a; padding: 0 12px 8px 0;
+     border-bottom: 1px solid #333a45; }
+td { padding: 9px 12px 9px 0; border-bottom: 1px solid #232830; color: #97a1af; }
+td.v { font-family: var(--mono); color: #e8ecf2; }
+</style>
+</head>
+<body>
+<div class="m">
+  <h1>Tres direcciones, seis páginas</h1>
+  <p class="intro">Tres webs distintas con la actual como referencia de <b>qué</b> tiene
+  que existir, no de cómo se ve. Cada una trae su landing y su página de ejecución, y
+  cada una tiene su propio lenguaje de componentes: botones, controles, layout, densidad.
+  No son tres paletas encima del mismo diseño.</p>
+  <p class="nota">Son PROTOTIPOS: la estructura y los componentes son reales y las cifras
+  son las del proyecto, pero no están conectados al backend. Los colores de las tres
+  salen de OKLCh con croma acotado y están verificados contra daltonismo — el peor par
+  de las cinco series da 0,077 / 0,065 / 0,069, contra 0,018 de la paleta que usa el
+  sitio hoy.</p>
+
+  <div class="d">
+    <div>
+      <h2>Órbita</h2>
+      <div class="tag">oscura · con color · aire</div>
+      <div class="muestra">
+        <i style="background:#0091a3"></i><i style="background:#8e90d8"></i>
+        <i style="background:#e695b6"></i><i style="background:#fabd7f"></i>
+        <i style="background:#c2f6b1"></i><i style="background:#00b7ed"></i>
+      </div>
+    </div>
+    <div>
+      <p>Minimalismo por aire y por foco, no por quitar el color. El presupuesto de
+      color se gasta en tres lugares y ninguno es decoración: la acción primaria, el
+      estado y el dato.</p>
+      <ul>
+        <li>Radios de 14 px; superficies con borde de luz, sin relleno</li>
+        <li>Tres pesos de botón: relleno de acento, fantasma y texto</li>
+        <li>Títulos en peso 300 — la jerarquía la hace el tamaño</li>
+        <li>Taller: carril vertical de etapas a la izquierda, lienzo de detalle a la derecha</li>
+      </ul>
+      <p class="coste"><b>Su costo:</b> es la más grande de las tres. El aire cuesta
+      scroll, y en el taller el carril se lleva 296 px de ancho útil.</p>
+    </div>
+    <div class="enl">
+      <a href="orbita-landing.html">El proyecto <span>· landing</span></a>
+      <a href="orbita-taller.html">Taller <span>· ejecución</span></a>
+    </div>
+  </div>
+
+  <div class="d">
+    <div>
+      <h2>Ficha</h2>
+      <div class="tag">papel · editorial · densa</div>
+      <div class="muestra">
+        <i style="background:#43162e"></i><i style="background:#552e09"></i>
+        <i style="background:#405221"></i><i style="background:#156968"></i>
+        <i style="background:#576f9b"></i><i style="background:#f6f3ec"></i>
+      </div>
+    </div>
+    <div>
+      <p>Minimalismo por tipografía y reglas. Es la más densa y a la vez la más
+      callada — que son dos cosas distintas. La corrida es un documento con número,
+      fecha, hash y figuras con epígrafe, no una sesión.</p>
+      <ul>
+        <li>Radio 2 px, sin rellenos, reglas de 1 px como único separador</li>
+        <li>Botones de texto subrayado; un solo relleno por pantalla</li>
+        <li>Campos sobre línea, sin caja: se escribe sobre el renglón</li>
+        <li>Taller: registro de corridas en tabla + ficha de la corrida abierta</li>
+      </ul>
+      <p class="coste"><b>Su costo:</b> el lienzo claro no deja lugar a la
+      escenografía espacial, y la tabla de corridas pierde la lectura de un mapa de
+      ramas — se ve el orden, no la bifurcación.</p>
+    </div>
+    <div class="enl">
+      <a href="ficha-landing.html">El proyecto <span>· landing</span></a>
+      <a href="ficha-taller.html">Taller <span>· ejecución</span></a>
+    </div>
+  </div>
+
+  <div class="d">
+    <div>
+      <h2>Consola</h2>
+      <div class="tag">oscura · densa · instrumento</div>
+      <div class="muestra">
+        <i style="background:#9c70bc"></i><i style="background:#da7b91"></i>
+        <i style="background:#e9a05e"></i><i style="background:#c3d577"></i>
+        <i style="background:#82fcdb"></i><i style="background:#7ed86a"></i>
+      </div>
+    </div>
+    <div>
+      <p>Minimalismo por eliminación de ornamento, no de información. La más densa y
+      la que más color usa, y las dos cosas a propósito: un instrumento muestra todo
+      lo que mide y usa el color para que se lea de un vistazo.</p>
+      <ul>
+        <li>Radio 3 px, filetes duros, retícula de 1 px, cero sombras</li>
+        <li>Controles segmentados en lugar de menús; botones con corchetes</li>
+        <li>Todo número en monoespaciado con cifras tabulares</li>
+        <li>Taller: las seis etapas siempre visibles arriba, mosaico de gráficos, y registro de ejecución en vivo</li>
+      </ul>
+      <p class="coste"><b>Su costo:</b> el lienzo lleva un tinte frío declarado, que
+      es lo contrario de lo que hicimos en el sitio actual. Y la densidad la hace la
+      menos amable para quien entra por primera vez.</p>
+    </div>
+    <div class="enl">
+      <a href="consola-landing.html">El proyecto <span>· landing</span></a>
+      <a href="consola-taller.html">Taller <span>· ejecución</span></a>
+    </div>
+  </div>
+
+  <div class="d">
+    <div>
+      <h2>Órbita 3D</h2>
+      <div class="tag">three.js · escena aislada</div>
+      <div class="muestra">
+        <i style="background:#77957c"></i><i style="background:#0e1c2c"></i>
+        <i style="background:#7fa8d6"></i><i style="background:#24384d"></i>
+      </div>
+    </div>
+    <div>
+      <p>La animación del héroe rehecha en three.js, con la Tierra de verdad. No es
+      una dirección de diseño: es la respuesta a «¿se puede?», con los controles
+      puestos donde están las decisiones.</p>
+      <ul>
+        <li>Textura: la Tierra de la NASA, o la Tierra en la paleta del sitio</li>
+        <li>Luz: terminador día/noche real, o plana sin luz</li>
+        <li>Altitud: a escala real, exagerada, o la que implicarían los «87 min»</li>
+      </ul>
+      <p class="coste"><b>Lo que demuestra:</b> a 400 km la órbita raspa el globo
+      —radio 1,063 R—, así que el dibujo actual la exagera por necesidad y no por
+      descuido. Y que «una vuelta ≈ 87 min» exige 133 km de altitud, donde una
+      órbita decae en días.</p>
+    </div>
+    <div class="enl">
+      <a href="orbita-3d.html">Abrir el prototipo <span>· escena</span></a>
+      <a href="orbita-3d.html?tex=paleta&amp;luz=plana">En la paleta, plana <span>· la que más pega</span></a>
+      <a href="orbita-3d.html?alt=133">Los «87 min» <span>· el problema</span></a>
+    </div>
+  </div>
+
+  <div class="d" style="grid-template-columns:1fr">
+    <div>
+      <h2>Cómo se comparan</h2>
+      <table>
+        <thead><tr><th></th><th>Órbita</th><th>Ficha</th><th>Consola</th></tr></thead>
+        <tbody>
+          <tr><td>lienzo</td><td class="v">#07080b</td><td class="v">#f6f3ec</td><td class="v">#0b0d10</td></tr>
+          <tr><td>croma de las series</td><td class="v">0,105</td><td class="v">0,075</td><td class="v">0,120</td></tr>
+          <tr><td>peor par de los 10, 4 vistas</td><td class="v">0,077</td><td class="v">0,065</td><td class="v">0,069</td></tr>
+          <tr><td>radio</td><td class="v">14 px</td><td class="v">2 px</td><td class="v">3 px</td></tr>
+          <tr><td>densidad</td><td>baja</td><td>alta</td><td>muy alta</td></tr>
+          <tr><td>elegir un paso</td><td>carril vertical</td><td>fila de una tabla</td><td>tira siempre visible</td></tr>
+          <tr><td>parámetros</td><td>panel con ayuda al lado</td><td>filas de la ficha</td><td>columna compacta</td></tr>
+          <tr><td>qué pasa mientras corre</td><td>estado en el carril</td><td>estado en la fila</td><td>registro en vivo</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script src="_saltar.js"></script>
+</body>
+</html>

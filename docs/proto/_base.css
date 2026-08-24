@@ -1,0 +1,37 @@
+/* ===========================================================================
+   PROTOTIPOS — lo único que las tres direcciones comparten.
+
+   Y es a propósito que sea tan poco: la idea del ejercicio es que cada dirección
+   tenga su propio lenguaje de componentes, no que sean tres paletas encima del
+   mismo diseño. Acá viven el reset, la barra para saltar entre prototipos y
+   nada más. Todo lo demás —tipografía, botones, controles, layout, radios,
+   densidad— lo define cada dirección en su propio <style>.
+
+   Estas páginas son PROTOTIPOS: la estructura y los componentes son reales, los
+   datos son los de verdad (25.024 registros, 42/45 hojas, 151 ventanas → 40
+   eventos), pero NO están conectadas al backend. Sirven para elegir dirección,
+   no para trabajar.
+   =========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; -webkit-font-smoothing: antialiased; }
+img, svg { max-width: 100%; }
+
+/* --- barra de navegación entre prototipos ---------------------------------
+   Deliberadamente fea y neutra: es andamio del ejercicio, y si se pareciera a
+   alguna de las tres direcciones ensuciaría la comparación. */
+#saltar {
+  position: fixed; z-index: 9999; bottom: 14px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px; padding: 5px;
+  border-radius: 11px; background: #141414; border: 1px solid #2e2e2e;
+  box-shadow: 0 10px 34px rgba(0,0,0,.5);
+  font: 500 12px/1 system-ui, -apple-system, sans-serif; color: #8f8f8f;
+}
+#saltar b { padding: 0 8px 0 4px; font: inherit; font-size: 10.5px; opacity: .6; }
+#saltar a {
+  padding: 6px 10px; border-radius: 7px; text-decoration: none;
+  color: #8f8f8f; white-space: nowrap;
+}
+#saltar a[aria-current] { background: #f0f0f0; color: #111; }
+#saltar span { width: 1px; height: 18px; background: #2e2e2e; margin: 0 4px; }
+@media (max-width: 640px) { #saltar { flex-wrap: wrap; max-width: 94vw; justify-content: center; } }

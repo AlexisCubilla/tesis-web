@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Órbita · El proyecto</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+/* ===========================================================================
+   ÓRBITA — oscura y con color.
+
+   LA IDEA. Minimalismo por aire y por foco, no por quitarle el color. El lienzo
+   es casi negro y las superficies casi no existen; todo el presupuesto de color
+   se gasta en tres lugares y ninguno es decoración: la acción primaria, el
+   estado, y el dato. El chrome no lleva color nunca — ni un botón secundario, ni
+   un filete, ni un fondo de sección.
+
+   Croma de las series 0,105, con rampa de luminosidad además de matiz: el peor
+   par de las diez combinaciones da 0,077 en visión normal y en las tres
+   dicromatías, 4,3 veces mejor que la paleta que usa el sitio actual.
+
+   EL LENGUAJE DE COMPONENTES, que es lo que la diferencia de las otras dos:
+     · radios grandes (14 px) y superficies con borde de luz, no con relleno
+     · tres pesos de botón: relleno de acento, fantasma con filete, y texto
+     · títulos en peso 300 a tamaño grande — la jerarquía la hace el tamaño
+     · el pipeline es una fila horizontal que se desplaza, no una lista
+   =========================================================================== */
+:root {
+  --lienzo: #07080b;
+  --sup-1: rgba(255,255,255,.032);
+  --sup-2: rgba(255,255,255,.058);
+  --linea: rgba(255,255,255,.085);
+  --linea-fuerte: rgba(255,255,255,.20);
+  --tinta: #f4f6f8;
+  --tinta-2: rgba(244,246,248,.58);
+  --tinta-3: rgba(244,246,248,.36);
+
+  /* El acento es el único color del chrome, y solo en la acción primaria y en
+     lo seleccionado. Contraste 8,6:1 contra el lienzo. */
+  --acento: #00b7ed;
+  --sobre-acento: #04121a;
+
+  --ok: #65ca7e;
+  --error: #ff8987;
+  --info: #e3a42e;
+
+  /* L de 0,60 a 0,92 · matiz base 210° · arco 360° */
+  --s1: #0091a3; --s2: #8e90d8; --s3: #e695b6; --s4: #fabd7f; --s5: #c2f6b1;
+
+  --r: 14px;
+  --r-chico: 9px;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+body {
+  background: var(--lienzo);
+  color: var(--tinta);
+  font: 400 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: inherit; }
+
+.marco { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+
+/* --- barra ---------------------------------------------------------------- */
+.barra {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 28px;
+  background: rgba(7,8,11,.72);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--linea);
+}
+.barra .logo { display: flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: -.01em; }
+.barra .logo i {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  border: 1.5px solid var(--acento);
+  position: relative;
+}
+/* El satélite del logo: un punto sobre el anillo. Es la única figura del
+   sistema y aparece también en el héroe, a otra escala. */
+.barra .logo i::after {
+  content: ''; position: absolute; top: -2px; left: 50%; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--acento); transform: translateX(-50%);
+}
+.barra nav { margin-left: auto; display: flex; gap: 4px; }
+.barra nav a {
+  padding: 8px 14px; border-radius: var(--r-chico); text-decoration: none;
+  color: var(--tinta-2); font-size: .94rem;
+}
+.barra nav a[aria-current] { background: var(--sup-2); color: var(--tinta); }
+
+/* --- botones: tres pesos ------------------------------------------------- */
+.b {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 13px 22px; border-radius: var(--r-chico);
+  font: inherit; font-size: .95rem; font-weight: 500;
+  text-decoration: none; cursor: pointer; border: 1px solid transparent;
+  transition: background .16s ease, border-color .16s ease, opacity .16s ease;
+}
+.b-1 { background: var(--acento); color: var(--sobre-acento); }
+.b-1:hover { opacity: .88; }
+.b-2 { border-color: var(--linea-fuerte); color: var(--tinta); }
+.b-2:hover { background: var(--sup-1); }
+.b-3 { padding: 13px 4px; color: var(--tinta-2); }
+.b-3:hover { color: var(--tinta); }
+.b svg { width: 15px; height: 15px; flex: none; }
+
+/* --- héroe ---------------------------------------------------------------
+   Una sola afirmación, grande y en peso 300, y debajo una tira de tres cifras.
+   No hay párrafo de bajada: la cifra dice lo mismo en menos. */
+.heroe { padding: 108px 0 96px; text-align: center; position: relative; overflow: hidden; }
+.heroe .etiqueta {
+  display: inline-block; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--linea); color: var(--tinta-2);
+  font-size: .78rem; margin-bottom: 30px;
+}
+.heroe h1 {
+  margin: 0 auto 26px; max-width: 22ch;
+  font-size: clamp(2.3rem, 6vw, 4.1rem); font-weight: 300; line-height: 1.05;
+  letter-spacing: -.03em;
+}
+.heroe h1 em { font-style: normal; color: var(--acento); }
+.heroe .acciones { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* El anillo del héroe: la misma figura del logo a escala grande, detrás del
+   texto. Un trazo, sin relleno y sin resplandor — es la firma de la dirección,
+   no una textura. */
+.anillo {
+  position: absolute; top: 50%; left: 50%; width: 760px; height: 760px;
+  transform: translate(-50%, -46%) rotate(-14deg) scaleY(.42);
+  border: 1px solid var(--linea); border-radius: 50%; pointer-events: none;
+}
+.anillo::after {
+  content: ''; position: absolute; top: -4px; left: 50%; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--acento);
+  transform: translateX(-50%) scaleY(2.38);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .anillo { animation: girar 44s linear infinite; }
+  @keyframes girar {
+    to { transform: translate(-50%, -46%) rotate(346deg) scaleY(.42); }
+  }
+}
+
+/* --- tira de cifras ------------------------------------------------------ */
+.cifras {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px; background: var(--linea);
+  border: 1px solid var(--linea); border-radius: var(--r); overflow: hidden;
+  margin-top: 64px;
+}
+.cifras > div { background: var(--lienzo); padding: 26px 24px; }
+.cifras .v { font: 300 2.3rem/1 var(--mono); letter-spacing: -.04em; }
+.cifras .v small { font-size: .9rem; color: var(--tinta-3); letter-spacing: 0; }
+.cifras .r { color: var(--tinta-2); font-size: .84rem; margin-top: 8px; }
+
+/* --- secciones ----------------------------------------------------------- */
+section { padding: 88px 0; }
+section > .marco > header { max-width: 58ch; margin-bottom: 40px; }
+/* Dos afirmaciones en paralelo. En una sola columna quedaba media pantalla vacía
+   a la derecha, y eso se lee como página sin terminar, no como aire. */
+.par-afirmaciones { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+.par-afirmaciones > header { margin-bottom: 0; max-width: none; }
+@media (max-width: 820px) { .par-afirmaciones { grid-template-columns: 1fr; gap: 40px; } }
+section h2 {
+  margin: 0 0 14px; font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+  font-weight: 300; letter-spacing: -.025em; line-height: 1.12;
+}
+section header p { margin: 0; color: var(--tinta-2); }
+
+/* --- el pipeline como fila que se desplaza ------------------------------- */
+.rieles {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(268px, 1fr);
+  gap: 16px; overflow-x: auto; padding-bottom: 10px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.etapa {
+  scroll-snap-align: start;
+  border: 1px solid var(--linea); border-radius: var(--r);
+  padding: 22px; background: var(--sup-1);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.etapa .n { font: 400 .78rem/1 var(--mono); color: var(--acento); }
+.etapa h3 { margin: 0; font-size: 1.02rem; font-weight: 500; }
+.etapa p { margin: 0; color: var(--tinta-2); font-size: .9rem; }
+.etapa .salida {
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--linea);
+  font: 400 .84rem/1.4 var(--mono); color: var(--tinta);
+}
+
+/* --- embudo -------------------------------------------------------------- */
+.embudo { display: grid; gap: 10px; }
+.embudo > div { display: grid; grid-template-columns: 210px 1fr 96px; align-items: center; gap: 16px; }
+.embudo .et { color: var(--tinta-2); font-size: .9rem; }
+.embudo .barra { height: 8px; border-radius: 4px; background: var(--acento); opacity: .9; }
+.embudo .n { font: 400 .92rem var(--mono); text-align: right; }
+/* Cada nivel del embudo baja un peldaño de opacidad: la magnitud ya la da el
+   largo, y la opacidad refuerza que es una secuencia y no cinco categorías. */
+.embudo > div:nth-child(1) .barra { opacity: 1; }
+.embudo > div:nth-child(2) .barra { opacity: .82; }
+.embudo > div:nth-child(3) .barra { opacity: .64; }
+.embudo > div:nth-child(4) .barra { opacity: .46; }
+.embudo > div:nth-child(5) .barra { opacity: .32; }
+.embudo > div:nth-child(6) .barra { opacity: .22; }
+
+/* --- cierre -------------------------------------------------------------- */
+.cierre {
+  border: 1px solid var(--linea); border-radius: var(--r);
+  padding: 52px 44px; text-align: center; background: var(--sup-1);
+}
+.cierre h2 { margin: 0 0 12px; }
+.cierre p { margin: 0 auto 28px; max-width: 52ch; color: var(--tinta-2); }
+
+footer {
+  border-top: 1px solid var(--linea); padding: 40px 0 96px;
+  color: var(--tinta-3); font-size: .86rem;
+}
+footer p { margin: 0 0 6px; max-width: 76ch; }
+
+@media (max-width: 720px) {
+  .heroe { padding: 72px 0 68px; }
+  .anillo { width: 520px; height: 520px; }
+  section { padding: 60px 0; }
+  .embudo > div { grid-template-columns: 128px 1fr 72px; gap: 10px; font-size: .84rem; }
+}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="logo"><i></i> Etapa 1 · BIRDS-4</div>
+  <nav>
+    <a href="orbita-landing.html" aria-current="page">El proyecto</a>
+    <a href="orbita-taller.html">Taller</a>
+  </nav>
+</header>
+
+<div class="heroe">
+  <div class="anillo"></div>
+  <div class="marco">
+    <span class="etiqueta">Tesis · UNA–FPUNA</span>
+    <h1>25.024 mediciones de batería, y <em>ninguna etiqueta</em></h1>
+    <div class="acciones">
+      <a class="b b-1" href="orbita-taller.html">
+        Abrir el taller
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="b b-2" href="#pipeline">Ver cómo funciona</a>
+    </div>
+  </div>
+</div>
+
+<div class="marco">
+  <div class="cifras">
+    <div><div class="v">25.024</div><div class="r">mediciones de telemetría</div></div>
+    <div><div class="v">42<small>/45</small></div><div class="r">hojas del Excel usadas</div></div>
+    <div><div class="v">40</div><div class="r">eventos para revisar</div></div>
+  </div>
+</div>
+
+<section>
+  <div class="marco par-afirmaciones">
+    <header>
+      <h2>Un satélite que no se puede arreglar</h2>
+      <p>El CubeSat BIRDS-4 / TSURU manda a Tierra voltaje, corriente y temperatura
+      de batería, una medición cada 10–11 segundos. El ciclo de carga y descarga se
+      repite cada hora y media. Si la batería se degrada, el satélite muere.</p>
+    </header>
+    <header>
+      <h2>Y nadie dijo nunca qué es una falla</h2>
+      <p>Sin etiquetas no existe el «acierto el 90 %»: no se sabe cuál era el 100 %.
+      Lo que reemplaza a la respuesta correcta es el acuerdo entre métodos distintos
+      y los resultados que se repiten al cambiar la muestra.</p>
+    </header>
+  </div>
+</section>
+
+<section id="pipeline">
+  <div class="marco">
+    <header>
+      <h2>Seis pasos, de la pila a la lista</h2>
+      <p>Cada paso deja algo más chico que lo que recibió. Se desplaza para ver los seis.</p>
+    </header>
+    <div class="rieles">
+      <div class="etapa">
+        <div class="n">01</div><h3>Leer y limpiar</h3>
+        <p>Se juntan las 42 hojas y se descartan las filas vacías: son huecos del decodificador, no telemetría.</p>
+        <div class="salida">25.024 → 24.138 filas</div>
+      </div>
+      <div class="etapa">
+        <div class="n">02</div><h3>Cortar en ventanas</h3>
+        <p>Una anomalía es un comportamiento en el tiempo. Tramos de 50 mediciones que se deslizan de a una.</p>
+        <div class="salida">→ 22.080 ventanas</div>
+      </div>
+      <div class="etapa">
+        <div class="n">03</div><h3>Quitar lo repetido</h3>
+        <p>Dos ventanas vecinas comparten 49 de sus 50 datos. Las casi idénticas no aportan nada.</p>
+        <div class="salida">22.080 → 6.102</div>
+      </div>
+      <div class="etapa">
+        <div class="n">04</div><h3>Resumir y filtrar</h3>
+        <p>24 números por señal: valor, variación, tendencia, ritmo. Se descartan los que no informan.</p>
+        <div class="salida">72 → ~45 características</div>
+      </div>
+      <div class="etapa">
+        <div class="n">05</div><h3>Cinco buscadores</h3>
+        <p>Isolation Forest, ECOD, COPOD, PCA y HDBSCAN-GLOSH puntúan cada ventana con ideas distintas de «raro».</p>
+        <div class="salida">310 marcas · 151 candidatas</div>
+      </div>
+      <div class="etapa">
+        <div class="n">06</div><h3>Agrupar en eventos</h3>
+        <p>Una anomalía aparece en muchas ventanas solapadas. Se consolidan en un evento con su tramo temporal.</p>
+        <div class="salida">151 → 40 eventos</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="marco">
+    <header>
+      <h2>El embudo, en números</h2>
+      <p>De toda la telemetría a lo que una persona revisa en una tarde.</p>
+    </header>
+    <div class="embudo">
+      <div><div class="et">Mediciones</div><div class="barra" style="width:100%"></div><div class="n">25.024</div></div>
+      <div><div class="et">Ventanas analizadas</div><div class="barra" style="width:88%"></div><div class="n">22.080</div></div>
+      <div><div class="et">Tras quitar repetidas</div><div class="barra" style="width:24%"></div><div class="n">6.102</div></div>
+      <div><div class="et">Marcas de los métodos</div><div class="barra" style="width:5%"></div><div class="n">310</div></div>
+      <div><div class="et">Ventanas candidatas</div><div class="barra" style="width:3%"></div><div class="n">151</div></div>
+      <div><div class="et">Eventos para el experto</div><div class="barra" style="width:1.4%"></div><div class="n">40</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="marco">
+    <div class="cierre">
+      <h2>Cambiá un parámetro y volvé a correrlo</h2>
+      <p>El taller ejecuta el pipeline de verdad — el mismo código que produce los
+      resultados de la tesis. Cada corrida queda guardada como una rama que se
+      puede comparar con las otras.</p>
+      <a class="b b-1" href="orbita-taller.html">
+        Abrir el taller
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="marco">
+    <p>Detección y clasificación de anomalías en el consumo de baterías satelitales
+    mediante un enfoque híbrido no supervisado–supervisado · UNA–FPUNA.</p>
+    <p>Material didáctico. El registro canónico vive en el repositorio de la tesis.</p>
+  </div>
+</footer>
+
+<script src="_saltar.js"></script>
+</body>
+</html>
