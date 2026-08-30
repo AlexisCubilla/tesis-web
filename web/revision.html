@@ -236,6 +236,18 @@ function cargarScript(src) {
  *  Al reintentar se le agrega algo a la URL para que el navegador vuelva a pedirlo de verdad en vez
  *  de responder con el fallo que ya tiene guardado.
  */
+/** Con qué base se le pide al Document Server, ya sea directo o por el proxy.
+ *
+ *  Cuando va por el proxy (lo normal) hay que respetar el prefijo bajo el que esté publicado el
+ *  taller: en el servidor cuelga de `…/tesis/`, y una ruta con barra inicial se saldría de ahí. Se
+ *  saca de la dirección de esta misma página, que siempre es `<prefijo>/revision`.
+ */
+function baseDelEditor() {
+  if (URL_PUBLICA) return URL_PUBLICA;
+  return location.origin + location.pathname.replace(/\/[^/]*$/, '');
+}
+
+
 async function asegurarDocsApi(urlPublica) {
   if (typeof DocsAPI !== 'undefined') return;
   // Siempre se le agrega algo a la URL, no solo al reintentar. Son 13 KB, así que cachearlo no
@@ -244,7 +256,7 @@ async function asegurarDocsApi(urlPublica) {
   // vuelve a cargar nunca más, ni recargando, sin ningún error que lo explique. Los archivos
   // grandes del editor no pasan por acá: los pide él con sus propias URLs versionadas.
   const unico = `?v=${++intentosDeApi}-${Date.now()}`;
-  await cargarScript(`${urlPublica}/web-apps/apps/api/documents/api.js${unico}`);
+  await cargarScript(`${baseDelEditor()}/web-apps/apps/api/documents/api.js${unico}`);
   if (typeof DocsAPI === 'undefined') throw new Error('api.js cargó pero no dejó DocsAPI');
 }
 let intentosDeApi = 0;
@@ -544,7 +556,7 @@ async function probarDocumentServer(urlPublica) {
   // 1. ¿Se llega siquiera al Document Server? `no-cors` no deja leer la respuesta, pero para esto
   //    alcanza: interesa si la petición llega o se cae.
   try {
-    await fetch(`${urlPublica}/healthcheck`, { mode: 'no-cors', cache: 'no-store' });
+    await fetch(`${baseDelEditor()}/healthcheck`, { mode: 'no-cors', cache: 'no-store' });
     salida.alcanza = 'sí';
   } catch (e) {
     salida.alcanza = 'NO';
@@ -562,7 +574,7 @@ async function probarDocumentServer(urlPublica) {
     const contestar = (r) => { clearTimeout(reloj); listo(r); };
     try {
       ws = new WebSocket(
-        urlPublica.replace(/^http/, 'ws') + '/doc/prueba/c/?EIO=4&transport=websocket');
+        baseDelEditor().replace(/^http/, 'ws') + '/doc/prueba/c/?EIO=4&transport=websocket');
       ws.onopen = () => { try { ws.close(); } catch (e) {} contestar('abre'); };
       ws.onerror = () => contestar('BLOQUEADO o rechazado');
       ws.onclose = (e) => contestar(e.wasClean ? 'abre' : `cerrado sin abrir (código ${e.code})`);
@@ -631,7 +643,7 @@ async function probarYContar(urlPublica) {
   // pruebas no pueden ver, y por eso se muestran las direcciones tal cual.
   const hostTaller = location.hostname;
   let hostEditor = '';
-  try { hostEditor = new URL(urlPublica).hostname; } catch (e) { hostEditor = '?'; }
+  try { hostEditor = new URL(baseDelEditor()).hostname; } catch (e) { hostEditor = '?'; }
   const mismoHost = hostTaller === hostEditor;
 
   caja.innerHTML = `
@@ -639,7 +651,7 @@ async function probarYContar(urlPublica) {
       <div>Se llega al Document Server: ${marca(r.alcanza)}</div>
       <div>Abre el websocket: ${marca(r.websocket)}</div>
       <div>Estás viendo el taller en: <span class="mono">${escapar(location.origin)}</span></div>
-      <div>El editor se carga de: <span class="mono">${escapar(urlPublica)}</span></div>
+      <div>El editor se carga de: <span class="mono">${escapar(baseDelEditor())}</span></div>
     </div>
     ${mismoHost ? '' : `
       <p style="margin:9px 0 0">El taller y el editor están en hosts distintos
