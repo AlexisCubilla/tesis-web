@@ -58,6 +58,15 @@ ARCHIVOS = (
 #: así que se lo reconoce por forma y no por valor.
 VERSION = re.compile(r"^\d+\.\d+\.\d+[-.][0-9a-zA-Z]+$")
 
+#: Encabezados que NO se le reenvían al Document Server al abrir el websocket: son del apretón de
+#: manos y los pone la biblioteca. Mandarlos también nosotros los duplica y nginx contesta 400.
+#: Todo lo demás sí va —sobre todo la cookie de sesión de socket.io—.
+SALTEAR_WS = {
+    "host", "connection", "upgrade", "sec-websocket-key", "sec-websocket-version",
+    "sec-websocket-extensions", "sec-websocket-protocol", "sec-websocket-accept",
+    "content-length", "keep-alive", "transfer-encoding",
+}
+
 #: Encabezados que no se reenvían: son de la conexión, no del mensaje, y arrastrarlos rompe la
 #: respuesta (sobre todo `content-length` cuando el cuerpo va en trozos).
 #:
@@ -267,7 +276,18 @@ async def _relevar(ws: WebSocket, camino: str):
     #
     # No hace falta: el apretón de manos de socket.io arranca por HTTP —que sí pasa por el reenvío de
     # arriba, con el `Host` correcto—, así que el Document Server ya sabe con qué nombre lo ven.
-    cabeceras = {}
+    # Se le pasan al Document Server los encabezados del navegador, menos los del apretón de manos
+    # —esos los pone la biblioteca, y duplicarlos hace que nginx conteste 400—.
+    #
+    # Lo importante que va acá es la **cookie**. socket.io arranca por HTTP (long-polling), y ese
+    # tramo pasa por el reenvío de arriba, así que el navegador recibe la cookie de sesión. Cuando
+    # después sube a websocket la manda de vuelta — y si el relé la tira, el Document Server recibe
+    # una conexión que no puede atar a ninguna sesión y contesta «Bad request» (engine.io código 3).
+    #
+    # Desde afuera eso se ve como que el editor abre y el documento no llega nunca: socket.io se cae
+    # a long-polling, la sesión se pierde y el editor termina reportando «Error de descarga» — que
+    # apunta al archivo cuando el archivo nunca tuvo nada de malo.
+    cabeceras = {k: v for k, v in ws.headers.items() if k.lower() not in SALTEAR_WS}
     if (host := ws.headers.get("host")):
         cabeceras["X-Forwarded-Host"] = host
     cabeceras["X-Forwarded-Proto"] = "https" if ws.url.scheme == "wss" else "http"
