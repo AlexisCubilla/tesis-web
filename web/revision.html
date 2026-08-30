@@ -481,6 +481,48 @@ function montarEditor(config) {
  *  OnlyOffice reemplaza y renavega su iframe, así que se reintenta enganchar por un rato en vez de
  *  hacerlo una sola vez.
  */
+/** El prefijo bajo el que está publicado el taller: `/tesis` en el servidor, vacío en la raíz. */
+function prefijoDelTaller() {
+  return location.pathname.replace(/\/[^/]*$/, '');
+}
+
+
+/** Le corrige al editor las URLs que arma el Document Server contra la raíz del dominio.
+ *
+ *  Cuando el taller cuelga de un prefijo (`…/tesis/`), esto hace falta porque el Document Server no
+ *  tiene forma de saberlo: `X-Forwarded-Host` le dice el host y nada más, así que arma las URLs
+ *  contra la raíz. La del documento convertido sale como `/cache/files/…` y cae fuera del prefijo,
+ *  donde no hay nada escuchando.
+ *
+ *  Desde el servidor eso no se ve: para el Document Server salió todo bien —no registra ni un
+ *  error— y el editor reporta «Error de descarga», que hace pensar en el archivo cuando lo que
+ *  falla es una dirección.
+ *
+ *  Se reescribe solo lo que empieza por la raíz Y pertenece al Document Server; el resto se toca.
+ *  Sirviendo en la raíz el prefijo es vacío y esto no hace nada.
+ */
+function corregirRutasDelEditor(w) {
+  const prefijo = prefijoDelTaller();
+  if (!prefijo || w.__rutasCorregidas) return;
+  w.__rutasCorregidas = true;
+
+  const DEL_SERVIDOR = /^\/(cache|downloadas|converter|coauthoring|internal)\//;
+  const arreglar = (u) => (typeof u === 'string' && DEL_SERVIDOR.test(u)) ? prefijo + u : u;
+
+  const abrir = w.XMLHttpRequest.prototype.open;
+  w.XMLHttpRequest.prototype.open = function (metodo, url, ...resto) {
+    return abrir.call(this, metodo, arreglar(url), ...resto);
+  };
+
+  if (w.fetch) {
+    const original = w.fetch;
+    w.fetch = function (entrada, ...resto) {
+      return original.call(this, typeof entrada === 'string' ? arreglar(entrada) : entrada, ...resto);
+    };
+  }
+}
+
+
 function espiarElEditor(alError) {
   let enganchados = 0;
   const enganchar = () => {
@@ -492,6 +534,7 @@ function espiarElEditor(alError) {
     try {
       w.__espiado = true;
       enganchados++;
+      corregirRutasDelEditor(w);
       w.addEventListener('error', (e) => {
         // Dos cosas MUY distintas llegan por el mismo evento, y hay que separarlas:
         //
