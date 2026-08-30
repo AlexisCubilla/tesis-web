@@ -143,14 +143,22 @@ async def reenviar(ruta: str, request: Request):
 
     cabeceras = {k: v for k, v in request.headers.items() if k.lower() not in SALTEAR}
 
-    # Se le reenvía el `Host` original, y no es cosmético: el Document Server arma con él las URLs
-    # que después le da al navegador —entre ellas la del documento ya convertido, en `/cache/…`—.
-    # Si acá llegara `onlyoffice`, que es como lo ve el taller por dentro, el editor recibiría
-    # `http://onlyoffice/cache/…` y no podría resolverlo: falla con «Error de descarga» (código -4),
-    # que suena a que el servidor no pudo bajar el archivo cuando en realidad lo bajó perfecto y el
-    # que no puede bajar nada es el navegador.
+    # El `Host` del taller viaja como `X-Forwarded-Host`, NO como `Host`.
+    #
+    # Hace falta que llegue de alguna forma porque el Document Server arma con él las URLs que
+    # después le da al navegador —entre ellas la del documento convertido, en `/cache/…`—; si usara
+    # el nombre con el que lo ve el taller por dentro, el editor recibiría una URL que no puede
+    # resolver y fallaría con «Error de descarga» (-4).
+    #
+    # Pero mandarlo como `Host` rompe otra cosa, y peor: cuando el Document Server está detrás de un
+    # nginx compartido, el `Host` es lo que decide a qué sitio entra la petición. Pidiéndole a
+    # `docs.…` un archivo con `Host: demo.…`, la petición aterriza en el sitio del taller, que no
+    # tiene `/web-apps/` y contesta 404 — un 404 que el proxy reenvía tal cual y parece suyo.
+    #
+    # Así que el `Host` lo pone httpx a partir de OO_URL_INTERNA (el destino real) y el nombre de
+    # cara al navegador va en `X-Forwarded-Host`, que es para lo que existe.
     if (host := request.headers.get("host")):
-        cabeceras["host"] = host
+        cabeceras.pop("host", None)
         cabeceras.setdefault("x-forwarded-host", host)
     cabeceras.setdefault("x-forwarded-proto", request.url.scheme)
 
@@ -182,8 +190,12 @@ async def _reenviar_reescribiendo(ruta: str, request: Request) -> Response:
     por editor y queda cacheado en el navegador, así que se paga una vez.
     """
     cabeceras = {k: v for k, v in request.headers.items() if k.lower() not in SALTEAR}
+    # Mismo criterio que en `reenviar`: el `Host` lo pone httpx desde OO_URL_INTERNA, y el del
+    # taller viaja como `X-Forwarded-Host`. Mandarlo como `Host` haría aterrizar la petición en otro
+    # sitio del mismo nginx.
     if (host := request.headers.get("host")):
-        cabeceras["host"] = host
+        cabeceras.pop("host", None)
+        cabeceras.setdefault("x-forwarded-host", host)
     # Se pide sin comprimir para poder sustituir sobre el texto sin descomprimir a mano.
     cabeceras["accept-encoding"] = "identity"
 
