@@ -509,17 +509,31 @@ function corregirRutasDelEditor(w) {
   const DEL_SERVIDOR = /^\/(cache|downloadas|converter|coauthoring|internal)\//;
   const arreglar = (u) => (typeof u === 'string' && DEL_SERVIDOR.test(u)) ? prefijo + u : u;
 
-  const abrir = w.XMLHttpRequest.prototype.open;
-  w.XMLHttpRequest.prototype.open = function (metodo, url, ...resto) {
-    return abrir.call(this, metodo, arreglar(url), ...resto);
-  };
-
-  if (w.fetch) {
-    const original = w.fetch;
-    w.fetch = function (entrada, ...resto) {
-      return original.call(this, typeof entrada === 'string' ? arreglar(entrada) : entrada, ...resto);
+  // Todo va envuelto: si algo de esto falla, el editor se queda esperando un documento que nunca
+  // pidió, sin error y sin nada en el registro del servidor. Es preferible no reescribir —y que
+  // falle como fallaba— antes que dejarlo colgado.
+  try {
+    const abrir = w.XMLHttpRequest.prototype.open;
+    w.XMLHttpRequest.prototype.open = function (metodo, url, ...resto) {
+      try { url = arreglar(url); } catch (e) { /* que siga con la original */ }
+      return abrir.call(this, metodo, url, ...resto);
     };
-  }
+  } catch (e) { /* sin reescritura de XHR */ }
+
+  try {
+    const original = w.fetch;
+    if (original) {
+      // `apply(w, …)` y no `call(this, …)`: el editor llama a `fetch` suelto («const f = fetch»),
+      // y ahí `this` es undefined. `fetch` exige estar atado a la ventana, así que con `this`
+      // tiraba «Illegal invocation» — el editor se comía la excepción y no pedía nada más.
+      w.fetch = function (entrada, ...resto) {
+        try {
+          if (typeof entrada === 'string') entrada = arreglar(entrada);
+        } catch (e) { /* que siga con la original */ }
+        return original.apply(w, [entrada, ...resto]);
+      };
+    }
+  } catch (e) { /* sin reescritura de fetch */ }
 }
 
 
