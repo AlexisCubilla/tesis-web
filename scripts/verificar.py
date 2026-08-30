@@ -85,6 +85,23 @@ def main() -> int:
             print(f"  {etapa:11s} " + " · ".join(f"{k}={v}" for k, v in params.items()))
 
     print()
+    print("Revisión experta (OnlyOffice)")
+    print("─" * 62)
+    motivo = ajustes.motivo_revision_apagada()
+    if motivo:
+        print("  apagada:", motivo)
+        print("  (el taller funciona igual; no aparece el botón de comentar)")
+    else:
+        print(f"  editor para el navegador   {ajustes.url_para_el_navegador() or 'mismo origen (proxy)'}")
+        print(f"  taller ← Document Server   {ajustes.OO_URL_DEL_TALLER}")
+        print(f"  taller → Document Server   {ajustes.OO_URL_INTERNA or '(directo, sin proxy)'}")
+        print(f"  firma JWT                  {'sí' if ajustes.OO_JWT_SECRETO else 'no'}")
+        from backend import revision as _rev
+        docs = _rev.listar()
+        editados = [d for d in docs if d["version"] > 0]
+        print(f"  documentos                 {len(docs)} ({len(editados)} con comentarios)")
+
+    print()
     print("Interfaz")
     print("─" * 62)
     import subprocess

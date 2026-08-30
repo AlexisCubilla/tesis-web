@@ -1,6 +1,9 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic>=2.6
+# Para hacerle de proxy al Document Server (backend/proxy_oo.py). El websocket usa
+# `websockets`, que ya viene con uvicorn[standard].
+httpx>=0.27
 # El paquete de la tesis se instala aparte, desde el repo hermano:
 #   pip install -e ../repo-rebuild
 # (arrastra pandas, numpy, scikit-learn, pyod, hdbscan y joblib)

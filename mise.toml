@@ -49,11 +49,15 @@ description = "Corre los tests: que el taller siga reproduciendo los números de
 run = "./.venv/bin/python -m pytest tests/ -q"
 
 [tasks.limpiar]
-description = "Borra el caché de resultados y el árbol de ejecuciones (no toca los datos crudos)"
+description = "Borra el caché de resultados y el árbol de ejecuciones (no toca los datos crudos ni la revisión experta)"
+# NO toca data/revision/: ahí están los documentos que comentó el experto y su historial, que es lo
+# único del taller que no se puede volver a calcular. Por eso tienen su propia base y no viven en
+# ejecuciones.sqlite, que esta tarea borra entera.
 run = """
 ./.venv/bin/python -c "
 from backend import ajustes; import shutil
 shutil.rmtree(ajustes.DIR_CACHE, ignore_errors=True)
 ajustes.BASE_SQLITE.unlink(missing_ok=True)
-print('caché y árbol borrados en', ajustes.DIR_DATOS)"
+print('caché y árbol borrados en', ajustes.DIR_DATOS)
+print('la revisión experta NO se tocó:', ajustes.DIR_DATOS / 'revision')"
 """

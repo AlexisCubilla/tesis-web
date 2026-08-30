@@ -13,20 +13,21 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from . import ajustes, almacen, etapas, trabajos
+from . import ajustes, almacen, etapas, proxy_oo, revision, trabajos
 
 RAIZ = ajustes.RAIZ
 WEB = ajustes.DIR_WEB
 
 app = FastAPI(title="Taller — Etapa 1", version="0.1.0")
 _con = almacen.conectar()
+revision.preparar()
 trabajos.iniciar_trabajador(_con)
 
 
@@ -131,11 +132,40 @@ def get_nodo(clave: str):
 
 
 @app.delete("/api/nodo/{clave}")
-def delete_nodo(clave: str):
-    """Borra el nodo, todo lo que cuelga de él y sus resultados en disco."""
+def delete_nodo(clave: str, forzar: bool = False):
+    """Borra el nodo, todo lo que cuelga de él y sus resultados en disco.
+
+    **Se planta si el experto ya comentó alguna de esas ramas.** Todo lo demás que borra este
+    endpoint se puede volver a calcular corriendo el pipeline otra vez; lo que escribió el experto,
+    no. Y el botón de borrar está en la misma pantalla donde se comenta, así que un clic en el nodo
+    equivocado se llevaría trabajo irrepetible sin avisar.
+
+    Con `forzar=1` se borra igual, pero el documento no se va con la rama: queda huérfano y se puede
+    seguir descargando (ver `revision.desvincular`).
+    """
     if almacen.obtener(_con, clave) is None:
         raise HTTPException(404, "Nodo inexistente")
-    return almacen.borrar(_con, clave)
+
+    # El borrado es en cascada, así que hay que mirar el nodo y todo lo que cuelga de él.
+    claves = [clave, *almacen.descendientes(_con, clave)]
+    comentados = revision.con_trabajo_del_experto(claves)
+
+    if comentados and not forzar:
+        raise HTTPException(409, {
+            "mensaje": "Esa rama tiene documentos con comentarios del experto. Eso no se puede "
+                       "recalcular: confirmá el borrado si de verdad querés seguir.",
+            "documentos": [
+                {"id": d["id"], "nodo": d["nodo"], "tipo": d["tipo"], "nombre": d["nombre"],
+                 "version": d["version"], "guardado_en": d["guardado_en"],
+                 "ultimo_autor": d["ultimo_autor"]}
+                for d in comentados
+            ],
+        })
+
+    huerfanos = revision.desvincular(claves) if comentados else 0
+    resultado = almacen.borrar(_con, clave)
+    resultado["documentos_huerfanos"] = huerfanos
+    return resultado
 
 
 #: Tope de puntos de una serie temporal antes de empezar a submuestrear. Ver `get_datos`.
@@ -668,27 +698,31 @@ def _ahora_iso() -> str:
     return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
 
 
-@app.get("/api/nodo/{clave}/excel/{tipo}")
-def get_excel(clave: str, tipo: str):
-    """Genera y devuelve uno de los Excel entregables, para la rama que se esté mirando.
-
-    El taller ya tenía todo lo necesario en el caché del nodo; lo único que faltaba era llamar a
-    las funciones de `export` que el pipeline usa y devolver el archivo. Nada se reimplementa
-    (ADR A1): son las mismas tres funciones del paquete de la tesis.
-
-    Tarda menos de un segundo, así que va en la propia petición y no por la cola de trabajos.
-    """
-    import dataclasses as dc
-
+def _nodo_exportable(clave: str, tipo: str) -> dict:
+    """Valida que se pueda exportar esa rama con ese tipo, o corta con el error que corresponda."""
     if tipo not in EXPORTABLES:
         raise HTTPException(404, f"Tipo desconocido: {tipo}. Hay: {', '.join(EXPORTABLES)}")
-
     nodo = almacen.obtener(_con, clave)
     if nodo is None:
         raise HTTPException(404, "Nodo inexistente")
     if nodo["etapa"] != "eventos" or nodo["estado"] != "listo" or not nodo["tiene_resultado"]:
         raise HTTPException(409, "El entregable sale del último paso: hace falta un nodo de eventos listo")
+    return nodo
 
+
+def _generar_entregable(clave: str, tipo: str, carpeta: Path) -> tuple[Path, dict]:
+    """Arma uno de los tres Excel del pipeline dentro de `carpeta` y devuelve (ruta, nodo).
+
+    Está separado del endpoint porque lo usan dos caminos: la descarga suelta, que arma el archivo
+    en un temporal y lo tira, y el documento de revisión, que se queda con él. Los dos tienen que
+    producir exactamente lo mismo — si se duplicara la generación, con el tiempo el archivo que
+    comenta el experto y el que se descarga dirían cosas distintas.
+
+    Nada se reimplementa (ADR A1): son las mismas tres funciones del paquete de la tesis.
+    """
+    import dataclasses as dc
+
+    nodo = _nodo_exportable(clave, tipo)
     salida = almacen.cargar_resultado(clave)
     cadena = almacen.cadena_hasta(_con, clave)
     dif = _diferencias_con_la_tesis(cadena)
@@ -708,7 +742,6 @@ def get_excel(clave: str, tipo: str):
     # El nombre lleva la procedencia: quien recibe el archivo suelto tiene que poder distinguir
     # el de la configuración firmada del de una prueba sin abrirlo.
     marca = "tesis" if not dif else f"rama-{clave[:8]}"
-    carpeta = Path(tempfile.mkdtemp(prefix="taller-xlsx-"))
     destino = carpeta / f"{base}_{marca}.xlsx"
 
     if tipo == "experto":
@@ -725,12 +758,311 @@ def get_excel(clave: str, tipo: str):
         export.build_normal_examples_excel(normales, salida["ventanas"], destino)
 
     _hoja_de_procedencia(destino, nodo, cadena, dif)
+    return destino, nodo
+
+
+@app.get("/api/nodo/{clave}/excel/{tipo}")
+def get_excel(clave: str, tipo: str):
+    """Genera y devuelve uno de los Excel entregables, para la rama que se esté mirando.
+
+    Tarda menos de un segundo, así que va en la propia petición y no por la cola de trabajos.
+    """
+    carpeta = Path(tempfile.mkdtemp(prefix="taller-xlsx-"))
+    destino, _nodo = _generar_entregable(clave, tipo, carpeta)
     return FileResponse(
         destino, filename=destino.name,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         # El temporal se borra recién cuando terminó de mandarse.
         background=BackgroundTask(shutil.rmtree, carpeta, ignore_errors=True),
     )
+
+
+# --------------------------------------------------------------------------------------
+# Revisión experta: documentos que el experto comenta
+# --------------------------------------------------------------------------------------
+# El entregable de arriba es una vista: se arma, se manda y se borra. Lo de acá abajo es lo
+# contrario — un artefacto que se queda, porque lo que el experto escribe encima es lo único del
+# taller que no se puede volver a calcular. Ver el módulo `revision`.
+
+
+class PeticionRevision(BaseModel):
+    autor: str | None = None
+
+
+@app.get("/api/revision/config")
+def get_revision_config():
+    """¿Está configurada la revisión experta, y contra qué Document Server?
+
+    El frontend lo consulta para decidir si muestra el botón de comentar. Sin OnlyOffice el taller
+    funciona igual: se pierde la pantalla de comentarios, nada más.
+    """
+    return {
+        "habilitada": ajustes.revision_habilitada(),
+        # Si está apagada, se dice por qué: es lo primero que uno quiere saber al desplegar.
+        "motivo": ajustes.motivo_revision_apagada(),
+        "url_publica": ajustes.url_para_el_navegador(),
+        "url_del_taller": ajustes.OO_URL_DEL_TALLER,
+        "jwt": bool(ajustes.OO_JWT_SECRETO),
+        "tipos": {k: v[1] for k, v in EXPORTABLES.items()},
+    }
+
+
+@app.get("/api/revision")
+def get_revisiones(nodo: str | None = None):
+    """Todos los documentos de revisión, o los de una rama."""
+    docs = revision.listar(nodo)
+    for d in docs:
+        d["editado"] = d["version"] > 0
+    return {"documentos": docs}
+
+
+def _con_ficha(ruta: str, doc: dict) -> str:
+    """La URL de una ruta protegida, con la ficha del documento pegada."""
+    return f"{ruta}?t={doc['ficha']}"
+
+
+def _exigir_ficha(doc: dict, t: str | None) -> None:
+    """Corta si la ficha no es la del documento.
+
+    Protege las dos rutas que tienen que quedar abiertas en el proxy de adelante porque las usa el
+    Document Server, que no puede autenticarse. La del callback es la que importa: sobrescribe el
+    documento del experto.
+    """
+    if not revision.ficha_valida(doc, t):
+        raise HTTPException(403, "Ficha inválida o ausente para ese documento")
+
+
+def _doc_publico(doc: dict) -> dict:
+    """El documento como lo ve el frontend, con su historial."""
+    salida = dict(doc)
+    salida["editado"] = doc["version"] > 0
+    salida["versiones"] = revision.versiones(doc["id"])
+    return salida
+
+
+@app.post("/api/nodo/{clave}/revision/{tipo}")
+def post_revision(clave: str, tipo: str, pet: PeticionRevision | None = None):
+    """Abre el documento de revisión de esa rama, creándolo la primera vez.
+
+    **Es idempotente a propósito.** Si ya existe, devuelve el que hay sin tocarlo: volver a entrar a
+    comentar no puede regenerar el archivo encima de lo que el experto ya escribió. Por eso el
+    entregable normal y este documento son cosas distintas aunque salgan de la misma función.
+    """
+    doc_id = revision.id_documento(clave, tipo)
+    doc = revision.obtener(doc_id)
+
+    # Si ya lo comentó, se abre lo que hay y no se toca. Esa es la regla.
+    if doc is not None and doc["version"] > 0:
+        return _doc_publico(doc)
+
+    # Pero si está en v0 nadie escribió nada todavía: es una copia del entregable y nada más. En ese
+    # caso se regenera, para que las correcciones al pipeline lleguen al experto en vez de dejarlo
+    # mirando una versión vieja. (Pasó con los gráficos: se arregló la posición de los ejes en
+    # `tesis.export` y los documentos ya creados habrían seguido mostrando el error para siempre.)
+    #
+    # No contradice la regla de «no regenerar encima»: acá no hay nada encima que perder.
+    if doc is not None:
+        revision.olvidar(doc_id)
+
+    nodo = _nodo_exportable(clave, tipo)
+    carpeta = Path(tempfile.mkdtemp(prefix="taller-revision-"))
+    try:
+        origen, _ = _generar_entregable(clave, tipo, carpeta)
+        doc = revision.crear(
+            nodo=clave, tipo=tipo, nombre=origen.name, origen=origen,
+            commit_tesis=nodo.get("commit_tesis") or almacen.commit_tesis(),
+        )
+    finally:
+        shutil.rmtree(carpeta, ignore_errors=True)
+    return _doc_publico(doc)
+
+
+@app.get("/api/revision/{doc_id}")
+def get_revision(doc_id: str):
+    doc = revision.obtener(doc_id)
+    if doc is None:
+        raise HTTPException(404, "No hay documento de revisión con ese id")
+    return _doc_publico(doc)
+
+
+@app.get("/api/revision/{doc_id}/editor")
+def get_revision_editor(doc_id: str, autor: str = "Experto"):
+    """La configuración que el navegador le pasa al editor de OnlyOffice.
+
+    Se arma en el backend y no en el JavaScript porque acá están las direcciones: el navegador no
+    tiene por qué saber con qué nombre el Document Server ve al taller, que además es distinto en
+    desarrollo y en el servidor.
+    """
+    doc = revision.obtener(doc_id)
+    if doc is None:
+        raise HTTPException(404, "No hay documento de revisión con ese id")
+    if not ajustes.revision_habilitada():
+        raise HTTPException(503, "La revisión experta no está configurada (falta OO_URL_PUBLICA)")
+
+    autor = (autor or "Experto").strip()[:60] or "Experto"
+    base = ajustes.OO_URL_DEL_TALLER
+    config = {
+        "document": {
+            "fileType": "xlsx",
+            # La `key` lleva la versión adentro: si no cambiara al guardar, el Document Server
+            # seguiría sirviendo su copia en caché y el experto abriría una versión vieja.
+            "key": revision.clave_oo(doc),
+            "title": doc["nombre"],
+            "url": base + _con_ficha(f"/api/revision/{doc_id}/archivo", doc),
+        },
+        "documentType": "cell",
+        "editorConfig": {
+            "callbackUrl": base + _con_ficha(f"/api/revision/{doc_id}/callback", doc),
+            "lang": ajustes.OO_IDIOMA,
+            "user": {"id": autor, "name": autor},
+            "customization": {"autosave": True, "forcesave": True, "comments": True},
+            # OnlyOffice arranca solo once plugins: ai, ocr, photoeditor, speech, translator,
+            # youtube, zotero, mendeley, thesaurus, highlightcode y speechrecognition. Entre todos
+            # son 1890 archivos (43 MB), y el de IA solo son 786 —un script por cada proveedor de
+            # modelos, más un vocabulario de tokenización—. Nada de eso sirve para anotar una
+            # planilla de eventos candidatos.
+            #
+            # Con la lista vacía no se carga ninguno. Lo que se gana es la primera apertura: es la
+            # que el experto va a sufrir, porque cada reinicio del Document Server cambia su huella
+            # de compilación y vuelve a enfriar la caché del navegador.
+            "plugins": {"autostart": [], "pluginsData": []},
+        },
+    }
+    return {"url_publica": ajustes.url_para_el_navegador(), "config": config}
+
+
+@app.get("/api/revision/{doc_id}/archivo")
+def get_revision_archivo(doc_id: str, t: str | None = None):
+    """Sirve el Excel vigente. Lo piden dos: el Document Server al abrir, y quien lo descargue."""
+    doc = revision.obtener(doc_id)
+    if doc is None:
+        raise HTTPException(404, "No hay documento de revisión con ese id")
+    _exigir_ficha(doc, t)
+    ruta = revision.ruta_actual(doc_id)
+    if not ruta.exists():
+        raise HTTPException(410, "El archivo del documento no está en disco")
+    return FileResponse(
+        ruta, filename=doc["nombre"],
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.get("/api/revision/{doc_id}/version/{numero}")
+def get_revision_version(doc_id: str, numero: int, t: str | None = None):
+    """Baja una versión concreta. La 0 es lo que salió del pipeline, antes de que nadie lo tocara."""
+    doc = revision.obtener(doc_id)
+    if doc is None:
+        raise HTTPException(404, "No hay documento de revisión con ese id")
+    _exigir_ficha(doc, t)
+    ruta = revision.ruta_version(doc_id, numero)
+    if not ruta.exists():
+        raise HTTPException(404, f"No existe la versión {numero}")
+    return FileResponse(
+        ruta, filename=f"v{numero:04d}_{doc['nombre']}",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def _bajar_del_document_server(url: str) -> bytes:
+    """Baja el archivo guardado desde el Document Server.
+
+    La URL viene del editor y apunta a sí mismo con un nombre que a veces solo él resuelve. Si está
+    configurada `OO_URL_INTERNA`, se le reemplaza el origen por esa — que es con la que el taller
+    sabe llegar.
+    """
+    import urllib.parse
+    import urllib.request
+
+    if ajustes.OO_URL_INTERNA:
+        partes = urllib.parse.urlsplit(url)
+        base = urllib.parse.urlsplit(ajustes.OO_URL_INTERNA)
+        url = urllib.parse.urlunsplit(
+            (base.scheme or partes.scheme, base.netloc, partes.path, partes.query, partes.fragment)
+        )
+    with urllib.request.urlopen(url, timeout=60) as r:
+        return r.read()
+
+
+def _reindexar(doc_id: str) -> dict:
+    """Vuelve a leer el archivo vigente y deja el índice al día."""
+    resumen = revision.resumen_de_comentarios(
+        revision.ruta_actual(doc_id),
+        revision.columnas_originales(revision.ruta_version(doc_id, 0)),
+    )
+    revision.guardar_indice(doc_id, resumen)
+    return resumen
+
+
+@app.post("/api/revision/{doc_id}/callback")
+async def post_revision_callback(doc_id: str, request: Request, t: str | None = None):
+    """Lo que el Document Server llama cuando pasa algo con el documento.
+
+    Del protocolo de OnlyOffice interesan dos estados: 2 (listo para guardar, ya cerraron todos) y
+    6 (guardado forzado, con la sesión todavía abierta). En los dos casos el editor **no manda el
+    archivo**: manda una URL suya para que lo vayamos a buscar.
+
+    Hay que contestar `{"error": 0}` siempre que se haya manejado bien, incluso en los estados que
+    se ignoran; si no, el Document Server reintenta y termina dando el documento por fallado.
+    """
+    try:
+        cuerpo = await request.json()
+    except Exception:
+        raise HTTPException(400, "El cuerpo del callback no es JSON")
+
+    doc = revision.obtener(doc_id)
+    if doc is None:
+        raise HTTPException(404, "No hay documento de revisión con ese id")
+    _exigir_ficha(doc, t)
+
+    estado = int(cuerpo.get("status", 0))
+    if estado not in (2, 6):
+        # 1 = alguien está editando · 4 = cerraron sin cambios · 3 y 7 = error del editor.
+        # Ninguno mueve el archivo, pero igual se contesta OK para que no reintente.
+        return {"error": 0}
+
+    url = cuerpo.get("url")
+    if not url:
+        raise HTTPException(400, "El callback pide guardar pero no manda la URL del archivo")
+
+    try:
+        contenido = _bajar_del_document_server(url)
+    except Exception as e:
+        # Se devuelve error a propósito para que el Document Server reintente: prefiero que insista
+        # antes que dar por guardado algo que no bajó.
+        raise HTTPException(502, f"No se pudo bajar el archivo guardado: {type(e).__name__}: {e}")
+
+    usuarios = cuerpo.get("users") or []
+    autor = str(usuarios[0])[:60] if usuarios else None
+    revision.registrar_guardado(doc_id, contenido, autor)
+
+    # El índice es derivado: si falla, el guardado igual valió, y se puede volver a generar desde
+    # las versiones que quedaron en disco. No se pierde nada.
+    try:
+        _reindexar(doc_id)
+    except Exception:
+        pass
+
+    return {"error": 0}
+
+
+@app.get("/api/revision/{doc_id}/comentarios")
+def get_revision_comentarios(doc_id: str, releer: bool = False):
+    """Lo que el experto escribió, extraído del archivo.
+
+    **Es un índice, no la fuente de verdad**: el archivo manda. Sirve para poder buscar sin abrir
+    cuarenta planillas. Con `releer=1` se vuelve a pasar sobre el archivo vigente, que es lo que hay
+    que hacer si se mejora la extracción.
+    """
+    doc = revision.obtener(doc_id)
+    if doc is None:
+        raise HTTPException(404, "No hay documento de revisión con ese id")
+
+    resumen = None if releer else revision.leer_indice(doc_id)
+    if resumen is None:
+        if not revision.ruta_actual(doc_id).exists():
+            raise HTTPException(410, "El archivo del documento no está en disco")
+        resumen = _reindexar(doc_id)
+    return {"documento": doc_id, "version": doc["version"], **resumen}
 
 # --------------------------------------------------------------------------------------
 # Web estática
@@ -773,4 +1105,21 @@ def taller():
     return FileResponse(WEB / "taller.html")
 
 
+@app.get("/revision")
+def revision_html():
+    """La pantalla donde el experto comenta. Se abre con `?doc=<id>`."""
+    return FileResponse(WEB / "revision.html")
+
+
 app.mount("/estatico", StaticFiles(directory=WEB), name="estatico")
+
+
+# El proxy del Document Server va ÚLTIMO, y no es un detalle: su ruta es un comodín `/{ruta:path}`,
+# así que registrado antes se tragaría todo lo del taller. Starlette resuelve por orden de registro.
+if ajustes.OO_PROXY:
+    app.include_router(proxy_oo.router)
+
+
+@app.on_event("shutdown")
+async def _cerrar_proxy():
+    await proxy_oo.cerrar()

@@ -1,0 +1,16 @@
+ipykernel
+jupyterlab
+joblib>=1.5
+numpy>=2.0
+openpyxl>=3.1
+pandas==3.0.1
+scikit-learn>=1.5
+scipy>=1.10
+tqdm>=4.66
+pyclustering
+s-dbw>=0.4
+hdbscan>=0.8
+pyod>=1.1
+matplotlib>=3.8
+seaborn>=0.13
+pytest>=8.0

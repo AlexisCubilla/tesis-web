@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión del experto — Etapa 1</title>
+<link rel="stylesheet" href="estatico/estilos.css">
+<style>
+  /* La pantalla es el editor. Todo lo demás se aparta: una barra arriba con la procedencia y una
+     columna angosta con el historial, que es lo único que hay que poder mirar sin salir de acá. */
+  .envoltorio-rev { max-width: none; padding: 0 18px 18px; }
+  .rev-grilla { display: grid; grid-template-columns: 1fr 268px; gap: 14px; align-items: stretch; }
+  @media (max-width: 900px) { .rev-grilla { grid-template-columns: 1fr; } }
+
+  /* El alto va en la CAJA, no en #editor: al montar el editor, OnlyOffice REEMPLAZA el elemento
+     que se le pasa por su propio <iframe height="100%">, así que cualquier estilo puesto sobre
+     #editor se pierde y el iframe queda con los 150px de alto por defecto. La caja sobrevive al
+     reemplazo y es la que le da contra qué medir ese 100%. */
+  .caja-editor { position: relative; height: calc(100vh - 190px); min-height: 460px;
+                 border: 1px solid var(--borde); border-radius: var(--radio); overflow: hidden;
+                 background: var(--panel-2); }
+  .caja-editor > iframe { display: block; width: 100%; height: 100%; border: 0; }
+  #editor { width: 100%; height: 100%; }
+
+  /* El velo tapa al editor hasta que el documento REALMENTE cargó (onDocumentReady), no hasta que
+     apareció el iframe. Sin esto, cuando el Document Server no contesta se queda a la vista el
+     esqueleto gris del editor —barras vacías y una cuadrícula en blanco— que es indistinguible de
+     «está por cargar»: una falla pasajera se ve igual que uno rota para siempre. */
+  .velo { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
+          padding: 28px; text-align: center; background: var(--panel-2); }
+  .velo[hidden] { display: none; }
+  .velo .titulo { font-weight: 650; margin-bottom: 6px; }
+  .velo .detalle { font-size: .82rem; color: var(--texto-2); max-width: 46ch; margin: 0 auto; }
+  .velo .detalle ul { text-align: left; margin: 9px 0 0; padding-left: 17px; }
+  .velo .acciones { margin-top: 15px; display: flex; gap: 8px; justify-content: center; }
+  /* `display:flex` le gana al `display:none` que el navegador aplica por el atributo `hidden`, así
+     que sin esta línea los botones de «algo falló» se ven también mientras carga — y entonces la
+     espera normal parece un error. Vale para cualquier `display` que no sea el del navegador. */
+  .velo .acciones[hidden] { display: none; }
+  .velo .bitacora { margin-top: 13px; font-family: var(--mono); font-size: .68rem;
+                    color: var(--texto-2); opacity: .75; }
+
+  /* Tres puntos que laten, para que se note que sigue intentando. */
+  .latido { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--acento); margin: 0 2px; animation: latir 1.2s infinite ease-in-out; }
+  .latido:nth-child(2) { animation-delay: .18s; }
+  .latido:nth-child(3) { animation-delay: .36s; }
+  @keyframes latir { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  .rev-lateral { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .rev-lateral .tarjeta { padding: 13px 14px; }
+  .rev-lateral h4 { font-size: .85rem; margin: 0 0 8px; }
+
+  .versiones { list-style: none; margin: 0; padding: 0; font-size: .78rem; }
+  .versiones li { display: flex; align-items: baseline; gap: 7px; padding: 5px 0;
+                  border-bottom: 1px solid var(--borde); }
+  .versiones li:last-child { border-bottom: 0; }
+  .versiones .vn { font-family: var(--mono); color: var(--acento); flex: none; }
+  .versiones .vd { color: var(--texto-2); min-width: 0; }
+  .versiones .va { color: var(--texto); }
+  .versiones a { margin-left: auto; flex: none; font-size: .72rem; }
+
+  .cinta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+           padding: 11px 0 13px; }
+
+  /* Las tres solapas. La que está abierta se marca con el acento, igual que en el resto del taller. */
+  .solapas { display: flex; gap: 6px; }
+  .solapas button { font: inherit; font-size: .82rem; cursor: pointer; padding: 6px 12px;
+                    border-radius: var(--radio); border: 1px solid var(--borde);
+                    background: var(--panel-2); color: var(--texto-2); }
+  .solapas button:hover:not(:disabled) { border-color: var(--borde-fuerte); color: var(--texto); }
+  .solapas button.activa { border-color: var(--acento); color: var(--texto); font-weight: 600; }
+  .solapas button:disabled { opacity: .55; cursor: default; }
+  .solapas .marca { font-family: var(--mono); font-size: .68rem; color: var(--acento-2);
+                    margin-left: 5px; }
+  .cinta .titulo { font-weight: 650; }
+  .cinta .mono { font-family: var(--mono); font-size: .76rem; color: var(--texto-2); }
+
+  .sin-editor { display: grid; place-items: center; height: 100%; padding: 40px;
+                text-align: center; color: var(--texto-2); font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <nav>
+    <a href=".">El proyecto</a>
+    <a href="taller">Taller</a>
+    <a href="#" class="activo">Revisión</a>
+  </nav>
+</header>
+
+<div class="envoltorio envoltorio-rev">
+  <div class="cinta">
+    <a class="boton" href="taller">← Volver al taller</a>
+    <div>
+      <div class="titulo" id="rev-nombre">…</div>
+      <div class="mono" id="rev-procedencia"></div>
+    </div>
+    <div class="solapas" id="rev-solapas"></div>
+    <span class="esp" style="flex:1"></span>
+    <span id="rev-estado" class="mono"></span>
+  </div>
+
+  <div id="rev-aviso"></div>
+
+  <div class="rev-grilla">
+    <div class="caja-editor">
+      <div id="editor"></div>
+      <!-- Va como hermano del editor, no adentro: OnlyOffice reemplaza #editor por su iframe. -->
+      <div class="velo" id="velo">
+        <div>
+          <div class="titulo" id="velo-titulo">Abriendo el editor</div>
+          <div class="detalle" id="velo-detalle">
+            <span class="latido"></span><span class="latido"></span><span class="latido"></span>
+          </div>
+          <div class="acciones" id="velo-acciones" hidden>
+            <button class="boton acento" id="btn-reintentar">Reintentar</button>
+            <a class="boton" id="btn-bajar-igual" download>Bajar el archivo</a>
+          </div>
+          <div class="bitacora" id="velo-bitacora"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="rev-lateral">
+      <div class="tarjeta">
+        <h4>Cómo se guarda</h4>
+        <p class="pista" style="margin:0;font-size:.78rem">
+          Escribí donde quieras: columnas nuevas, hojas nuevas, comentarios de celda. Cada vez que se
+          guarda queda una <strong>versión nueva</strong> — ninguna pisa a la anterior, así que nada
+          de lo que escribas se puede perder.
+        </p>
+      </div>
+
+      <div class="tarjeta">
+        <h4>Versiones</h4>
+        <ul class="versiones" id="rev-versiones"><li class="vd">…</li></ul>
+        <p class="pista" style="margin:9px 0 0;font-size:.72rem">
+          La v0 es lo que salió del pipeline, antes de que nadie lo tocara.
+        </p>
+      </div>
+
+      <div class="tarjeta">
+        <h4>Lo que quedó escrito</h4>
+        <div id="rev-comentarios" style="font-size:.78rem;color:var(--texto-2)">…</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const DOC = params.get('doc');
+const $ = (s) => document.querySelector(s);
+//: La ficha del documento: hace falta para bajar el archivo y sus versiones, porque esas rutas
+//: quedan abiertas en el proxy de adelante (las usa el Document Server, que no se autentica).
+let FICHA = '';
+
+const fecha = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
+};
+const escapar = (s) => String(s ?? '').replace(/[&<>"]/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function aviso(clase, html) {
+  $('#rev-aviso').innerHTML = `<div class="aviso ${clase}" style="margin-bottom:12px">${html}</div>`;
+}
+
+async function pedir(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error((await r.text()).slice(0, 300));
+  return r.json();
+}
+
+function pintarVersiones(doc) {
+  const vs = doc.versiones || [];
+  $('#rev-versiones').innerHTML = vs.map((v) => `
+    <li>
+      <span class="vn">v${v.version}</span>
+      <span class="vd">${fecha(v.guardado_en)}${v.autor ? ` · <span class="va">${escapar(v.autor)}</span>` : ''}</span>
+      <a href="api/revision/${encodeURIComponent(DOC)}/version/${v.version}?t=${FICHA}" download>bajar</a>
+    </li>`).join('') || '<li class="vd">todavía ninguna</li>';
+
+  $('#rev-estado').textContent = doc.version > 0
+    ? `v${doc.version} · último guardado ${fecha(doc.guardado_en)}`
+    : 'sin ediciones todavía';
+}
+
+async function pintarComentarios() {
+  const caja = $('#rev-comentarios');
+  try {
+    const c = await pedir(`api/revision/${encodeURIComponent(DOC)}/comentarios`);
+    if (!c.total) {
+      caja.innerHTML = 'Nada todavía. Lo que escribas aparece acá después de guardar.';
+      return;
+    }
+    const globitos = (c.comentarios_de_celda || []).map((g) =>
+      `<li><span class="mono" style="color:var(--acento)">${escapar(g.celda)}</span>
+       ${escapar(g.texto)}${g.autor ? ` <span class="tenue">— ${escapar(g.autor)}</span>` : ''}</li>`);
+    const enColumnas = (c.texto_en_columnas_nuevas || []).map((t) =>
+      `<li><span class="mono" style="color:var(--acento)">fila ${t.fila}</span>
+       ${escapar(t.texto)} <span class="tenue">— ${escapar(t.columna)}</span></li>`);
+    caja.innerHTML = `
+      <p style="margin:0 0 7px"><strong style="color:var(--texto)">${c.total}</strong> anotación(es).</p>
+      <ul style="margin:0;padding-left:15px;display:flex;flex-direction:column;gap:5px">
+        ${[...globitos, ...enColumnas].join('')}
+      </ul>
+      <p class="pista" style="margin:9px 0 0;font-size:.72rem">
+        Esto es un resumen para poder buscar. El archivo es el que manda.</p>`;
+  } catch (e) {
+    caja.textContent = 'No se pudo leer el resumen.';
+  }
+}
+
+function cargarScript(src) {
+  return new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = ok;
+    s.onerror = () => mal(new Error(`No se pudo cargar ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+/** Se asegura de que `DocsAPI` exista, cargándolo si hace falta.
+ *
+ *  Hace falta para que «Reintentar» sirva. El motivo más común para estar viendo ese botón es que
+ *  el Document Server estaba caído — y entonces `api.js` tampoco cargó, así que `DocsAPI` no existe
+ *  y remontar el editor sin más falla siempre. O sea: el reintento no funcionaría justo en el caso
+ *  para el que está puesto.
+ *
+ *  Al reintentar se le agrega algo a la URL para que el navegador vuelva a pedirlo de verdad en vez
+ *  de responder con el fallo que ya tiene guardado.
+ */
+async function asegurarDocsApi(urlPublica) {
+  if (typeof DocsAPI !== 'undefined') return;
+  // Siempre se le agrega algo a la URL, no solo al reintentar. Son 13 KB, así que cachearlo no
+  // ahorra nada medible — y en cambio protege de un caso feo: si alguna vez se sirvió un `api.js`
+  // roto (pasó: el proxy lo mandó comprimido dos veces), el navegador se lo queda y la página no
+  // vuelve a cargar nunca más, ni recargando, sin ningún error que lo explique. Los archivos
+  // grandes del editor no pasan por acá: los pide él con sus propias URLs versionadas.
+  const unico = `?v=${++intentosDeApi}-${Date.now()}`;
+  await cargarScript(`${urlPublica}/web-apps/apps/api/documents/api.js${unico}`);
+  if (typeof DocsAPI === 'undefined') throw new Error('api.js cargó pero no dejó DocsAPI');
+}
+let intentosDeApi = 0;
+
+//: Los tres entregables, con el nombre corto que usan los botones del taller.
+const TIPOS = [
+  ['experto', 'Para el experto'],
+  ['presentable', 'Presentable'],
+  ['normales', 'Contraste normal'],
+];
+
+/** Las solapas de los tres entregables de esta rama.
+ *
+ *  Se arman con lo que ya existe en el servidor para esa rama: el que todavía no se abrió se crea al
+ *  hacer clic. La marca ✎ dice cuáles tienen comentarios, que es lo que uno quiere saber de un
+ *  vistazo al volver después de unos días.
+ */
+async function pintarSolapas(doc) {
+  const caja = $('#rev-solapas');
+  if (!caja) return;
+
+  let porTipo = {};
+  try {
+    const r = await pedir(`api/revision?nodo=${encodeURIComponent(doc.nodo)}`);
+    porTipo = Object.fromEntries((r.documentos || []).map((d) => [d.tipo, d]));
+  } catch (e) { /* con lo que hay alcanza */ }
+
+  caja.innerHTML = TIPOS.map(([tipo, nombre]) => {
+    const otro = porTipo[tipo];
+    const marca = otro && otro.editado ? `<span class="marca">✎ v${otro.version}</span>` : '';
+    const activa = tipo === doc.tipo ? ' activa' : '';
+    return `<button class="${activa}" data-tipo="${tipo}"${tipo === doc.tipo ? ' disabled' : ''}>
+              ${nombre}${marca}</button>`;
+  }).join('');
+
+  caja.querySelectorAll('button[data-tipo]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const tipo = b.dataset.tipo;
+      const yaEsta = porTipo[tipo];
+      if (yaEsta) { location.href = `revision?doc=${encodeURIComponent(yaEsta.id)}`; return; }
+      // Todavía no existe: se crea. El presentable tarda unos segundos en generarse.
+      const antes = b.innerHTML;
+      b.disabled = true;
+      b.innerHTML = 'Preparando…';
+      try {
+        const r = await fetch(`api/nodo/${encodeURIComponent(doc.nodo)}/revision/${tipo}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+        location.href = `revision?doc=${encodeURIComponent((await r.json()).id)}`;
+      } catch (e) {
+        b.disabled = false;
+        b.innerHTML = antes;
+        aviso('peligro', `No se pudo abrir ese entregable: ${escapar(e.message)}`);
+      }
+    });
+  });
+}
+
+async function arrancar() {
+  if (!DOC) {
+    velo('Falta decir qué documento abrir',
+         'La dirección tiene que traer <span class="mono">?doc=…</span>. '
+         + 'Se llega acá desde el paso 6 de una rama, en el taller.');
+    return;
+  }
+
+  let doc;
+  try {
+    doc = await pedir(`api/revision/${encodeURIComponent(DOC)}`);
+  } catch (e) {
+    velo('No se encontró ese documento',
+         `<span class="mono">${escapar(e.message)}</span>`);
+    return;
+  }
+
+  // La descarga se arma ACÁ, apenas se sabe que el documento existe, y no más abajo junto al
+  // editor: es la salida de emergencia, y tiene que servir justamente cuando el editor no anda.
+  // Si se armara al final, todos los caminos de falla vuelven antes y el botón queda sin destino.
+  FICHA = doc.ficha || '';
+  $('#btn-bajar-igual').href = `api/revision/${encodeURIComponent(DOC)}/archivo?t=${FICHA}`;
+
+  $('#rev-nombre').textContent = doc.nombre;
+  $('#rev-procedencia').textContent =
+    `rama ${doc.nodo.slice(0, 8)} · ${doc.tipo} · tesis @ ${doc.commit_tesis || '—'}`;
+  pintarVersiones(doc);
+  pintarComentarios();
+  pintarSolapas(doc);
+
+  if (doc.rama_borrada) {
+    aviso('info', '<strong>La rama de este documento se borró.</strong> El archivo se conserva y se '
+      + 'puede seguir descargando; la hoja de Procedencia de adentro dice de dónde salió.');
+  }
+
+  let cfg;
+  try {
+    cfg = await pedir(`api/revision/${encodeURIComponent(DOC)}/editor?autor=Experto`);
+  } catch (e) {
+    velo('La revisión experta no está configurada',
+         'Falta <span class="mono">OO_URL_PUBLICA</span> en el <span class="mono">.env</span> del '
+         + 'taller. El archivo se puede bajar igual.', { acciones: true });
+    $('#btn-reintentar').hidden = true;
+    return;
+  }
+
+  URL_PUBLICA = cfg.url_publica;
+
+  try {
+    await asegurarDocsApi(cfg.url_publica);
+  } catch (e) {
+    velo('El Document Server no respondió',
+         `No se pudo cargar el editor desde <span class="mono">${escapar(cfg.url_publica)}</span>. `
+         + 'Revisá que esté levantado y que esa dirección se vea desde este navegador.',
+         { acciones: true });
+    return;
+  }
+
+  montarEditor(cfg.config);
+}
+
+/** Cuánto se espera al documento antes de dar la cara y decir que no vino.
+ *
+ *  Dos minutos y medio, que parece exagerado y no lo es: el editor se arma con unos 2000 archivos y
+ *  con la caché fría eso tarda. Y la caché se enfría sola —cada arranque del Document Server cambia
+ *  su huella de compilación y con eso la URL de todos los archivos—, así que la descarga completa no
+ *  es el caso raro sino el de después de cada reinicio.
+ *
+ *  Cortar antes no ahorra nada: el editor sigue cargando por detrás igual. Lo único que se consigue
+ *  es decirle a alguien que algo se rompió cuando en realidad estaba funcionando.
+ */
+const ESPERA_MAXIMA_MS = 150000;
+
+let editor = null;
+let reintentos = 0;
+let reloj = null;
+let ticTac = null;
+//: Dónde está el Document Server según el backend. Se guarda apenas se lo sabe, porque el
+//: diagnóstico lo necesita justamente en los casos en que el editor no llegó a cargar.
+let URL_PUBLICA = '';
+
+/** Monta el editor y no baja el velo hasta que el documento cargó de verdad.
+ *
+ *  La diferencia importante es `onDocumentReady` contra «apareció el iframe»: el iframe aparece
+ *  enseguida y dibuja su esqueleto gris aunque el documento no llegue nunca. Si nos guiáramos por
+ *  eso, una falla pasajera del Document Server —un reinicio, un segundo de mala suerte— se vería
+ *  exactamente igual que estar por cargar, para siempre y sin explicación.
+ */
+function montarEditor(config) {
+  const bitacora = [];
+  const anotar = (n) => bitacora.push(`${n} @${Math.round(performance.now())}ms`);
+  // Queda a mano en la consola: si alguien reporta que no le abre, `__bitacora` dice hasta dónde
+  // llegó el editor y con qué reventó, sin tener que reproducirlo.
+  window.__bitacora = bitacora;
+
+  const arranque = performance.now();
+  let etapa = 'Trayendo el editor';
+  const segundos = () => Math.round((performance.now() - arranque) / 1000);
+
+  const pintarEspera = () => velo(etapa, `
+    <span class="latido"></span><span class="latido"></span><span class="latido"></span>
+    <p style="margin:8px 0 0">${segundos()} s</p>
+    ${segundos() > 12 ? `<p style="margin:6px 0 0">La primera vez tarda: el editor son unos 2000
+      archivos. Después de la primera carga queda en caché y abre en un segundo.</p>` : ''}`);
+
+  pintarEspera();
+  clearInterval(ticTac);
+  ticTac = setInterval(() => { if (!$('#velo').hidden) pintarEspera(); }, 1000);
+
+  const listo = () => { clearTimeout(reloj); clearInterval(ticTac); };
+  reloj = setTimeout(() => { clearInterval(ticTac); noLlego(bitacora); }, ESPERA_MAXIMA_MS);
+
+  config.events = {
+    // `onAppReady` es la señal de que el editor terminó de armarse. A partir de acá lo que falta es
+    // el documento, que es rápido: conviene decirlo, porque son dos esperas muy distintas.
+    onAppReady: () => { anotar('onAppReady'); etapa = 'Cargando el documento'; pintarEspera(); },
+    onInfo: (e) => anotar('onInfo ' + JSON.stringify(e.data)),
+    onWarning: (e) => anotar('onWarning ' + JSON.stringify(e.data)),
+    onDocumentReady: () => {
+      anotar('onDocumentReady');
+      listo();
+      reintentos = 0;
+      $('#velo').hidden = true;
+    },
+    // Cuando el editor avisa que guardó, el backend ya registró la versión: se refresca el costado.
+    onDocumentStateChange: (e) => { if (!e.data) setTimeout(refrescar, 900); },
+    onError: (e) => {
+      anotar('onError ' + JSON.stringify(e.data));
+      listo();
+      noLlego(bitacora, e.data);
+    },
+  };
+
+  // Si es un reintento, hay que dejarle un elemento limpio: el anterior ya fue reemplazado.
+  if (editor) {
+    try { editor.destroyEditor(); } catch (e) { /* si ya no está, mejor */ }
+    const viejo = document.querySelector('.caja-editor > iframe, .caja-editor > #editor');
+    if (viejo) viejo.remove();
+    const nuevo = document.createElement('div');
+    nuevo.id = 'editor';
+    $('.caja-editor').prepend(nuevo);
+  }
+  editor = new DocsAPI.DocEditor('editor', config);
+
+  // Todo lo que reviente adentro del editor entra a la misma bitácora que sus eventos. Si el editor
+  // se muere sin avisar —que es exactamente lo que pasa en algunos navegadores— acá queda el motivo.
+  espiarElEditor((mensaje) => {
+    if (bitacora.length < 12) anotar('✗ ' + mensaje);
+    if (!$('#velo').hidden && $('#velo-acciones') && !$('#velo-acciones').hidden) {
+      // Ya se está mostrando la pantalla de fracaso: se refresca para que el error salga ahí.
+      $('#velo-bitacora').innerHTML =
+        `avisos del editor: ${escapar(bitacora.join('  ·  '))}`;
+    }
+  });
+}
+
+/** Engancha los errores de adentro del iframe del editor y los manda a `alError`.
+ *
+ *  Existe porque el editor puede morirse sin decir nada: no emite `onError` ni ningún evento, y
+ *  desde afuera solo se ve una pantalla que no carga. Lo que sí queda es la excepción de JavaScript
+ *  adentro del iframe — y como ahora el editor se sirve por el mismo origen, se la puede leer.
+ *
+ *  OnlyOffice reemplaza y renavega su iframe, así que se reintenta enganchar por un rato en vez de
+ *  hacerlo una sola vez.
+ */
+function espiarElEditor(alError) {
+  let enganchados = 0;
+  const enganchar = () => {
+    const f = document.querySelector('iframe[name=frameEditor]');
+    if (!f) return;
+    let w;
+    try { w = f.contentWindow; } catch (e) { return; }
+    if (!w || w.__espiado) return;
+    try {
+      w.__espiado = true;
+      enganchados++;
+      w.addEventListener('error', (e) => {
+        // Dos cosas MUY distintas llegan por el mismo evento, y hay que separarlas:
+        //
+        //  · una excepción de JavaScript, que trae mensaje, archivo y línea;
+        //  · un recurso que no cargó (script, imagen, hoja de estilo), que no trae NADA de eso
+        //    —queda `error — :?`, que no dice nada— pero sí trae el elemento en `e.target`.
+        //
+        // El segundo caso es el que importa cuando hay un bloqueador de publicidad de por medio:
+        // aborta el pedido y lo único que queda para saber QUÉ bloqueó es la URL del elemento.
+        const t = e.target;
+        const url = t && t !== w && (t.src || t.href);
+        if (url) {
+          alError(`no cargó: ${String(url).replace(location.origin, '')} <${(t.tagName || '?').toLowerCase()}>`);
+        } else {
+          alError(`${e.message || 'error sin mensaje'} — ${(e.filename || '').split('/').pop()}:${e.lineno || '?'}`);
+        }
+      }, true);
+      w.addEventListener('unhandledrejection', (e) => alError(
+        `promesa rechazada: ${(e.reason && e.reason.message) || e.reason}`));
+      const original = w.console.error;
+      w.console.error = function (...args) {
+        try { alError('console.error: ' + args.map(String).join(' ').slice(0, 220)); } catch (x) {}
+        return original.apply(w.console, args);
+      };
+    } catch (e) {
+      // Si el navegador no deja mirar adentro, eso ya es información.
+      alError(`no se pudo leer adentro del editor: ${e.name}: ${e.message}`);
+    }
+  };
+  const reloj = setInterval(enganchar, 400);
+  setTimeout(() => clearInterval(reloj), 40000);
+  enganchar();
+}
+
+
+function velo(titulo, detalleHtml, { acciones = false, bitacora = null } = {}) {
+  $('#velo').hidden = false;
+  $('#velo-titulo').textContent = titulo;
+  $('#velo-detalle').innerHTML = detalleHtml;
+  $('#velo-acciones').hidden = !acciones;
+
+  // Qué alcanzó a avisar el editor antes de quedarse callado. Es lo primero que hay que mirar:
+  // si está `onAppReady`, el editor arrancó y recibió su configuración, y el problema está entre
+  // el editor y el documento. Si no está, nunca recibió nada y el problema es anterior.
+  const caja = $('#velo-bitacora');
+  if (bitacora === null) { caja.textContent = ''; return; }
+  caja.innerHTML = bitacora.length
+    ? `avisos del editor: ${escapar(bitacora.join('  ·  '))}`
+    : '<span style="color:var(--peligro)">el editor no emitió ni un aviso '
+      + '(ni siquiera onAppReady)</span>';
+}
+
+/** Prueba, desde ESTE navegador, las dos cosas que el editor necesita del Document Server.
+ *
+ *  Existe porque el editor falla igual —pantalla en blanco— por motivos muy distintos, y desde el
+ *  servidor no se ven: el Document Server puede estar perfecto y ser el navegador el que no llega o
+ *  el que bloquea la conexión. Las dos pruebas separan justamente eso.
+ */
+async function probarDocumentServer(urlPublica) {
+  const salida = { alcanza: null, websocket: null };
+
+  // 1. ¿Se llega siquiera al Document Server? `no-cors` no deja leer la respuesta, pero para esto
+  //    alcanza: interesa si la petición llega o se cae.
+  try {
+    await fetch(`${urlPublica}/healthcheck`, { mode: 'no-cors', cache: 'no-store' });
+    salida.alcanza = 'sí';
+  } catch (e) {
+    salida.alcanza = 'NO';
+  }
+
+  // 2. ¿Abre el websocket? Es por ahí que el editor pide el documento: si esto no abre, el editor
+  //    se queda esperando para siempre y el servidor nunca se entera de que alguien quiso entrar.
+  //
+  //    Los parámetros `EIO`/`transport` no son decorativos: el Document Server habla socket.io y
+  //    rechaza el handshake sin ellos. Sin esto la prueba da «bloqueado» hasta en un navegador donde
+  //    el editor anda perfecto — un diagnóstico que miente es peor que no tenerlo.
+  salida.websocket = await new Promise((listo) => {
+    let ws;
+    const reloj = setTimeout(() => { try { ws.close(); } catch (e) {} listo('no contestó'); }, 8000);
+    const contestar = (r) => { clearTimeout(reloj); listo(r); };
+    try {
+      ws = new WebSocket(
+        urlPublica.replace(/^http/, 'ws') + '/doc/prueba/c/?EIO=4&transport=websocket');
+      ws.onopen = () => { try { ws.close(); } catch (e) {} contestar('abre'); };
+      ws.onerror = () => contestar('BLOQUEADO o rechazado');
+      ws.onclose = (e) => contestar(e.wasClean ? 'abre' : `cerrado sin abrir (código ${e.code})`);
+    } catch (e) {
+      contestar('excepción: ' + e.message);
+    }
+  });
+
+  return salida;
+}
+
+/** El documento no llegó. Se dice qué pasa, qué se puede hacer, y no se pierde el archivo. */
+function noLlego(bitacora, error) {
+  reintentos += 1;
+  const detalle = error
+    ? `<p style="margin:0 0 8px">El editor devolvió
+       <span class="mono">${escapar(JSON.stringify(error))}</span>.</p>`
+    : `<p style="margin:0 0 8px">El documento no llegó en
+       ${Math.round(ESPERA_MAXIMA_MS / 1000)} segundos. Puede que <strong>siga cargando</strong> por
+       detrás y aparezca solo en un rato — si es así, este aviso se va sin hacer nada.</p>`;
+
+  velo('El documento no cargó', detalle + `
+    <p style="margin:0">Tus comentarios <strong>no se perdieron</strong>: están en las versiones
+    guardadas, que se siguen pudiendo bajar del costado.</p>
+    <div id="velo-diagnostico" style="margin-top:11px">
+      Probando qué falla<span class="latido"></span><span class="latido"></span><span class="latido"></span>
+    </div>`, { acciones: true, bitacora });
+
+  $('#btn-reintentar').textContent = reintentos > 1 ? `Reintentar (${reintentos})` : 'Reintentar';
+
+  // El diagnóstico se corre acá y no antes: solo interesa cuando algo falló.
+  if (URL_PUBLICA) probarYContar(URL_PUBLICA);
+}
+
+async function probarYContar(urlPublica) {
+  const r = await probarDocumentServer(urlPublica);
+  const caja = document.getElementById('velo-diagnostico');
+  if (!caja) return;
+
+  const marca = (v) => v === 'sí' || v === 'abre'
+    ? `<span style="color:var(--acento-2)">${escapar(v)}</span>`
+    : `<span style="color:var(--peligro)">${escapar(v)}</span>`;
+
+  // Cada combinación tiene una causa distinta, y hace falta decir cuál para no mandar a nadie a
+  // revisar el servidor cuando el problema está del lado del navegador.
+  let veredicto;
+  if (r.alcanza !== 'sí') {
+    veredicto = `Este navegador <strong>no llega</strong> a
+      <span class="mono">${escapar(urlPublica)}</span>. Si el taller lo ves por red o por un dominio,
+      esa dirección tiene que ser una que se vea desde acá — no <span class="mono">localhost</span>,
+      que para vos es tu propia máquina.`;
+  } else if (r.websocket !== 'abre') {
+    veredicto = `Se llega al Document Server pero <strong>el websocket no abre</strong>, y es por ahí
+      que el editor pide el documento. Suele ser un proxy o un cortafuegos que no deja pasar la
+      conexión, o una extensión del navegador bloqueándola. Probá en una ventana de incógnito con las
+      extensiones apagadas.`;
+  } else {
+    veredicto = `Las dos pruebas dan bien, así que el camino está. Si igual no carga, puede ser una
+      pestaña vieja con el editor cacheado: probá recargar forzando
+      (<span class="mono">Ctrl+Shift+R</span>).`;
+  }
+
+  // Los dos orígenes en juego. Si no coinciden en el HOST, el editor queda en un marco «de otro
+  // sitio» y el navegador le parte el almacenamiento: las pruebas de arriba pasan igual —se llega y
+  // el websocket abre— pero el editor nunca termina de arrancar. Es la causa que las otras dos
+  // pruebas no pueden ver, y por eso se muestran las direcciones tal cual.
+  const hostTaller = location.hostname;
+  let hostEditor = '';
+  try { hostEditor = new URL(urlPublica).hostname; } catch (e) { hostEditor = '?'; }
+  const mismoHost = hostTaller === hostEditor;
+
+  caja.innerHTML = `
+    <div style="text-align:left;display:inline-block">
+      <div>Se llega al Document Server: ${marca(r.alcanza)}</div>
+      <div>Abre el websocket: ${marca(r.websocket)}</div>
+      <div>Estás viendo el taller en: <span class="mono">${escapar(location.origin)}</span></div>
+      <div>El editor se carga de: <span class="mono">${escapar(urlPublica)}</span></div>
+    </div>
+    ${mismoHost ? '' : `
+      <p style="margin:9px 0 0">El taller y el editor están en hosts distintos
+      (<span class="mono">${escapar(hostTaller)}</span> contra
+      <span class="mono">${escapar(hostEditor)}</span>). Probado acá no alcanza para romperlo, pero
+      según cómo esté configurado el navegador puede molestar: vale la pena descartarlo poniendo
+      <span class="mono">OO_URL_PUBLICA=http://${escapar(hostTaller)}:8080</span> en el
+      <span class="mono">.env</span> y reiniciando el taller.</p>`}
+    <p style="margin:9px 0 0">${veredicto}</p>`;
+}
+
+async function refrescar() {
+  try {
+    pintarVersiones(await pedir(`api/revision/${encodeURIComponent(DOC)}`));
+    pintarComentarios();
+  } catch (e) { /* si falla, lo que se ve sigue siendo lo último bueno */ }
+}
+
+document.getElementById('btn-reintentar').addEventListener('click', async () => {
+  velo('Reintentando',
+       '<span class="latido"></span><span class="latido"></span><span class="latido"></span>');
+  try {
+    // Se vuelve a pedir la configuración en vez de reusar la vieja: si mientras tanto se guardó una
+    // versión, la `key` cambió, y reusar la anterior haría que el Document Server sirva su copia
+    // en caché — el experto abriría una versión vieja sin enterarse.
+    const cfg = await pedir(`api/revision/${encodeURIComponent(DOC)}/editor?autor=Experto`);
+    await asegurarDocsApi(cfg.url_publica);
+    montarEditor(cfg.config);
+  } catch (e) {
+    noLlego([], { mensaje: e.message });
+  }
+});
+
+arrancar();
+</script>
+</body>
+</html>

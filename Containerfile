@@ -22,6 +22,19 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Las dependencias científicas se instalan desde el requirements del repo de la tesis, que se monta
 # en /tesis. Se hace en el arranque porque el repo es un volumen, no parte de la imagen.
+#
+# Pero compilarlas cada vez cuesta minutos (hdbscan y pyclustering traen extensiones nativas), y el
+# arranque las recompilaba en cada contenedor nuevo. Esta copia del requirements de la tesis las deja
+# prehorneadas en la imagen: al arrancar, pip las encuentra satisfechas y no hace nada.
+#
+# NO es una fuente de verdad, es una semilla de caché. El CMD sigue corriendo `pip install -e /tesis`,
+# que resuelve las dependencias contra el requirements.txt REAL del repo montado y reconcilia lo que
+# haga falta. Si esta copia queda desactualizada, el arranque es más lento; nunca incorrecto.
+#
+# Para volver a sincronizarla:  cp $RUTA_TESIS/requirements.txt requirements-tesis.txt
+COPY requirements-tesis.txt ./
+RUN pip install -r requirements-tesis.txt
+
 COPY backend/ ./backend/
 COPY web/ ./web/
 COPY scripts/ ./scripts/

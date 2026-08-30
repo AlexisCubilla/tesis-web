@@ -139,8 +139,13 @@ cp .env.example .env  # y ajustá RUTA_TESIS si hace falta
 podman compose up
 ```
 
-Levanta un solo servicio. **No hay base de datos que levantar**: el árbol de ejecuciones es un archivo
-SQLite y los resultados van a disco. Todo el estado es la carpeta de datos.
+Levanta el taller y un Document Server de OnlyOffice para la revisión experta. **No hay base de datos
+que levantar**: el árbol de ejecuciones es un archivo SQLite y los resultados van a disco. Todo el
+estado es la carpeta de datos.
+
+El Document Server es opcional y pesa varios GB. Si no se lo quiere, alcanza con levantar el taller
+solo (`podman compose up taller`) y dejar `OO_URL_PUBLICA` vacía en el `.env`: no aparece el botón de
+comentar y todo lo demás funciona igual. Ver «La revisión del experto» más abajo.
 
 El repo de la tesis se monta en `/tesis` (escribible solo para que `pip install -e` genere
 `src/tesis.egg-info`, que está en `.gitignore` de la tesis), así que la imagen no queda atada a una
@@ -149,8 +154,11 @@ versión del pipeline: en la interfaz siempre se muestra con qué commit se est�
 La primera vez hay que generar la tabla cruda dentro del contenedor:
 
 ```bash
-podman compose run --rm taller python scripts/exportar_crudo.py
+podman compose exec taller python scripts/exportar_crudo.py
 ```
+
+Con `exec` y no con `run`: `run` levanta un contenedor nuevo reemplazando su comando, así que se
+saltea el `pip install -e /tesis` del arranque y el script no encuentra el paquete de la tesis.
 
 ## Estructura
 
@@ -158,11 +166,13 @@ podman compose run --rm taller python scripts/exportar_crudo.py
 backend/
   etapas.py      definición de las 6 etapas y sus envoltorios sobre `tesis`
   almacen.py     SQLite (árbol) + caché en disco + hash de configuración
+  revision.py    los documentos que comenta el experto, con su historial de versiones
   trabajos.py    ejecución en segundo plano (una corrida tarda decenas de segundos)
   main.py        API y servidor de la web
 web/
   index.html     página didáctica del proyecto
   taller.html    el banco de trabajo
+  revision.html  el editor donde el experto comenta un entregable
   analisis.html  la pantalla de análisis de una rama
   app.js         formularios, árbol de ramas y qué se muestra en cada etapa
   analisis.js    los cuatro cortes de la pantalla de análisis
@@ -174,6 +184,7 @@ scripts/
 tests/
   test_reproduccion.py  afirma los números de la tabla de verificación
 data/                 estado local (ignorado por git): tabla cruda, caché, SQLite
+data/revision/        los documentos del experto y sus versiones — lo único que no se recalcula
 docs/arquitectura.md  las decisiones de diseño y por qué
 ```
 
@@ -280,9 +291,144 @@ mundos.
 Está adentro del taller a propósito: la rama es la que tocaste en el mapa, así que no hay que
 elegirla ni reconocerla en ningún lado.
 
+## La revisión del experto
+
+La Etapa 2 es «el experto revisa y etiqueta». Esto es por dónde entra ese trabajo.
+
+Desde el último paso, además de descargar los Excel, se abre **Revisión del experto**: los **tres
+entregables** de esa rama, editables dentro del navegador. El experto escribe donde quiera —
+columnas nuevas, hojas nuevas, comentarios de celda, colores— y cada vez que guarda queda una
+versión más. No hay formulario ni lista de etiquetas cerrada, a propósito: la taxonomía de la
+Etapa 2 es lo que él tiene que producir, y ofrecerle opciones sería adelantarle la respuesta.
+
+Cada entregable tiene su propio documento y su propio historial, y se pasa de uno a otro con las
+solapas de arriba. El que ya tiene comentarios se marca con ✎, para saber de un vistazo dónde hubo
+trabajo al volver después de unos días.
+
+> El presentable son 44 hojas con 80 gráficos, y guardar lo reescribe entero con el motor de
+> OnlyOffice. Se comprobó que vuelve igual —mismas hojas, mismos gráficos— así que se puede comentar
+> sin miedo a perder el formato.
+
+**Por qué no alcanzaba con mandar el Excel por correo.** Apenas el archivo sale del servidor hay
+dos copias, y la del experto es la buena mientras la nuestra envejece sin que se note. Acá hay una
+sola: vive donde vive el taller, y quien quiera verla entra y la ve.
+
+### Lo que no se puede perder
+
+De todo lo que guarda el taller, esto es lo único que **no se recalcula**. Las ramas, los números y
+los gráficos salen del pipeline; si se borran, se vuelven a correr. El juicio de una persona sobre
+telemetría que nadie etiquetó, no. De ahí tres decisiones que valen la pena conocer:
+
+| | Qué pasa |
+|---|---|
+| **Cada guardado deja una versión** | Ninguna pisa a la anterior. Un borrado accidental o una sesión caída se arreglan bajando la versión de antes. La v0 es lo que salió del pipeline, antes de que nadie lo tocara. |
+| **El documento no se regenera encima** | Volver a entrar a comentar abre el que ya existe. Volver a correr la rama no lo toca. |
+| **Borrar una rama comentada avisa** | El borrado en cascada se planta y dice qué documentos dependen de eso. Si se confirma igual, los pasos se van pero **el documento se queda**: se marca como huérfano y se sigue pudiendo bajar. |
+
+Por lo mismo, la revisión tiene su **propia base** (`data/revision/revision.sqlite`) y no vive en
+`ejecuciones.sqlite`. `mise run limpiar` borra el árbol entero para empezar de cero — está bien,
+porque se recalcula — y se habría llevado puesto el trabajo del experto de paso.
+
+Respaldar es copiar `data/revision/`. Ahí están los archivos, todas sus versiones y el registro.
+
+### El resumen es un índice, no la verdad
+
+En la pantalla de revisión, al costado, aparece lo que el experto escribió: los comentarios de
+celda y lo que puso en columnas que no venían en el entregable. Sirve para buscar sin abrir cuarenta
+planillas, y para que la Etapa 3 tenga algo que leer.
+
+**El archivo es el que manda.** Ese resumen se extrae de él y se puede volver a extraer: si la
+extracción mejora, se pasa de nuevo sobre las versiones guardadas y no se pierde nada. Al revés
+—dejar los comentarios solo adentro del `.xlsx` y confiar en la arqueología de XML más adelante—
+sería poner lo más valioso en el lugar más frágil.
+
+### Si el taller queda expuesto en internet
+
+El taller **no tiene usuarios ni contraseña** — ver el aviso de `HOST` en `.env.example`. Cualquiera
+que llegue puede lanzar ejecuciones y borrar ramas. Puertas afuera hay que ponerle autenticación
+adelante (nginx, oauth2-proxy, lo que sea); esto vale para todo el sitio, no solo para la revisión.
+
+Pero **dos rutas no pueden pedir autenticación**, porque quien las usa es el Document Server y no
+tiene con qué autenticarse:
+
+```
+GET  /api/revision/{doc}/archivo     baja el archivo para abrirlo
+POST /api/revision/{doc}/callback    avisa que el experto guardó
+```
+
+Esas dos hay que dejarlas pasar, y la segunda es la peligrosa: **sobrescribe el documento**. Por eso
+cada documento tiene una **ficha** —un secreto de 32 bytes que viaja en la URL— y las tres rutas de
+archivo la exigen: sin ella contestan `403`. El Document Server no necesita saber nada de esto; usa
+las URLs que le damos.
+
+La ficha reemplaza a JWT para este problema y no le pide nada a la otra punta. Lo que **no** hace es
+proteger el resto del taller: eso es trabajo de la autenticación de adelante.
+
+### Cómo se configura
+
+Hace falta un [Document Server de OnlyOffice](https://github.com/ONLYOFFICE/DocumentServer). El
+`podman-compose.yml` levanta uno para desarrollo; en un servidor que ya tenga el suyo, se apunta a
+ese y se borra el servicio.
+
+Si no hay ninguno configurado, el taller funciona igual: no aparece el botón y nada más.
+
+Lo único delicado son las direcciones, que son **tres y no son la misma**:
+
+```
+navegador ─────── OO_URL_PUBLICA ──────→ Document Server     carga el editor
+Document Server ─ OO_URL_DEL_TALLER ───→ taller              baja el archivo y avisa al guardar
+taller ────────── OO_URL_INTERNA ──────→ Document Server     va a buscar lo que se guardó
+```
+
+La del medio es la que se escapa. El Document Server corre en otro contenedor, así que para él
+`localhost` es él mismo, no el taller: si se le pone `http://localhost:8000`, el editor abre bien y
+después el guardado no llega nunca. Con `podman compose` los servicios se ven por nombre
+(`http://taller:8000`), y eso ya viene puesto en el compose.
+
+En el `.env` solo hay que tocar `OO_URL_PUBLICA`.
+
+> **Si el editor abre pero dice «Error de descarga»**, el Document Server está rechazando al taller
+> por su propia protección anti-SSRF, que no acepta direcciones privadas — y dentro de la red de
+> compose el taller es exactamente eso. Se resuelve con `ALLOW_PRIVATE_IP_ADDRESS=true`, que el
+> compose ya trae. En su log se lo ve como *«DNS lookup … is not allowed. Because, It is private IP
+> address»*.
+
+### Esperá a que el Document Server esté sano antes de abrir el editor
+
+Es la trampa más cara de este montaje, y no se parece en nada a su causa.
+
+Su `/healthcheck` contesta `true` a los cinco segundos, pero **el servidor no está listo**: alrededor
+de un minuto después termina de generar su caché de fuentes y **se reinicia solo**
+(`documentserver-generate-allfonts.sh` hace `supervisorctl restart ds:docservice`). A quien abrió el
+editor en esa ventana se le corta la sesión en plena carga — sale «Se ha perdido la conexión», o se
+queda cargando sin fin, o el documento queda en solo lectura.
+
+Medido acá: contenedor arriba a las 21:58:38, reinicio a las 21:59:51. **73 segundos.**
+
+Por eso el `healthcheck` del compose no le cree al del servidor: además del HTTP, exige que el
+contenedor lleve más de 120 segundos arriba. Mirá que diga `healthy` antes de abrir la revisión:
+
+```bash
+podman ps --filter name=onlyoffice --format "{{.Names}} {{.Status}}"
+```
+
+Mientras diga `(starting)`, el editor puede abrir y morirse a mitad de camino. No es tu navegador.
+
+> Los plugins vienen apagados desde el taller (`editorConfig.plugins` en `main.py`). OnlyOffice
+> arranca once por defecto —IA, OCR, editor de fotos, traductor, YouTube, Zotero…— que suman 1890
+> archivos y no sirven para anotar una planilla. La primera apertura es mucho más liviana sin ellos,
+> y esa es la que importa: cada reinicio del servidor cambia su huella y enfría la caché.
+
+En desarrollo el Document Server corre **sin firma JWT** (`JWT_ENABLED=false`). Si el del servidor
+la tiene activada, el secreto va en `OO_JWT_SECRETO`.
+
 ## Estado
 
 La cadena completa (datos → ventaneo → características → filtrado → detección → eventos) anda de punta
 a punta, con ramas, caché, borrado e inspección por etapa.
 
-Pendiente: estabilidad Jaccard y feature-shift como etapas, comparar dos ramas lado a lado, y la animación de la ventana deslizándose sobre la señal.
+La revisión experta anda de punta a punta: el entregable se abre en el navegador, cada guardado deja
+una versión y borrar una rama comentada avisa antes.
+
+Pendiente: estabilidad Jaccard y feature-shift como etapas, comparar dos ramas lado a lado, y la
+animación de la ventana deslizándose sobre la señal.

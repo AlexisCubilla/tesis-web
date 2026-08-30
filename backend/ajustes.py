@@ -64,6 +64,95 @@ DIR_WEB: Path = _ruta("DIR_WEB", "web")
 #: Puerto por defecto (lo usan las tareas de mise y el compose; uvicorn puede recibir otro).
 PUERTO: int = int(_num("PUERTO", 8000))
 
+# --------------------------------------------------------------------------------------
+# Revisión experta (OnlyOffice)
+# --------------------------------------------------------------------------------------
+# El editor necesita TRES direcciones distintas, y confundirlas es el error clásico: no todos los
+# que participan ven al otro con el mismo nombre.
+#
+#   navegador ──── OO_URL_PUBLICA ────→ Document Server   (carga el editor)
+#   navegador ──────────────────────→ taller             (esta app)
+#   Document Server ── OO_URL_DEL_TALLER ──→ taller       (baja el archivo y avisa al guardar)
+#
+# La tercera es la que se escapa: el Document Server corre en OTRO contenedor, así que para él
+# `localhost` es él mismo, no el taller. En desarrollo con podman se ven por nombre de servicio
+# (http://taller:8000); en el servidor será el nombre real de la máquina.
+
+
+def _bool_temprano(nombre: str, defecto: bool) -> bool:
+    """Igual que `_bool`, pero definido acá arriba porque se usa antes."""
+    valor = os.environ.get(nombre, "").strip().lower()
+    return defecto if not valor else valor not in ("0", "false", "no")
+
+
+def _url(nombre: str, defecto: str = "") -> str:
+    """Lee una URL del entorno y le saca la barra final, para poder concatenar sin dudar."""
+    return (os.environ.get(nombre, "").strip() or defecto).rstrip("/")
+
+
+#: Dónde carga el navegador el editor.
+#:
+#: **Vacío es lo normal y significa «por el mismo origen que el taller»**: el propio taller le hace
+#: de proxy al Document Server (ver `proxy_oo.py`). Eso evita que el editor quede en un marco de otro
+#: origen, que es lo que Firefox castiga partiéndole el almacenamiento hasta dejarlo sin arrancar.
+#:
+#: Se le pone una URL solo si se quiere ir DERECHO al Document Server, sin pasar por el taller.
+OO_URL_PUBLICA: str = _url("OO_URL_PUBLICA")
+
+#: Con qué dirección el Document Server ve a este taller. Sin esto no puede bajar el archivo ni
+#: avisar cuando el experto guarda, así que la edición no funcionaría.
+#:
+#: No tiene valor por defecto a propósito: `http://taller:8000` solo significa algo adentro del
+#: compose, y como respaldo general haría que la revisión pareciera configurada en un servidor donde
+#: no lo está. El compose la define explícitamente.
+OO_URL_DEL_TALLER: str = _url("OO_URL_DEL_TALLER")
+
+#: Con qué dirección este taller ve al Document Server. Hace falta porque al guardar, el editor
+#: NO manda el archivo: manda una URL suya para que lo vayamos a buscar, y a veces esa URL viene con
+#: un nombre que solo él entiende. Si está definida, se le reemplaza el origen a esa URL.
+OO_URL_INTERNA: str = _url("OO_URL_INTERNA")
+
+#: Secreto JWT del Document Server. Vacío = sin firma (es lo que se usa en desarrollo).
+OO_JWT_SECRETO: str = os.environ.get("OO_JWT_SECRETO", "").strip()
+
+#: Idioma y formato del editor.
+OO_IDIOMA: str = os.environ.get("OO_IDIOMA", "es").strip() or "es"
+
+
+#: Servir el Document Server a través del taller, en el mismo origen. Es lo que hay que querer casi
+#: siempre; se apaga solo para depurar contra el servidor directo.
+OO_PROXY: bool = _bool_temprano("OO_PROXY", True)
+
+
+def url_para_el_navegador() -> str:
+    """Con qué prefijo el navegador pide el editor.
+
+    Cadena vacía = mismo origen, que es lo que hace que el marco no sea de un tercero.
+    """
+    return "" if OO_PROXY and not OO_URL_PUBLICA else OO_URL_PUBLICA
+
+
+def motivo_revision_apagada() -> str | None:
+    """Por qué la revisión experta no está disponible, o None si sí lo está.
+
+    Hacen falta las dos direcciones y no alcanza con una: una para que el taller (o el navegador)
+    llegue al Document Server, y otra para que el Document Server llegue de vuelta al taller. Con una
+    sola, el editor abre y después no puede ni bajar el archivo ni avisar cuando se guarda.
+    """
+    if not (OO_URL_INTERNA or OO_URL_PUBLICA):
+        return ("falta OO_URL_INTERNA (o OO_URL_PUBLICA): no hay Document Server configurado")
+    if not OO_URL_DEL_TALLER:
+        return ("falta OO_URL_DEL_TALLER: el Document Server no sabría con qué dirección volver "
+                "a este taller para bajar el archivo y avisar de los guardados")
+    return None
+
+
+def revision_habilitada() -> bool:
+    """¿Está configurada la revisión experta? Sin Document Server el taller funciona igual, pero
+    sin la pantalla de comentarios."""
+    return motivo_revision_apagada() is None
+
+
 #: Intervalo real entre mediciones, en segundos. Se usa solo para traducir "50 mediciones" a minutos
 #: en los textos de la interfaz. En los datos varía entre 10 y 11,3 s según la hoja.
 MUESTREO_SEGUNDOS: float = _num("MUESTREO_SEGUNDOS", 10.6)

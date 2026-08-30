@@ -436,12 +436,43 @@ async function borrarSeleccion() {
                                             && x.clave !== S.sel).length;
   if (!confirm(`Se borran ${cuantos} paso(s) desde acá en adelante, con sus resultados en disco.\n` +
                `¿Seguir?`)) return;
-  const r = await api(`api/nodo/${S.sel}`, { method: 'DELETE' });
+
+  let r = await borrar(S.sel, false);
+
+  // El backend se planta si el experto comentó alguna de esas ramas. Es lo único del taller que no
+  // se puede volver a calcular, así que la segunda pregunta dice exactamente qué se estaría
+  // perdiendo, en vez de repetir «¿seguro?».
+  if (r.bloqueado) {
+    const lista = r.detalle.documentos
+      .map((d) => `  · ${d.nombre} (v${d.version}, por ${d.ultimo_autor || 'el experto'})`).join('\n');
+    const seguir = confirm(
+      `${r.detalle.documentos.length} documento(s) con comentarios del experto dependen de esto:\n\n` +
+      `${lista}\n\n` +
+      `Los pasos se borran, pero los documentos NO: quedan guardados y se pueden seguir bajando ` +
+      `desde su propia pantalla.\n\n¿Borrar igual?`);
+    if (!seguir) return;
+    r = await borrar(S.sel, true);
+    if (r.bloqueado) { alert('No se pudo borrar.'); return; }
+  }
+
   S.sel = n.padre;
   await recargar();
   if (S.sel) cargarVisual();
+  const huerfanos = r.documentos_huerfanos
+    ? ` · ${r.documentos_huerfanos} documento(s) del experto conservados` : '';
   $('#estado-ejecucion').textContent =
-    `Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados`;
+    `Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados${huerfanos}`;
+}
+
+/** DELETE de un nodo, distinguiendo el 409 del guardia de cualquier otro error. */
+async function borrar(clave, forzar) {
+  const resp = await fetch(`api/nodo/${clave}${forzar ? '?forzar=true' : ''}`, { method: 'DELETE' });
+  if (resp.status === 409) {
+    const cuerpo = await resp.json().catch(() => ({}));
+    if (cuerpo.detail && cuerpo.detail.documentos) return { bloqueado: true, detalle: cuerpo.detail };
+  }
+  if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`);
+  return resp.json();
 }
 
 // ============================================================================ formulario
@@ -1037,6 +1068,7 @@ function verEventos(d) {
       <a class="boton" download href="api/nodo/${S.sel}/excel/normales"
          title="Ventanas normales, para contrastar contra las candidatas">Contraste normal</a>
     </div>
+    <div id="caja-revision"></div>
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem">clic en una fila para ver sus señales</span></div>
@@ -1053,6 +1085,90 @@ function verEventos(d) {
   lineaDeEventos($('#caja-linea'), d, filas);
   document.querySelectorAll('#fase-visual tr[data-ev]').forEach((tr) =>
     tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev))));
+  bloqueDeRevision(S.sel);
+}
+
+/** El acceso a la revisión del experto, debajo de las descargas.
+ *
+ *  Es lo mismo que se descarga, pero abierto en un editor dentro del navegador y guardado acá: el
+ *  archivo no se va a un correo, no se duplica y no queda una copia más nueva en otro lado. Cada
+ *  guardado deja una versión, así que lo que el experto escribe no se puede perder.
+ *
+ *  Si el servidor no tiene Document Server configurado, esto no aparece y el taller sigue igual.
+ */
+//: Los tres entregables, con el nombre corto que ya usan los botones de descarga de arriba.
+const TIPOS_REVISION = [
+  ['experto', 'Para el experto'],
+  ['presentable', 'Presentable'],
+  ['normales', 'Contraste normal'],
+];
+
+async function bloqueDeRevision(clave) {
+  const caja = document.getElementById('caja-revision');
+  if (!caja) return;
+
+  let cfg;
+  try {
+    cfg = await (await fetch('api/revision/config')).json();
+  } catch (e) { return; }
+  if (!cfg.habilitada) return;
+
+  let docs = [];
+  try {
+    docs = (await (await fetch(`api/revision?nodo=${encodeURIComponent(clave)}`)).json()).documentos || [];
+  } catch (e) { /* todavía no hay ninguno */ }
+
+  const porTipo = Object.fromEntries(docs.map((d) => [d.tipo, d]));
+
+  // Cada entregable dice en qué estado está, porque no es lo mismo uno sin abrir que uno ya
+  // comentado: el segundo es trabajo que no se recalcula.
+  const estado = (doc) => {
+    if (!doc) return 'sin abrir';
+    if (!doc.editado) return 'abierto, sin comentarios';
+    return `<span style="color:var(--acento-2)">v${doc.version}</span> · ${doc.ultimo_autor || 'el experto'}`;
+  };
+
+  caja.innerHTML = `
+    <div class="descargas" style="margin-top:10px;align-items:flex-start">
+      <div>
+        <h4 style="font-size:.92rem;margin:0 0 2px">Revisión del experto</h4>
+        <p class="pista" style="margin:0">Los mismos tres entregables, abiertos en el navegador para
+        comentarlos. Cada uno guarda su historial acá — <b>no se mandan por correo ni se duplican</b>.</p>
+      </div>
+      <span class="esp"></span>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch">
+        ${TIPOS_REVISION.map(([tipo, nombre]) => `
+          <button class="boton ${tipo === 'experto' ? 'acento' : ''}" data-tipo="${tipo}"
+                  style="display:flex;gap:9px;align-items:baseline;justify-content:space-between">
+            <span>${nombre}</span>
+            <span class="tenue" style="font-size:.72rem">${estado(porTipo[tipo])}</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
+
+  caja.querySelectorAll('button[data-tipo]').forEach((b) => {
+    b.addEventListener('click', () => abrirRevision(clave, b.dataset.tipo, b));
+  });
+}
+
+/** Abre (creando la primera vez) el documento de revisión de un entregable. */
+async function abrirRevision(clave, tipo, boton) {
+  const antes = boton.innerHTML;
+  boton.disabled = true;
+  // El presentable son 44 hojas con 80 gráficos: generarlo la primera vez no es instantáneo.
+  boton.innerHTML = '<span>Preparando…</span>';
+  try {
+    const r = await fetch(`api/nodo/${encodeURIComponent(clave)}/revision/${tipo}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+    const d = await r.json();
+    location.href = `revision?doc=${encodeURIComponent(d.id)}`;
+  } catch (e) {
+    boton.disabled = false;
+    boton.innerHTML = antes;
+    alert(`No se pudo abrir ese entregable.\n\n${e.message}`);
+  }
 }
 
 /** Dónde cae cada evento a lo largo del registro de su hoja.

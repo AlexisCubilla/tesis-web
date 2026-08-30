@@ -34,9 +34,59 @@ services:
       DIR_DATOS: /app/data
       DIR_WEB: /app/web
       TESIS_BASE_DIR: /tesis/data/raw
+      # Con qué dirección el Document Server ve al taller. NO es localhost: para él, localhost es
+      # él mismo. Dentro de la red de compose los servicios se ven por su nombre.
+      OO_URL_DEL_TALLER: http://taller:8000
+      # Y con cuál el taller lo ve a él, para ir a buscar el archivo cuando el experto guarda.
+      OO_URL_INTERNA: http://onlyoffice
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/estado')"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 90s
+
+  # Editor de planillas para la revisión experta. El experto abre el entregable de una rama acá
+  # adentro y comenta con libertad; el taller se queda con cada guardado como una versión.
+  #
+  # En desarrollo va sin firma JWT (JWT_ENABLED=false). En el servidor, donde el Document Server ya
+  # está desplegado, este servicio no hace falta: se apunta OO_URL_PUBLICA / OO_URL_INTERNA al que
+  # haya y listo.
+  onlyoffice:
+    image: docker.io/onlyoffice/documentserver:latest
+    ports:
+      - "${PUERTO_ONLYOFFICE:-8080}:80"
+    environment:
+      JWT_ENABLED: "false"
+      # El taller usa la API de callbacks de OnlyOffice, no WOPI. Viene apagado por defecto en la
+      # imagen; se deja escrito para que la intención quede a la vista y no dependa del default.
+      # (El servidor igual se genera un par de claves WOPI al arrancar: son inertes con esto en false.)
+      WOPI_ENABLED: "false"
+      # Sin esto el editor abre pero no puede bajar el archivo: el Document Server trae una
+      # protección anti-SSRF que rechaza cualquier dirección privada, y dentro de la red de compose
+      # el taller es exactamente eso (10.89.x.x). Falla con «Error de descarga» y en su log dice
+      # «DNS lookup ... is not allowed. Because, It is private IP address».
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+    volumes:
+      # El Document Server guarda su propio estado (fuentes, caché de conversión). No es el nuestro:
+      # los documentos y su historial viven del lado del taller, en data/revision.
+      - ${DIR_DATOS:-./data}/onlyoffice/datos:/var/www/onlyoffice/Data:z
+      - ${DIR_DATOS:-./data}/onlyoffice/registros:/var/log/onlyoffice:z
+    # OJO: su `/healthcheck` contesta `true` a los ~5 segundos y MIENTE. Alrededor de un minuto más
+    # tarde el servidor termina de generar la caché de fuentes y SE REINICIA SOLO
+    # (`documentserver-generate-allfonts.sh`, que hace `supervisorctl restart ds:docservice`). A
+    # quien haya abierto el editor en esa ventana se le corta la conexión en plena carga: sale
+    # «Se ha perdido la conexión», o se queda cargando para siempre.
+    #
+    # Por eso el healthcheck exige DOS cosas: que el HTTP conteste y que el contenedor lleve arriba
+    # más tiempo que ese reinicio. Medido acá el reinicio cae a los 67 s; 120 s deja margen.
+    #
+    # Vale la incomodidad: sin esto, `podman compose up` dice «listo» un minuto antes de serlo, y el
+    # editor falla de una forma que no se parece en nada a su causa.
+    healthcheck:
+      test: ["CMD-SHELL",
+             "[ $$(( $$(date +%s) - $$(stat -c %Y /proc/1) )) -ge 120 ] && curl -sf http://localhost/healthcheck | grep -q true"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 150s
