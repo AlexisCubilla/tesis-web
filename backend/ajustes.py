@@ -112,6 +112,25 @@ OO_URL_DEL_TALLER: str = _url("OO_URL_DEL_TALLER")
 #: un nombre que solo él entiende. Si está definida, se le reemplaza el origen a esa URL.
 OO_URL_INTERNA: str = _url("OO_URL_INTERNA")
 
+#: ¿El navegador va a buscar los documentos DIRECTO al Document Server, en vez de por el taller?
+#:
+#: Cuando el Document Server prepara un documento, le pasa al editor una URL para bajarlo
+#: (`/cache/files/…`), y la arma contra el host del que le llegó el pedido. Hay dos formas de que esa
+#: URL sirva, y cuál corresponde depende de dónde esté publicado el taller:
+#:
+#:   apagado (por defecto) · Se le manda `X-Forwarded-Host`, así que arma la URL contra el taller y
+#:                           el navegador la pide por el proxy. Correcto si el taller está en la RAÍZ
+#:                           de su dominio.
+#:
+#:   encendido             · No se manda, así que arma la URL contra sí mismo. Correcto si el taller
+#:                           cuelga de un PREFIJO (`…/tesis/`): el Document Server no tiene forma de
+#:                           saber del prefijo —`X-Forwarded-Host` es solo el host— y armaría
+#:                           `/cache/…` en la raíz del dominio, donde no hay nada escuchando.
+#:
+#: Encendido exige que el navegador llegue al Document Server y que este mande CORS permisivo, porque
+#: pasa a ser una petición de otro origen.
+OO_URLS_DIRECTAS: bool = _bool_temprano("OO_URLS_DIRECTAS", False)
+
 #: Secreto JWT del Document Server. Vacío = sin firma (es lo que se usa en desarrollo).
 OO_JWT_SECRETO: str = os.environ.get("OO_JWT_SECRETO", "").strip()
 

@@ -166,8 +166,8 @@ async def reenviar(ruta: str, request: Request):
     #
     # Así que el `Host` lo pone httpx a partir de OO_URL_INTERNA (el destino real) y el nombre de
     # cara al navegador va en `X-Forwarded-Host`, que es para lo que existe.
-    if (host := request.headers.get("host")):
-        cabeceras.pop("host", None)
+    cabeceras.pop("host", None)
+    if (host := request.headers.get("host")) and not ajustes.OO_URLS_DIRECTAS:
         cabeceras.setdefault("x-forwarded-host", host)
     cabeceras.setdefault("x-forwarded-proto", request.url.scheme)
 
@@ -288,7 +288,7 @@ async def _relevar(ws: WebSocket, camino: str):
     # a long-polling, la sesión se pierde y el editor termina reportando «Error de descarga» — que
     # apunta al archivo cuando el archivo nunca tuvo nada de malo.
     cabeceras = {k: v for k, v in ws.headers.items() if k.lower() not in SALTEAR_WS}
-    if (host := ws.headers.get("host")):
+    if (host := ws.headers.get("host")) and not ajustes.OO_URLS_DIRECTAS:
         cabeceras["X-Forwarded-Host"] = host
     cabeceras["X-Forwarded-Proto"] = "https" if ws.url.scheme == "wss" else "http"
 
