@@ -39,8 +39,11 @@ services:
       OO_URL_DEL_TALLER: http://taller:8000
       # Y con cuál el taller lo ve a él, para ir a buscar el archivo cuando el experto guarda.
       OO_URL_INTERNA: http://onlyoffice
+    # Contra `/api/salud` y no contra `/api/estado`: desde que el taller pide sesión, `/api/estado`
+    # contesta 401 a quien no la tenga, y el healthcheck no tiene con qué autenticarse. Mirándolo
+    # ahí, el contenedor quedaría "unhealthy" para siempre con el servidor perfectamente vivo.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/estado')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/salud')"]
       interval: 30s
       timeout: 5s
       retries: 3

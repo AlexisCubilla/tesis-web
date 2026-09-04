@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingresar — Taller Etapa 1</title>
+<link rel="stylesheet" href="estatico/estilos.css">
+<style>
+  /* La pantalla de ingreso no lleva navegación: no hay a dónde ir hasta entrar. Solo la marca,
+     para que se vea de qué sitio es y no parezca una pantalla de un tercero. */
+  .ingreso { max-width: 380px; margin: 12vh auto 0; padding: 0 20px 60px; }
+  .ingreso .marca { display: flex; align-items: center; gap: 11px; font-weight: 500;
+                    margin-bottom: 26px; }
+  .ingreso .marca span.punto {
+    width: 22px; height: 22px; flex: none; border-radius: 50%;
+    border: 1.5px solid var(--acento); position: relative;
+  }
+  .ingreso .marca span.punto::after {
+    content: ''; position: absolute; top: -2px; left: 50%;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--acento);
+    transform: translateX(-50%);
+  }
+  .ingreso h1 { font-size: 1.24rem; margin: 0 0 4px; }
+  .ingreso .pista { margin: 0 0 22px; }
+  .ingreso .campo { margin-bottom: 14px; }
+  .ingreso .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
+  .ingreso .campo input { width: 100%; padding: 9px 12px; border-radius: var(--radio-2);
+    border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
+    font: inherit; font-size: .95rem; }
+  .ingreso .campo input:focus { outline: none; border-color: var(--acento); }
+  .ingreso .boton { width: 100%; justify-content: center; margin-top: 6px; }
+  .ingreso .aviso { margin-top: 18px; font-size: .84rem; }
+</style>
+</head>
+<body>
+<div class="estrellas"></div>
+
+<div class="ingreso">
+  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+
+  <h1>Ingresar al taller</h1>
+  <p class="pista">Los datos de telemetría y los resultados de las corridas no son públicos.</p>
+
+  <form id="form">
+    <div class="campo">
+      <label for="usuario">Usuario</label>
+      <input id="usuario" name="usuario" autocomplete="username" autofocus required>
+    </div>
+    <div class="campo">
+      <label for="contrasena">Contraseña</label>
+      <input id="contrasena" name="contrasena" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="boton primario" type="submit" id="entrar">Entrar</button>
+  </form>
+
+  <div id="mensaje"></div>
+</div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+
+/** A dónde volver después de entrar. Solo se aceptan rutas de este mismo sitio: un `destino`
+ *  absoluto convertiría esta pantalla en un trampolín para mandar gente a otro lado. */
+function destino() {
+  const pedido = new URLSearchParams(location.search).get('destino') || '/taller';
+  return (pedido.startsWith('/') && !pedido.startsWith('//')) ? pedido : '/taller';
+}
+
+function avisar(texto, clase = '') {
+  $('#mensaje').innerHTML = texto
+    ? `<div class="aviso ${clase}">${texto}</div>` : '';
+}
+
+/* Si el .env no trae administrador no hay con qué entrar, y hay que decirlo acá: sin esto, cada
+   intento fallaría con «usuario o contraseña incorrectos» y nadie sabría que el problema es de
+   configuración y no de memoria. */
+fetch('api/acceso').then((r) => r.json()).then((d) => {
+  if (d.usuario) { location.replace(destino()); return; }
+  if (d.motivo) {
+    avisar(`<strong>El taller no tiene administrador configurado.</strong> ${d.motivo}. ` +
+           `Definilas en el <span class="mono">.env</span> y reiniciá el servidor.`);
+    $('#entrar').disabled = true;
+  }
+}).catch(() => {});
+
+$('#form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const boton = $('#entrar');
+  boton.disabled = true;
+  boton.textContent = 'Entrando…';
+  avisar('');
+  try {
+    const r = await fetch('api/sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: $('#usuario').value, contrasena: $('#contrasena').value }),
+    });
+    if (!r.ok) {
+      const cuerpo = await r.json().catch(() => ({}));
+      throw new Error(cuerpo.detail || `HTTP ${r.status}`);
+    }
+    location.replace(destino());
+  } catch (err) {
+    avisar(err.message);
+    $('#contrasena').value = '';
+    $('#contrasena').focus();
+    boton.disabled = false;
+    boton.textContent = 'Entrar';
+  }
+});
+</script>
+</body>
+</html>

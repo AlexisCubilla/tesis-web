@@ -128,6 +128,21 @@
   --boton-hover: rgba(255, 255, 255, .09);
   --fila-hover: rgba(127, 168, 214, .07);
   --opcion-activa: rgba(21, 68, 115, .30);
+  /* La fila de un evento contestado, teñida según LA RESPUESTA: `--ok` si es anomalía, `--peligro`
+     si no lo es, `--texto` si quedó neutral. Cada una va en dos alturas porque `tbody tr:hover`
+     empata en especificidad con el selector de atributo, así que sin la segunda la fila que se
+     está apuntando —justo la que se mira— sería la única que pierde el tinte.
+
+     Los tres alfa no son iguales y no es descuido: al mismo valor el rojo pesa más que el verde y
+     el blanco más que los dos, así que igualarlos numéricamente los desiguala en pantalla. Bajan
+     en ese orden para que las tres filas se lean con el mismo volumen, y «neutral» además queda
+     deliberadamente al fondo: es la respuesta que no toma postura. */
+  --fila-si:            rgba(101, 202, 126, .10);
+  --fila-si-hover:      rgba(101, 202, 126, .17);
+  --fila-no:            rgba(255, 137, 135, .09);
+  --fila-no-hover:      rgba(255, 137, 135, .16);
+  --fila-neutral:       rgba(244, 246, 248, .055);
+  --fila-neutral-hover: rgba(244, 246, 248, .105);
   /* Las dos variantes de aviso comparten matiz —la información va en naranja
      claro— y se separan por intensidad: la advertencia lleva el filete pleno, la
      informativa lo lleva a media tinta. Ver `.aviso.info`. */
@@ -454,6 +469,21 @@ p { margin: 0 0 1em; text-wrap: pretty; }
    inactiva la haría parecer la activa. */
 .barra nav a:hover { color: var(--texto); }
 .barra nav a.activo { background: var(--panel-2); color: var(--texto); }
+
+/* --- La cuenta, al final de la barra ---
+   Va separada de las pestañas por un filete y no por más aire: son dos cosas distintas —a dónde ir
+   y quién sos— y el filete lo dice sin sumar una tercera caja. El nombre NO es un botón: no lleva
+   recuadro, porque no se puede hacer clic en él y darle marco lo haría parecer una pestaña más. */
+.barra .cuenta { display: flex; align-items: center; gap: 10px;
+  margin-left: 10px; padding-left: 14px; border-left: 1px solid var(--borde); }
+.barra .cuenta .quien { font-size: .86rem; color: var(--texto-2); }
+.barra .cuenta .salir {
+  font: inherit; font-size: .86rem; padding: 7px 12px; border-radius: var(--radio-2);
+  border: 1px solid var(--borde); background: none; color: var(--texto-2); cursor: pointer;
+  transition: color .18s ease;
+}
+.barra .cuenta .salir:hover { color: var(--texto); }
+.barra .cuenta .salir:disabled { opacity: .5; cursor: progress; }
 /* La pestaña activa se marca con su propio relleno y no con un subrayado colgando
    de la barra. El subrayado obligaba a calcular un `bottom` negativo contra el alto
    de la barra, y se desalineaba en cuanto cambiaba el padding; el relleno viaja con
@@ -613,9 +643,100 @@ td.num { text-align: right; font-family: var(--mono); }
   cursor: pointer; white-space: nowrap; }
 .grafico-btn:hover { color: var(--texto); border-color: var(--borde-fuerte); }
 
+/* --- Con un modal abierto, el fondo no se desplaza ---
+   `showModal()` deja inerte lo que hay detrás, pero NO frena el desplazamiento: la rueda sobre el
+   fondo sigue moviendo la página, así que al cerrar el diálogo se vuelve a otro lugar del que se
+   estaba. Eso rompe exactamente lo que hace llevadero clasificar de a cuarenta —abrir, mirar,
+   responder, cerrar y seguir en la misma fila—, que es el motivo por el que esto es un diálogo y
+   no un panel al pie (ver la nota de `.dlg-evento`).
+
+   Va en CSS con `:has()` y no en JS a propósito: cubre los dos diálogos del taller sin que ninguno
+   tenga que acordarse de trabar ni de destrabar nada, y anida bien. El gráfico agrandado se abre
+   DENTRO del diálogo del evento, y al cerrarlo el selector todavía encuentra abierto al de afuera,
+   así que la traba no se suelta antes de tiempo — con un contador en JS eso es un bug clásico.
+
+   `scrollbar-gutter` no es cosmético: sin él, al trabar el desplazamiento desaparece la barra y
+   todo el contenido de atrás salta ~15 px hacia la derecha en el momento de abrir el diálogo.
+   Reservando el hueco siempre, no hay salto. */
+html { scrollbar-gutter: stable; }
+html:has(dialog[open]) { overflow: hidden; }
+
 .grafico-modal { border: none; border-radius: var(--radio); padding: 14px 16px; width: min(1400px, 95vw);
   background: var(--panel); color: var(--texto); box-shadow: var(--sombra); }
 .grafico-modal::backdrop { background: rgba(0, 0, 0, .55); }
+
+/* --- Diálogo de clasificación de un evento ---
+   Doble clic sobre un evento —en la línea de tiempo o en la tabla— y abre esto: arriba las tres
+   señales del tramo, abajo la pregunta. Es un `<dialog>` modal y no un panel al pie de la página
+   porque clasificar es un acto que empieza y termina: mientras dura, lo único que importa es ese
+   evento, y al cerrarlo se vuelve exactamente a donde se estaba en la tabla.
+
+   El gráfico va ARRIBA de la pregunta a propósito. Al revés, la respuesta quedaría a mano antes de
+   haber mirado la señal, y este diálogo existe justamente para que se la mire. */
+.dlg-evento { border: none; border-radius: var(--radio); padding: 0; width: min(1000px, 95vw);
+  max-height: 92vh; background: var(--panel); color: var(--texto); box-shadow: var(--sombra); }
+.dlg-evento::backdrop { background: rgba(0, 0, 0, .6); }
+.dlg-evento .cuerpo { padding: 16px 18px 18px; max-height: 92vh; overflow-y: auto; }
+.dlg-evento .cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 4px; }
+.dlg-evento .cab h4 { margin: 0; font-size: 1rem; }
+.dlg-evento .meta { font-family: var(--mono); font-size: .76rem; color: var(--texto-2); }
+.dlg-evento .porque { font-family: var(--mono); font-size: .74rem; color: var(--texto-2);
+  margin: 8px 0 0; }
+
+.encuesta { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borde); }
+.encuesta > legend, .encuesta .pregunta { font-weight: 650; font-size: .95rem; margin-bottom: 12px; }
+
+/* La escala, de «definitivamente no» a «definitivamente sí», en fila y en ese orden.
+   Los cinco pesan lo mismo: si el «sí» destacara, la interfaz estaría sugiriendo una respuesta a
+   quien tiene que darla, que en un instrumento de medición es contaminar el dato. El único color
+   que aparece es el de la opción YA elegida, que informa un estado en vez de proponerlo. */
+.escala { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+@media (max-width: 640px) { .escala { grid-template-columns: repeat(2, 1fr); } }
+.escala label { display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 46px; padding: 8px 6px; border-radius: var(--radio-2);
+  border: 1px solid var(--borde); background: var(--fondo-2);
+  font-size: .82rem; font-weight: 500; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.escala label:hover { border-color: var(--borde-fuerte); color: var(--texto); }
+.escala input { position: absolute; opacity: 0; width: 0; height: 0; }
+.escala label:has(input:checked) { border-color: var(--acento); color: var(--texto);
+  background: rgba(21, 68, 115, .38); }
+.escala label:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+.encuesta textarea { width: 100%; margin-top: 14px; padding: 9px 11px; border-radius: var(--radio-2);
+  border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
+  font: inherit; font-size: .88rem; line-height: 1.55; resize: vertical; min-height: 76px; }
+.encuesta textarea:focus { outline: none; border-color: var(--borde-fuerte); }
+.encuesta .pie { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+/* Marca de «ya lo clasifiqué» en la tabla de eventos. La ETIQUETA es texto y no un ícono de color:
+   la respuesta tiene cinco valores y un semáforo de cinco tonos obligaría a recordar qué significa
+   cada uno. Eso sigue siendo cierto y por eso la etiqueta no se toca; el tinte de la fila —abajo—
+   es otra cosa: agrupa las cinco en tres y el texto queda al lado para desempatar. */
+.marca-clas { font-size: .74rem; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto-2); }
+.marca-clas.si { border-color: var(--acento); color: var(--texto); }
+.marca-clas.pendiente { opacity: .45; }
+
+/* La fila entera de un evento contestado, teñida según la respuesta: al volver a la lista después
+   de cada una hay que poder ver de un barrido qué queda pendiente y qué se dijo, y para eso la
+   etiqueta de la última columna obliga a recorrer la tabla con la vista pegada al borde derecho.
+
+   TRES COLORES Y NO CINCO. Las cinco opciones se agrupan por el SIGNO de su `valor` en la escala
+   (ver `tonoDeRespuesta` en `app.js`): sí/definitivamente sí van juntas, no/definitivamente no
+   también, y «neutral» sola. Es la distinción que se quiere barrer con la vista; el matiz entre
+   «sí» y «definitivamente sí» se lee en la etiqueta, que sigue estando al lado. Y el color nunca
+   queda solo: quien no distinga los tonos tiene el texto en la misma fila.
+
+   El mismo código de color va en el contorno de los bloques de la línea de tiempo, para que verde
+   signifique lo mismo en las dos vistas. */
+tbody tr[data-tono="si"]              { background: var(--fila-si); }
+tbody tr[data-tono="si"]:hover        { background: var(--fila-si-hover); }
+tbody tr[data-tono="no"]              { background: var(--fila-no); }
+tbody tr[data-tono="no"]:hover        { background: var(--fila-no-hover); }
+tbody tr[data-tono="neutral"]         { background: var(--fila-neutral); }
+tbody tr[data-tono="neutral"]:hover   { background: var(--fila-neutral-hover); }
 
 /* Lupa de las miniaturas: discreta, pero siempre visible — en pantalla táctil no hay hover
    que la revele. */

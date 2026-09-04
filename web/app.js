@@ -33,6 +33,14 @@ const S = {
 const $ = (s) => document.querySelector(s);
 const api = async (ruta, op) => {
   const r = await fetch(ruta, op);
+  /* La sesión venció con la pestaña abierta. Mandar a la pantalla de ingreso acá —y no dejar que
+     cada llamada muestre «HTTP 401» por su cuenta— evita el estado en el que media interfaz sigue
+     dibujada con datos viejos y ninguna acción funciona, que es de los peores para diagnosticar.
+     El destino viaja pegado para volver al mismo nodo después de entrar. */
+  if (r.status === 401) {
+    location.href = 'login?destino=' + encodeURIComponent(location.pathname + location.search);
+    throw new Error('Sesión vencida');
+  }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
   return r.json();
 };
@@ -757,6 +765,9 @@ async function cargarVisual() {
       return;
     }
     const d = await api(`api/nodo/${n.clave}/datos`);
+    // La tabla de eventos marca lo que YO ya clasifiqué, así que la encuesta tiene que estar
+    // cargada antes de dibujarla. Es una sola llamada y solo en la última etapa.
+    if (d.tipo === 'eventos') await cargarClasificacion(n.clave);
     vis.innerHTML = '';
     ({ serie: verSerie, ventanas: verVentanas, features: verFeatures, filtrado: verFiltrado,
        scores: verScores, eventos: verEventos }[d.tipo] || (() => {}))(d);
@@ -1042,6 +1053,58 @@ function verScores(d) {
       </tbody></table></div>`).join('')}</div>`;
 }
 
+/* ---------------------------------------------------------------- clasificación de eventos
+   Lo que una persona opina de cada evento candidato. Se carga junto con la tabla y se guarda en
+   `C` para que la marca de «ya lo revisé» no cueste una llamada por fila.
+
+   `C.mias` va indexado por `event_id` en TEXTO: viene de JSON, que no tiene claves numéricas.
+   Convertirlo a número al recibirlo era una tentación; se dejó como llegó y se convierte al
+   consultar, que es un solo lugar. */
+const C = { pregunta: '', escala: [], mias: {} };
+
+const miRespuesta = (id) => C.mias[String(id)] || null;
+const etiquetaEscala = (codigo) => (C.escala.find((o) => o.codigo === codigo) || {}).etiqueta || codigo;
+
+/** El signo de mi respuesta para un evento: `si`, `no`, `neutral`, o `null` si no la contesté.
+ *
+ *  Sale del `valor` de la escala (-2 a 2) y no de los códigos, que son cinco y podrían ser otros:
+ *  agrupar por signo es la única forma de pasar de cinco opciones a tres colores que siga siendo
+ *  correcta si mañana la escala tiene siete. Una respuesta cuyo código no esté en la escala cae en
+ *  `neutral` sola, porque `undefined` no es mayor ni menor que cero.
+ */
+function tonoDeRespuesta(id) {
+  const mia = miRespuesta(id);
+  if (!mia) return null;
+  const valor = (C.escala.find((o) => o.codigo === mia.respuesta) || {}).valor;
+  return valor > 0 ? 'si' : valor < 0 ? 'no' : 'neutral';
+}
+
+/** El `data-tono` de una fila de la tabla, o nada si el evento está sin contestar. */
+const atributoTono = (id) => {
+  const tono = tonoDeRespuesta(id);
+  return tono ? ` data-tono="${tono}"` : '';
+};
+
+async function cargarClasificacion(clave) {
+  try {
+    const d = await api(`api/nodo/${clave}/clasificacion`);
+    C.pregunta = d.pregunta; C.escala = d.escala; C.mias = d.mias || {};
+  } catch (e) {
+    // Que falle la encuesta no puede dejar sin tabla de eventos: son dos cosas independientes.
+    C.pregunta = ''; C.escala = []; C.mias = {};
+  }
+}
+
+/** Lo último que se dibujó en la tabla de eventos.
+ *
+ *  Existe para poder repintar la línea de tiempo cuando cambia UNA clasificación. La tabla se
+ *  arregla sola —es una celda y un atributo—, pero el contorno de la línea lo dibuja ECharts
+ *  dentro de un `renderItem`, y eso no se toca desde afuera: hay que volver a pedir el gráfico, y
+ *  para eso hacen falta los datos con los que se armó. Rehacer la fase entera en su lugar tiraría
+ *  también el detalle del evento que quedó abierto abajo.
+ */
+let _tablaEventos = null;
+
 function verEventos(d) {
   const cols = ['event_id', 'SheetName', 'start', 'end', 'n_ventanas', 'n_detectores', 'features_top']
     .filter((c) => d.columnas.includes(c));
@@ -1071,21 +1134,70 @@ function verEventos(d) {
     <div id="caja-revision"></div>
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
       <span class="esp"></span>
-      <span class="tenue" style="font-size:.78rem">clic en una fila para ver sus señales</span></div>
+      <span class="tenue" style="font-size:.78rem" id="avance-clas"></span>
+      <span class="tenue" style="font-size:.78rem">clic = ver señales · doble clic = clasificar</span></div>
     <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
-      `<th>${rot[c] || c}</th>`).join('')}</tr></thead>
-    <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer">${cols.map((c) => {
+      `<th>${rot[c] || c}</th>`).join('')}<th>mi juicio</th></tr></thead>
+    <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer"${
+      atributoTono(f.event_id)}>${cols.map((c) => {
       const v = f[c];
       if (c === 'n_detectores') return `<td class="num"><strong style="color:${v >= 4 ? 'var(--acento-2)' : 'var(--texto-2)'}">${v}/5</strong></td>`;
       if (c === 'features_top') return `<td class="mono" style="font-size:.71rem;color:var(--texto-2)">${(v || '').slice(0, 60)}</td>`;
       return typeof v === 'number' ? `<td class="num">${v}</td>` : `<td>${v}</td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div>
+    }).join('')}<td class="celda-clas">${marcaClasificacion(f.event_id)}</td></tr>`).join('')}</tbody></table></div>
     <div id="detalle-evento" style="margin-top:16px"></div>`;
+  _tablaEventos = { d, filas };
   lineaDeEventos($('#caja-linea'), d, filas);
-  document.querySelectorAll('#fase-visual tr[data-ev]').forEach((tr) =>
-    tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev))));
+  /* Un clic abre las señales abajo, como siempre; el doble clic abre el diálogo para clasificar.
+     Conviven sin pelearse porque el navegador dispara los dos y el segundo no deshace al primero:
+     al cerrar el diálogo, el detalle de ese mismo evento ya quedó abierto detrás. */
+  document.querySelectorAll('#fase-visual tr[data-ev]').forEach((tr) => {
+    tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev)));
+    tr.addEventListener('dblclick', () => abrirDialogoEvento(Number(tr.dataset.ev)));
+  });
+  pintarAvanceClasificacion(filas.length);
   bloqueDeRevision(S.sel);
+}
+
+/** La celda «mi juicio» de una fila: la respuesta si la hay, o un guion si falta. */
+function marcaClasificacion(id) {
+  const mia = miRespuesta(id);
+  return mia
+    ? `<span class="marca-clas si" title="${mia.comentario ? 'Con comentario' : 'Sin comentario'}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>`
+    : '<span class="marca-clas pendiente">sin clasificar</span>';
+}
+
+/** «12 de 40 clasificados» arriba de la tabla: lo primero que hace falta al volver a una sesión. */
+function pintarAvanceClasificacion(total) {
+  const caja = $('#avance-clas');
+  if (!caja) return;
+  const hechos = Object.keys(C.mias).length;
+  caja.textContent = hechos ? `${hechos} de ${total} clasificados por vos ·` : '';
+}
+
+/** Repinta una fila después de guardar —su celda y su tinte—, sin rehacer la tabla entera. */
+function refrescarMarca(id) {
+  const fila = document.querySelector(`#fase-visual tr[data-ev="${id}"]`);
+  if (fila) {
+    fila.querySelector('.celda-clas').innerHTML = marcaClasificacion(id);
+    /* Y el tinte de la respuesta. Se pinta acá y no solo al armar la tabla porque el sentido de la
+       marca es barrer la lista con la vista al volver de CADA respuesta, no al recargar. */
+    const tono = tonoDeRespuesta(id);
+    if (tono) fila.dataset.tono = tono; else delete fila.dataset.tono;
+  }
+  /* Y el contorno en la línea de tiempo, que hay que redibujar entera: el bloque lo pinta un
+     `renderItem` de ECharts, no un estilo que se pueda cambiar desde acá. `limpiar` primero, y no
+     solo el `innerHTML`: `medida` AGREGA un gráfico al contenedor, así que sin destruir el anterior
+     quedarían dos apilados y una instancia viva sin dueño. */
+  const caja = $('#caja-linea');
+  if (caja && _tablaEventos) {
+    Grafico.limpiar(caja);
+    caja.innerHTML = '';
+    lineaDeEventos(caja, _tablaEventos.d, _tablaEventos.filas);
+  }
+  const total = document.querySelectorAll('#fase-visual tr[data-ev]').length;
+  pintarAvanceClasificacion(total);
 }
 
 /** El acceso a la revisión del experto, debajo de las descargas.
@@ -1176,6 +1288,10 @@ async function abrirRevision(clave, tipo, boton) {
  *  La tabla dice cuántos eventos hay y con qué fuerza, pero no dónde. Y «dónde» es lo primero que
  *  se quiere mirar: si se amontonan en una hoja, si caen al principio de la sesión, si hay hojas
  *  enteras sin nada. Cada hoja es una pista gris con el largo de su registro, y encima los eventos.
+ *
+ *  Una hoja ocupa más de un renglón cuando tiene eventos que se solapan: van en carriles, y el
+ *  rótulo del eje lo lleva solo el primero. Es la única forma de que se puedan abrir de a uno
+ *  —ver la nota de los carriles más abajo—, y de paso es la respuesta a «¿acá hay uno o dos?».
  */
 function lineaDeEventos(destino, d, filas) {
   const pistas = d.pistas || [];
@@ -1184,13 +1300,78 @@ function lineaDeEventos(destino, d, filas) {
   const conEventos = new Set(filas.map((f) => f.SheetName));
   const usadas = pistas.filter((p) => conEventos.has(p.hoja));
   const vacias = pistas.length - usadas.length;
-  const fila = new Map(usadas.map((p, i) => [p.hoja, i]));
+  const pistaDe = new Map(usadas.map((p) => [p.hoja, p]));
   const maxDet = Math.max(...filas.map((f) => f.n_detectores), 1);
-  const alto = usadas.length * 26 + 76;
+
+  /* CARRILES: una hoja ocupa tantos renglones como haga falta para que ningún evento tape a otro.
+   *
+   * Hace falta porque hay eventos que se solapan de verdad —el 6 (237-337) y el 7 (290-340) en
+   * «August 26» comparten 47 mediciones— y dibujados en el mismo renglón el de arriba se come al
+   * de abajo: no es que se vea mal, es que **no se puede abrir**. El 7 sobresale 3 mediciones del
+   * 6, que a esta escala son 2 px, así que no hay dónde hacerle doble clic. Peor todavía el 25 en
+   * «May 26», cuya parte libre es UNA medición. La tabla los lista a todos, pero la línea es donde
+   * se elige qué mirar, y ahí había eventos inalcanzables.
+   *
+   * El reparto es el clásico de una agenda: recorrer los eventos de la hoja por dónde empiezan y
+   * poner cada uno en el primer carril que ya haya terminado. Los que solo quedan cerca —el 2 y el
+   * 3 en «August 07», a 7 mediciones— siguen compartiendo carril: para esos el filete oscuro
+   * alcanza, y separarlos costaría un renglón por nada.
+   */
+  const carrilDe = new Map();    // event_id -> carril dentro de su hoja
+  const cuantosCarriles = new Map();
+  for (const p of usadas) {
+    const suyos = filas.filter((f) => f.SheetName === p.hoja).sort((a, b) => a.start - b.start);
+    const finDe = [];            // hasta dónde llega lo último puesto en cada carril
+    for (const f of suyos) {
+      let i = finDe.findIndex((fin) => fin < f.start);
+      if (i === -1) i = finDe.length;
+      finDe[i] = f.end;
+      carrilDe.set(f.event_id, i);
+    }
+    cuantosCarriles.set(p.hoja, Math.max(finDe.length, 1));
+  }
+
+  /* Un renglón del eje por cada carril de cada hoja, en el orden de las hojas. El rótulo lo lleva
+     solo el primero: los de abajo son la misma hoja y repetir el nombre haría pensar que son otra. */
+  const renglones = [];
+  for (const p of usadas) {
+    for (let i = 0; i < cuantosCarriles.get(p.hoja); i++) renglones.push({ hoja: p.hoja, carril: i });
+  }
+  const y = new Map(renglones.map((r, i) => [`${r.hoja}#${r.carril}`, i]));
+  const dondeVa = (f) => y.get(`${f.SheetName}#${carrilDe.get(f.event_id)}`);
+  const partidas = [...cuantosCarriles.values()].filter((n) => n > 1).length;
+  /* Una sola lectura del CSS para todos los bloques: `renderItem` corre una vez por evento.
+
+     El contorno dice QUÉ se respondió, no solo que se respondió: verde si es anomalía, rojo si no
+     lo es, gris si quedó neutral. El gris va el más apagado de los tres a propósito — «neutral» no
+     tiene que pesar como una postura.
+
+     Y CADA UNO LLEVA SU TRAZO, no solo su color. Es la regla de la casa: el `.chip` de estado
+     lleva un punto además del matiz «para que quien no distinga rojo de verde siga leyendo la
+     etiqueta» (ver `estilos.css`), y acá el problema es peor, porque un bloque de la línea no
+     tiene etiqueta al lado: el contorno es lo único que hay. Verde/rojo es justo el par que
+     colapsa en la deuteranopía, así que el largo del trazo hace la distinción sin depender del
+     color. En la tabla no hace falta — ahí la respuesta está escrita en la fila.
+
+     LOS TRES VAN CORTADOS, ninguno entero: es lo que se pidió, y de paso deja los tres tramos en
+     una escalera —largo, corto, punto— que se lee como «cuánto se afirma», que es lo que la escala
+     mide. Un contorno entero, además, se confundía con el filete de un bloque cualquiera. */
+  const contorno = {
+    si:      { color: Grafico.paleta.varCss('--ok'),      guion: [9, 3] },
+    no:      { color: Grafico.paleta.varCss('--peligro'), guion: [5, 3] },
+    neutral: { color: Grafico.paleta.varCss('--texto-2'), guion: [2, 3] },
+  };
+  const fondo = Grafico.paleta.varCss('--fondo');
+  const alto = renglones.length * 26 + 76;
 
   Grafico.medida(destino, {
     titulo: 'Dónde cae cada evento',
     alto,
+    /* El `event_id` va en la posición 4 del dato de la serie de eventos (ver `data` más abajo).
+       La pista gris es la serie 0 y es `silent`, así que nunca llega acá. */
+    alDobleClic: (info) => {
+      if (info.seriesIndex === 1 && Array.isArray(info.value)) abrirDialogoEvento(Number(info.value[4]));
+    },
     opcion: (c) => {
       const pista = (params, api) => {
         const y = api.coord([0, api.value(0)])[1];
@@ -1204,10 +1385,52 @@ function lineaDeEventos(destino, d, filas) {
         const x0 = api.coord([api.value(1), api.value(0)])[0];
         const x1 = api.coord([api.value(2), api.value(0)])[0];
         const n = api.value(3);
-        return { type: 'rect',
-                 shape: { x: x0, y: y - 9, width: Math.max(3, x1 - x0), height: 18, r: 3 },
-                 style: { fill: Grafico.paleta.serie(n >= 4 ? 1 : 0),
-                          opacity: .35 + .65 * (n / maxDet) } };
+        const ancho = Math.max(3, x1 - x0);
+        /* HAY EVENTOS QUE SE SOLAPAN DE VERDAD, y el filete oscuro está para que se vean.
+           Medido sobre la tabla de esta corrida: 3 pares se pisan (el 24 y el 25 en «May 26»
+           comparten 49 mediciones; el 26 y el 27 en «May 27», lo mismo; el 6 y el 7 en
+           «August 26», 47) y otros 2 quedan a menos de 8 mediciones. Sin borde, dos rellenos
+           translúcidos encimados se leen como UN bloque más ancho con una mancha en el medio, y
+           quien clasifica no tiene forma de saber que ahí hay dos eventos para responder. */
+        const relleno = {
+          type: 'rect',
+          shape: { x: x0, y: y - 9, width: ancho, height: 18, r: 3 },
+          style: { fill: Grafico.paleta.serie(n >= 4 ? 1 : 0),
+                   /* El alfa va en `fillOpacity` y no en `opacity`: `opacity` es del elemento
+                      entero, así que se llevaba puesto al contorno y en un evento de 1/5 métodos
+                      (alfa .35) el verde salía lavado a un marrón sucio —medido:
+                      rgba(161,123,76,147) en vez de rgba(101,202,126,255)—, justo donde la marca
+                      más tiene que verse. Separados, el relleno conserva su intensidad. */
+                   fillOpacity: .35 + .65 * (n / maxDet),
+                   stroke: fondo, lineWidth: 1 },
+        };
+        const tono = tonoDeRespuesta(api.value(4));
+        if (!tono) return relleno;
+        /* Clasificado. Dos decisiones, las dos por lo mismo —que la marca se vea igual sobre
+           cualquier bloque— y las dos aprendidas de verlo mal:
+
+           EL CONTORNO VA POR FUERA del relleno, no encima. `--ok` sobre el lila de los eventos de
+           4+ métodos da 1,4:1: en la práctica, invisible. Sobre el lienzo da casi 10:1. Corrido
+           dos píxeles hacia afuera, el color apoya siempre en el fondo y se lee igual en un bloque
+           lila que en uno turquesa.
+
+           Y EL CONTORNO SUBE DE `z2`, solo él. El orden de dibujado es el de la tabla (por
+           métodos, después por tramos), así que un evento solapado que cayera después tapaba
+           media marca con su relleno: el 7 se dibuja después del 6 y le comía el tercio derecho
+           del contorno. Sube el contorno y no el bloque entero para no cambiar qué relleno queda
+           arriba —si subiera el grupo, un evento clasificado de 5/5, que va opaco, esconderÍa al
+           vecino con el que se solapa.
+
+           OJO: el `z2` va en el rectángulo, NO en el grupo. zrender ordena la lista de dibujado
+           por el `z2` de cada elemento hoja e ignora el del grupo que los contiene; puesto en el
+           grupo no hace nada, y se comprobó midiendo el píxel (seguía saliendo lila). */
+        return { type: 'group', children: [relleno, {
+          type: 'rect',
+          z2: 2,
+          shape: { x: x0 - 2, y: y - 11, width: ancho + 4, height: 22, r: 4 },
+          style: { fill: 'none', stroke: contorno[tono].color, lineWidth: 2,
+                   lineDash: contorno[tono].guion },
+        }] };
       };
       return {
         animation: false,
@@ -1216,30 +1439,180 @@ function lineaDeEventos(destino, d, filas) {
         tooltip: Object.assign({}, c.tooltip, {
           formatter: (p) => (p.seriesIndex === 0 ? null
             : `<b>Evento ${p.value[4]}</b> · ${p.value[3]} de 5 métodos<br>` +
-              `<span style="color:${c.tenue}">${usadas[p.value[0]].hoja} · mediciones ` +
+              `<span style="color:${c.tenue}">${renglones[p.value[0]].hoja} · mediciones ` +
               `${p.value[1]}–${p.value[2]}</span>`),
         }),
         xAxis: Object.assign({}, c.eje, { type: 'value', min: 0,
           name: 'medición dentro de la hoja', nameLocation: 'middle', nameGap: 26,
           nameTextStyle: { color: c.tenue } }),
+        /* Las categorías van con una clave `hoja#carril` y NO con el rótulo: dos renglones de la
+           misma hoja tendrían el mismo nombre —o los dos vacíos— y un eje de categorías las
+           indexa por nombre, así que se colapsarían en una. El nombre visible lo pone el
+           `formatter`, que recibe la posición y puede callar los carriles de abajo. */
         yAxis: Object.assign({}, c.eje, { type: 'category',
-          data: usadas.map((p) => p.hoja), inverse: true,
+          data: renglones.map((r) => `${r.hoja}#${r.carril}`), inverse: true,
           axisTick: { show: false }, splitLine: { show: false },
-          axisLabel: { color: c.tenue, fontSize: 10 } }),
+          axisLabel: { color: c.tenue, fontSize: 10,
+                       formatter: (v, i) => (renglones[i].carril === 0 ? renglones[i].hoja : '') } }),
         series: [
+          // La pista gris se repite en cada carril: es el mismo registro visto en dos renglones, y
+          // sin ella el de abajo quedaría flotando sin la referencia de dónde empieza y termina.
           { type: 'custom', renderItem: pista, silent: true,
             encode: { x: [1, 2], y: 0 },
-            data: usadas.map((p, i) => [i, p.desde, p.hasta]) },
+            data: renglones.map((r, i) => [i, pistaDe.get(r.hoja).desde, pistaDe.get(r.hoja).hasta]) },
           { type: 'custom', renderItem: evento,
             encode: { x: [1, 2], y: 0 },
-            data: filas.filter((f) => fila.has(f.SheetName))
-                       .map((f) => [fila.get(f.SheetName), f.start, f.end, f.n_detectores, f.event_id]) },
+            data: filas.filter((f) => pistaDe.has(f.SheetName))
+                       .map((f) => [dondeVa(f), f.start, f.end, f.n_detectores, f.event_id]) },
         ],
       };
     },
     pie: `${filas.length} eventos repartidos en ${usadas.length} hojas` +
          (vacias ? `; las otras ${vacias} hojas no tienen ninguno.` : '.') +
-         ' Cuanto más intenso el bloque, más métodos coinciden.',
+         (partidas ? ` ${partidas} ${partidas === 1 ? 'hoja ocupa' : 'hojas ocupan'} más de un` +
+           ' renglón: son eventos que se pisan y van en carriles separados para poder abrir cada' +
+           ' uno.' : '') +
+         ' Cuanto más intenso el bloque, más métodos coinciden. El contorno es tu respuesta:' +
+         ' verde de trazo largo si lo marcaste como anomalía, rojo de trazo corto si dijiste que' +
+         ' no lo es, gris punteado si quedó neutral.' +
+         ' Doble clic sobre un evento para verlo y clasificarlo.',
+  });
+}
+
+
+/* ================================================================ el diálogo de clasificación
+ *
+ * Doble clic sobre un evento —en la línea de tiempo o en la tabla— y se abre esto: las tres señales
+ * del tramo, y debajo la pregunta con su escala y un comentario.
+ *
+ * POR QUÉ UN DIÁLOGO Y NO UN PANEL MÁS. Clasificar cuarenta eventos es una tarea repetitiva que se
+ * hace en varias sesiones. Lo que la hace llevadera es que cada evento sea un ciclo cerrado: se
+ * abre, se mira, se responde, se cierra y se vuelve a la lista en el mismo lugar. Un panel al pie
+ * de la página obligaría a desplazarse arriba y abajo por cada uno.
+ *
+ * POR QUÉ NO HAY OPCIÓN PREMARCADA. Ninguna de las cinco viene elegida de entrada, ni siquiera
+ * «Neutral». Una respuesta por defecto se convierte en la respuesta de quien duda, y acá lo que se
+ * está midiendo es justamente el juicio de esa persona: un default lo contaminaría de forma
+ * invisible en el reporte, que no podría distinguir «dijo neutral» de «no contestó».
+ */
+
+/** El diálogo abierto, si hay uno. Se guarda para no apilar dos con un doble clic apurado. */
+let _dlgEvento = null;
+
+async function abrirDialogoEvento(id) {
+  if (_dlgEvento) return;
+  const clave = S.sel;
+
+  const dlg = document.createElement('dialog');
+  dlg.className = 'dlg-evento';
+  dlg.innerHTML = '<div class="cuerpo"><p class="tenue" style="font-size:.85rem">Cargando…</p></div>';
+  document.body.appendChild(dlg);
+  _dlgEvento = dlg;
+
+  /* La limpieza NO cuelga del evento `close`, y eso es a propósito.
+     `dialog.close()` dispara `close` en una tarea encolada, no en el acto, y hay motores donde no
+     llega nunca (se comprobó en uno: el diálogo quedaba con `open=false` pero sin desmontarse, y
+     cada apertura dejaba un ECharts vivo y un elemento muerto en el DOM). Al colgar la limpieza de
+     una función síncrona e idempotente, el camino normal no depende de nadie, y `close` queda solo
+     como red para los cierres nativos —Escape— que no pasan por acá. */
+  let cerrado = false;
+  const limpiar = () => {
+    if (cerrado) return;
+    cerrado = true;
+    Grafico.limpiar(dlg);
+    dlg.remove();
+    _dlgEvento = null;
+  };
+  const cerrar = () => { dlg.close(); limpiar(); };
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) cerrar(); });
+  dlg.addEventListener('close', limpiar);
+  dlg.addEventListener('cancel', limpiar);   // Escape
+  dlg.showModal();
+
+  let d;
+  try {
+    d = await api(`api/nodo/${clave}/evento/${id}`);
+  } catch (e) {
+    dlg.querySelector('.cuerpo').innerHTML =
+      `<p class="tenue" style="font-size:.85rem">No se pudo cargar el evento: ${e.message}</p>
+       <button class="boton" id="cerrar-dlg">Cerrar</button>`;
+    dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
+    return;
+  }
+
+  const ev = d.evento;
+  const mia = miRespuesta(id);
+
+  dlg.querySelector('.cuerpo').innerHTML = `
+    <div class="cab">
+      <h4>Evento ${id} · ${ev.SheetName}</h4>
+      <span class="chip ${ev.n_detectores >= 4 ? 'listo' : 'pendiente'}">${ev.n_detectores}/5 métodos</span>
+      <span class="esp"></span>
+      <span class="meta">mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos</span>
+      <button class="boton plano" id="cerrar-dlg" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div id="caja-dlg-ev"></div>
+    <p class="porque">${ev.features_top || ''}</p>
+
+    <form class="encuesta" id="form-clas">
+      <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
+      <div class="escala">${C.escala.map((o) => `
+        <label><input type="radio" name="respuesta" value="${o.codigo}"
+          ${mia && mia.respuesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
+      <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
+        maxlength="4000">${mia ? (mia.comentario || '') : ''}</textarea>
+      <div class="pie">
+        <button class="boton primario" type="submit" id="guardar-clas">
+          ${mia ? 'Actualizar respuesta' : 'Guardar respuesta'}</button>
+        <button class="boton" type="button" id="cancelar-clas">Cerrar</button>
+        <span class="esp"></span>
+        <span class="tenue" style="font-size:.78rem" id="estado-clas">${
+          mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
+                  { dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
+      </div>
+    </form>`;
+
+  dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
+  dlg.querySelector('#cancelar-clas').addEventListener('click', cerrar);
+
+  Grafico.lineas(dlg.querySelector('#caja-dlg-ev'), {
+    // Sin título propio: el encabezado del diálogo ya dice de qué evento es, y repetirlo dos
+    // renglones más abajo sería la misma frase dos veces. Pero al agrandarlo el gráfico sale de
+    // ese contexto y necesita nombrarse — de eso se ocupa `tituloAgrandado`.
+    titulo: null,
+    tituloAgrandado: `Señales del evento ${id} · ${ev.SheetName}`,
+    xNombre: 'medición',
+    sustantivo: 'mediciones',
+    paneles: d.senales.map((s, i) => ({ nombre: s, valores: d.valores.map((f) => f[i]) })),
+  });
+  /* No hace falta forzar un `resize`: el diálogo ya está abierto y con tamaño cuando se crea el
+     gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
+     gráfico cubre cualquier cambio posterior. */
+
+  dlg.querySelector('#form-clas').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const elegida = dlg.querySelector('input[name="respuesta"]:checked');
+    const estado = dlg.querySelector('#estado-clas');
+    if (!elegida) { estado.textContent = 'Elegí una de las cinco opciones.'; return; }
+    const boton = dlg.querySelector('#guardar-clas');
+    boton.disabled = true;
+    estado.textContent = 'Guardando…';
+    try {
+      const guardada = await api(`api/nodo/${clave}/evento/${id}/clasificacion`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          respuesta: elegida.value,
+          comentario: dlg.querySelector('#comentario').value,
+        }),
+      });
+      C.mias[String(id)] = guardada;
+      refrescarMarca(id);
+      cerrar();
+    } catch (err) {
+      estado.textContent = `No se pudo guardar: ${err.message}`;
+      boton.disabled = false;
+    }
   });
 }
 

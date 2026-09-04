@@ -11,16 +11,18 @@ import dataclasses
 import json
 import shutil
 import tempfile
+import time
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from . import ajustes, almacen, etapas, proxy_oo, revision, trabajos
+from . import ajustes, almacen, clasificacion, cuentas, etapas, proxy_oo, revision, trabajos
 
 RAIZ = ajustes.RAIZ
 WEB = ajustes.DIR_WEB
@@ -28,6 +30,8 @@ WEB = ajustes.DIR_WEB
 app = FastAPI(title="Taller — Etapa 1", version="0.1.0")
 _con = almacen.conectar()
 revision.preparar()
+cuentas.preparar()
+clasificacion.preparar()
 trabajos.iniciar_trabajador(_con)
 
 
@@ -40,6 +44,26 @@ class PeticionEjecutar(BaseModel):
     padre: str | None = None
     parametros: dict = {}
     etiqueta: str | None = None
+
+
+class PeticionIngreso(BaseModel):
+    usuario: str
+    contrasena: str
+
+
+class PeticionUsuario(BaseModel):
+    nombre: str
+    contrasena: str
+    rol: str = cuentas.REVISOR
+
+
+class PeticionContrasena(BaseModel):
+    contrasena: str
+
+
+class PeticionClasificacion(BaseModel):
+    respuesta: str
+    comentario: str = ""
 
 
 # --------------------------------------------------------------------------------------
@@ -61,7 +85,7 @@ def get_etapas():
 
 
 @app.get("/api/estado")
-def get_estado():
+def get_estado(request: Request):
     """Estado general: si están los datos base, con qué versión de la tesis corre y su configuración."""
     try:
         import tesis
@@ -80,6 +104,10 @@ def get_estado():
         "config_tesis": ajustes.CONFIG_TESIS,
         "origen_config": ajustes.origen_config(),
         "muestreo_segundos": ajustes.MUESTREO_SEGUNDOS,
+        # Quién está adentro y si el acceso quedó bien configurado. La barra lo usa para mostrar la
+        # cuenta y el enlace de salir sin tener que pedir otra cosa al arrancar.
+        "usuario": getattr(request.state, "usuario", None),
+        "problema_acceso": ajustes.motivo_acceso_abierto(),
     }
 
 
@@ -135,13 +163,16 @@ def get_nodo(clave: str):
 def delete_nodo(clave: str, forzar: bool = False):
     """Borra el nodo, todo lo que cuelga de él y sus resultados en disco.
 
-    **Se planta si el experto ya comentó alguna de esas ramas.** Todo lo demás que borra este
-    endpoint se puede volver a calcular corriendo el pipeline otra vez; lo que escribió el experto,
-    no. Y el botón de borrar está en la misma pantalla donde se comenta, así que un clic en el nodo
-    equivocado se llevaría trabajo irrepetible sin avisar.
+    **Se planta si hay trabajo humano colgando de alguna de esas ramas**, y eso es de dos clases:
+    los documentos que comentó el experto y las clasificaciones de eventos. Todo lo demás que borra
+    este endpoint se puede volver a calcular corriendo el pipeline otra vez; el juicio de una
+    persona sobre telemetría que nadie etiquetó, no. Y el botón de borrar está en la misma pantalla
+    donde se clasifica, así que un clic en el nodo equivocado se llevaría trabajo irrepetible.
 
-    Con `forzar=1` se borra igual, pero el documento no se va con la rama: queda huérfano y se puede
-    seguir descargando (ver `revision.desvincular`).
+    Con `forzar=1` se borra igual, pero **nada de ese trabajo se pierde**: el documento queda
+    huérfano y se puede seguir descargando (`revision.desvincular`), y las clasificaciones se
+    quedan en su base con la copia del evento que guardaron al crearse — por eso `clasificacion`
+    denormaliza hoja, rango y prioridad.
     """
     if almacen.obtener(_con, clave) is None:
         raise HTTPException(404, "Nodo inexistente")
@@ -149,11 +180,18 @@ def delete_nodo(clave: str, forzar: bool = False):
     # El borrado es en cascada, así que hay que mirar el nodo y todo lo que cuelga de él.
     claves = [clave, *almacen.descendientes(_con, clave)]
     comentados = revision.con_trabajo_del_experto(claves)
+    clasificadas = clasificacion.cuantas_en(claves)
 
-    if comentados and not forzar:
+    if (comentados or clasificadas) and not forzar:
+        partes = []
+        if comentados:
+            partes.append(f"{len(comentados)} documento(s) con comentarios del experto")
+        if clasificadas:
+            partes.append(f"{clasificadas} clasificación(es) de eventos")
         raise HTTPException(409, {
-            "mensaje": "Esa rama tiene documentos con comentarios del experto. Eso no se puede "
-                       "recalcular: confirmá el borrado si de verdad querés seguir.",
+            "mensaje": f"Esa rama tiene {' y '.join(partes)}. Eso no se puede recalcular: "
+                       f"confirmá el borrado si de verdad querés seguir.",
+            "clasificaciones": clasificadas,
             "documentos": [
                 {"id": d["id"], "nodo": d["nodo"], "tipo": d["tipo"], "nombre": d["nombre"],
                  "version": d["version"], "guardado_en": d["guardado_en"],
@@ -165,6 +203,7 @@ def delete_nodo(clave: str, forzar: bool = False):
     huerfanos = revision.desvincular(claves) if comentados else 0
     resultado = almacen.borrar(_con, clave)
     resultado["documentos_huerfanos"] = huerfanos
+    resultado["clasificaciones_conservadas"] = clasificadas
     return resultado
 
 
@@ -1095,6 +1134,239 @@ async def revalidar_el_frontend(request, call_next):
     return respuesta
 
 
+# --------------------------------------------------------------------------------------
+# Acceso: la sesión, y las dos puertas que tienen que quedar abiertas
+# --------------------------------------------------------------------------------------
+
+#: Rutas exactas que no piden sesión. Son las mínimas para poder iniciarla, más `/api/salud`.
+_ABIERTAS = frozenset({"/login", "/api/sesion", "/api/acceso", "/api/salud", "/favicon.ico"})
+
+#: Prefijos abiertos. `/estatico` es el CSS y el JS: código, no datos, y la pantalla de ingreso lo
+#: necesita para poder dibujarse.
+_ABIERTAS_PREFIJO = ("/estatico/",)
+
+
+def _es_del_document_server(metodo: str, ruta: str) -> bool:
+    """¿Es una de las dos rutas que usa el Document Server?
+
+    No pueden pedir sesión: quien las llama es el Document Server, que corre en otro contenedor y
+    no tiene con qué autenticarse. Están protegidas de otra manera —la **ficha** del documento, un
+    secreto de 32 bytes que viaja en la URL y que `_exigir_ficha` verifica— así que abrirlas acá no
+    las deja sin llave, solo cambia cuál es la llave.
+
+    La lista es explícita y corta a propósito. `/api/revision/{doc}/version/{n}` NO está: la pide el
+    navegador, que sí tiene sesión, y suma la ficha encima.
+    """
+    partes = ruta.strip("/").split("/")
+    if len(partes) != 4 or partes[0] != "api" or partes[1] != "revision":
+        return False
+    return (partes[3] == "archivo" and metodo == "GET") or \
+           (partes[3] == "callback" and metodo == "POST")
+
+
+@app.middleware("http")
+async def exigir_sesion(request: Request, call_next):
+    """Deja pasar solo a quien tenga sesión, y le cuelga el usuario a la petición.
+
+    Va registrado DESPUÉS de `revalidar_el_frontend`, así que queda por fuera: se decide si la
+    petición entra antes de gastar nada en ella.
+
+    Dos respuestas distintas según quién pregunte, porque son dos consumidores distintos: a la API
+    se le contesta `401` en JSON —el frontend lo detecta y manda a la pantalla de ingreso sin perder
+    el estado—, y a una navegación se la redirige, con el destino pegado para volver a donde iba.
+    """
+    ruta = request.url.path
+    request.state.usuario = cuentas.usuario_de(request.cookies.get(cuentas.COOKIE))
+
+    abierta = (ruta in _ABIERTAS
+               or ruta.startswith(_ABIERTAS_PREFIJO)
+               or _es_del_document_server(request.method, ruta))
+
+    if request.state.usuario is None and not abierta:
+        if ruta.startswith("/api/"):
+            return JSONResponse({"detail": "Hace falta iniciar sesión"}, status_code=401)
+        destino = ruta + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"/login?destino={quote(destino, safe='')}", status_code=303)
+
+    return await call_next(request)
+
+
+def _usuario(request: Request) -> dict:
+    """El usuario de la petición. El middleware ya garantizó que exista en las rutas cerradas."""
+    usuario = getattr(request.state, "usuario", None)
+    if usuario is None:
+        raise HTTPException(401, "Hace falta iniciar sesión")
+    return usuario
+
+
+def _administrador(request: Request) -> dict:
+    usuario = _usuario(request)
+    if usuario["rol"] != cuentas.ADMIN:
+        raise HTTPException(403, "Solo el administrador puede hacer esto")
+    return usuario
+
+
+@app.get("/api/salud")
+def get_salud():
+    """¿El proceso está vivo? Nada más que eso, y sin pedir sesión.
+
+    Existe porque el healthcheck del contenedor miraba `/api/estado`, que ahora está detrás de la
+    sesión: sin esta ruta, el contenedor quedaría marcado como no sano para siempre y `depends_on`
+    nunca lo daría por arriba. Un healthcheck que necesita credenciales es un healthcheck roto.
+
+    Devuelve lo mínimo a propósito. `/api/estado` cuenta con qué commit corre, dónde está el repo de
+    la tesis y la configuración entera: eso sí pide sesión, y esta ruta no lo repite.
+    """
+    return {"vivo": True}
+
+
+@app.get("/api/acceso")
+def get_acceso(request: Request):
+    """Estado del acceso, sin pedir sesión: lo consulta la pantalla de ingreso.
+
+    Dice si hay administrador configurado y quién está adentro, y nada más. Si el `.env` no trae
+    administrador, nadie puede entrar y la pantalla tiene que poder explicarlo en vez de rechazar
+    cada intento sin motivo.
+    """
+    return {
+        "hay_admin": cuentas.hay_admin(),
+        "motivo": ajustes.motivo_acceso_abierto(),
+        "usuario": getattr(request.state, "usuario", None),
+    }
+
+
+@app.post("/api/sesion")
+def post_sesion(pet: PeticionIngreso, request: Request):
+    """Inicia sesión y deja la cookie."""
+    quien = (request.client.host if request.client else "?") + "|" + (pet.usuario or "")
+    espera = cuentas.freno(quien, time.monotonic())
+    if espera > 0:
+        raise HTTPException(429, f"Demasiados intentos. Probá de nuevo en {int(espera)} segundos.")
+
+    usuario = cuentas.autenticar(pet.usuario or "", pet.contrasena or "")
+    if usuario is None:
+        cuentas.anotar_fallo(quien, time.monotonic())
+        # Un solo mensaje para «no existe» y «contraseña equivocada»: distinguirlos le diría a
+        # quien prueba nombres cuáles existen.
+        raise HTTPException(401, "Usuario o contraseña incorrectos")
+
+    cuentas.limpiar_fallos(quien)
+    testigo = cuentas.abrir_sesion(usuario["nombre"])
+    respuesta = JSONResponse({"usuario": {"nombre": usuario["nombre"], "rol": usuario["rol"]}})
+    respuesta.set_cookie(
+        cuentas.COOKIE, testigo,
+        max_age=ajustes.SESION_DIAS * 86400, path="/",
+        httponly=True, samesite="lax", secure=ajustes.COOKIE_SEGURA,
+    )
+    return respuesta
+
+
+@app.post("/api/sesion/salir")
+def post_salir(request: Request):
+    cuentas.cerrar_sesion(request.cookies.get(cuentas.COOKIE))
+    respuesta = JSONResponse({"listo": True})
+    respuesta.delete_cookie(cuentas.COOKIE, path="/")
+    return respuesta
+
+
+@app.get("/api/yo")
+def get_yo(request: Request):
+    return _usuario(request)
+
+
+@app.get("/api/usuarios")
+def get_usuarios(request: Request):
+    _administrador(request)
+    return {"usuarios": cuentas.listar(), "roles": [cuentas.ADMIN, cuentas.REVISOR]}
+
+
+@app.post("/api/usuarios")
+def post_usuarios(pet: PeticionUsuario, request: Request):
+    admin = _administrador(request)
+    try:
+        return cuentas.crear(pet.nombre, pet.contrasena, rol=pet.rol, creado_por=admin["nombre"])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/usuarios/{nombre}/contrasena")
+def post_contrasena(nombre: str, pet: PeticionContrasena, request: Request):
+    """Cambia una contraseña. El administrador puede cambiar cualquiera; el resto, solo la suya."""
+    usuario = _usuario(request)
+    if usuario["rol"] != cuentas.ADMIN and usuario["nombre"] != nombre:
+        raise HTTPException(403, "Solo podés cambiar tu propia contraseña")
+    try:
+        cuentas.cambiar_clave(nombre, pet.contrasena)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"listo": True, "sesiones_cerradas": True}
+
+
+@app.delete("/api/usuarios/{nombre}")
+def delete_usuario(nombre: str, request: Request):
+    """Da de baja a un usuario. Sus clasificaciones **no** se borran: son juicio humano."""
+    admin = _administrador(request)
+    if nombre == admin["nombre"]:
+        raise HTTPException(400, "No podés borrar tu propia cuenta")
+    if cuentas.obtener(nombre) is None:
+        raise HTTPException(404, "Usuario inexistente")
+    cuentas.borrar(nombre)
+    return {"listo": True}
+
+
+# --------------------------------------------------------------------------------------
+# Clasificación de eventos: la encuesta por revisor
+# --------------------------------------------------------------------------------------
+
+def _fila_de_evento(clave: str, event_id: int) -> dict:
+    """La fila del entregable para un evento, como diccionario. 404 si no existe."""
+    nodo = almacen.obtener(_con, clave)
+    if nodo is None or nodo["etapa"] != "eventos" or not nodo["tiene_resultado"]:
+        raise HTTPException(404, "No hay eventos en ese nodo")
+    tabla = almacen.cargar_resultado(clave)["eventos"]
+    fila = tabla[tabla["event_id"] == event_id]
+    if fila.empty:
+        raise HTTPException(404, "Evento inexistente")
+    return json.loads(fila.iloc[0].to_json())
+
+
+@app.get("/api/nodo/{clave}/clasificacion")
+def get_clasificacion(clave: str, request: Request):
+    """Lo que YO clasifiqué en esta rama, más la escala y cuánto se avanzó entre todos.
+
+    `mias` va con la clave en texto porque JSON no tiene claves numéricas; el frontend la usa para
+    marcar la tabla sin pedir un dato por fila.
+    """
+    usuario = _usuario(request)
+    mias = clasificacion.del_nodo(clave, usuario["nombre"])
+    return {
+        "pregunta": clasificacion.PREGUNTA,
+        "escala": [dict(o) for o in clasificacion.ESCALA],
+        "mias": {str(k): v for k, v in mias.items()},
+        "resumen": clasificacion.resumen_nodo(clave),
+    }
+
+
+@app.get("/api/nodo/{clave}/evento/{event_id}/clasificacion")
+def get_clasificacion_evento(clave: str, event_id: int, request: Request):
+    """Mi respuesta sobre un evento (para abrir el diálogo con lo ya contestado)."""
+    usuario = _usuario(request)
+    return {"mia": clasificacion.mia(clave, event_id, usuario["nombre"])}
+
+
+@app.put("/api/nodo/{clave}/evento/{event_id}/clasificacion")
+def put_clasificacion(clave: str, event_id: int, pet: PeticionClasificacion, request: Request):
+    """Guarda mi respuesta. Volver a mandarla la corrige, sin perder cuándo se miró por primera vez."""
+    usuario = _usuario(request)
+    evento = _fila_de_evento(clave, event_id)
+    try:
+        return clasificacion.guardar(
+            clave, event_id, usuario["nombre"], pet.respuesta, pet.comentario, evento=evento
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/")
 def raiz():
     return FileResponse(WEB / "index.html")
@@ -1103,6 +1375,18 @@ def raiz():
 @app.get("/taller")
 def taller():
     return FileResponse(WEB / "taller.html")
+
+
+@app.get("/login")
+def login_html():
+    """La pantalla de ingreso. Abierta, obviamente."""
+    return FileResponse(WEB / "login.html")
+
+
+@app.get("/usuarios")
+def usuarios_html():
+    """La pantalla de administración de cuentas. Pide sesión; el rol lo verifica la API."""
+    return FileResponse(WEB / "usuarios.html")
 
 
 @app.get("/revision")

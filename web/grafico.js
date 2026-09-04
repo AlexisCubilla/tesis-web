@@ -124,6 +124,18 @@ window.Grafico = (function () {
       }
 
       this.pintar();
+
+      /* Doble clic sobre un elemento del gráfico. Va acá y no en quien pide el gráfico porque
+         ESTE archivo es el único que conoce ECharts (ver el encabezado): si `app.js` hiciera
+         `.eco.on(...)`, la promesa de poder cambiar de librería tocando un solo archivo se
+         rompería en silencio. El que llama recibe `{dataIndex, value, seriesIndex}` y nada más.
+         Se hereda al agrandar, porque `_agrandar` copia la configuración entera. */
+      if (typeof cfg.alDobleClic === 'function') {
+        this.eco.on('dblclick', (p) => cfg.alDobleClic({
+          dataIndex: p.dataIndex, value: p.value, seriesIndex: p.seriesIndex,
+        }));
+      }
+
       this.ro = new ResizeObserver(() => this.eco.resize());
       this.ro.observe(this.caja);
       vivos.add(this);
@@ -144,7 +156,10 @@ window.Grafico = (function () {
       cab.className = 'grafico-acciones';
       const t = document.createElement('h5');
       t.className = 'grafico-titulo';
-      t.textContent = this.cfg.titulo || 'Gráfico';
+      /* `tituloAgrandado` es para el gráfico que NO lleva título arriba porque ya está adentro de
+         algo que lo nombra —el diálogo de un evento, por ejemplo—. Sin esto, agrandarlo abría una
+         ventana rotulada «Gráfico», sin decir de qué. */
+      t.textContent = this.cfg.titulo || this.cfg.tituloAgrandado || 'Gráfico';
       const esp = document.createElement('span');
       esp.className = 'esp';
       const cerrar = document.createElement('button');
@@ -333,7 +348,8 @@ window.Grafico = (function () {
     // muestra al abrirse en grande.
     const pie = `${n} ${cfg.sustantivo || 'puntos'}. Para acercarte a un tramo: arrastrá los `
       + 'extremos de la barra de abajo, o usá la lupa de la esquina y encerrá el tramo en un recuadro.';
-    return new Grafo(destino, { titulo: cfg.titulo, alto, opcion, pie, compacto });
+    return new Grafo(destino, { titulo: cfg.titulo, tituloAgrandado: cfg.tituloAgrandado,
+                                alto, opcion, pie, compacto });
   }
 
   /* ================================================================== barras horizontales
@@ -373,7 +389,9 @@ window.Grafico = (function () {
   return {
     lineas,
     barras,
-    /** Escotilla para gráficos a medida (la pantalla de análisis): recibe la opción ya armada. */
+    /** Escotilla para gráficos a medida (la pantalla de análisis): recibe la opción ya armada.
+     *  Además de lo de siempre acepta `alDobleClic(info)`, que se llama con `{dataIndex, value,
+     *  seriesIndex}` al hacer doble clic sobre un elemento — sin exponer nada de ECharts. */
     medida: (destino, cfg) => new Grafo(destino, cfg),
     paleta: { serie, varCss, comun, herramientas, fmt },
     /** Antes de reemplazar el contenido de un contenedor, para no dejar instancias colgando. */

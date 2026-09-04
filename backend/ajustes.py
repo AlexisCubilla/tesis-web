@@ -183,6 +183,39 @@ def _bool(nombre: str, defecto: bool) -> bool:
     return valor not in ("0", "false", "no")
 
 
+# --------------------------------------------------------------------------------------
+# Acceso: quién puede entrar al taller
+# --------------------------------------------------------------------------------------
+# El taller pasó de no tener usuarios a tenerlos (ver `cuentas.py`). Lo único que se configura acá
+# es el administrador de arranque: el resto de las cuentas las crea él desde la interfaz.
+
+#: Usuario administrador, sembrado en cada arranque. Vacío = el taller arranca SIN administrador y
+#: nadie puede entrar; `/api/estado` y `scripts/verificar.py` lo avisan en lugar de dejarlo pasar.
+#:
+#: Que se siembre en cada arranque —y no solo la primera vez— es lo que lo vuelve una llave de
+#: repuesto: cambiar la contraseña acá y reiniciar recupera el acceso sin tocar la base a mano.
+ADMIN_USUARIO: str = os.environ.get("ADMIN_USUARIO", "").strip()
+ADMIN_CONTRASENA: str = os.environ.get("ADMIN_CONTRASENA", "") or ""
+
+#: Cuántos días vive una sesión antes de pedir la contraseña de nuevo.
+SESION_DIAS: int = int(_num("SESION_DIAS", 30))
+
+#: Marcar la cookie de sesión como `Secure` (solo viaja por HTTPS).
+#:
+#: Apagado por defecto porque el uso normal es `http://localhost:8000` o una IP de la red local, y
+#: con `Secure` encendido ahí el navegador no manda la cookie y nadie puede entrar. **Encenderlo en
+#: cuanto el taller esté detrás de HTTPS**: sin eso la sesión viaja en claro.
+COOKIE_SEGURA: bool = _bool("COOKIE_SEGURA", False)
+
+
+def motivo_acceso_abierto() -> str | None:
+    """Por qué nadie va a poder entrar, o `None` si el acceso está bien configurado."""
+    if not ADMIN_USUARIO or not ADMIN_CONTRASENA:
+        return ("faltan ADMIN_USUARIO y/o ADMIN_CONTRASENA en el .env: el taller arranca sin "
+                "administrador y no hay con qué iniciar sesión")
+    return None
+
+
 #: Respaldo si el paquete de la tesis todavía no está instalado (por ejemplo, al correr `mise run
 #: check` antes de `mise run install`). Son los valores vigentes al escribir esto; la fuente real es
 #: `config.py` de la tesis.

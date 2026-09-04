@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usuarios — Taller Etapa 1</title>
+<link rel="stylesheet" href="estatico/estilos.css">
+<style>
+  .envoltorio { max-width: 900px; }
+  .campo { margin-bottom: 13px; }
+  .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
+  .campo input, .campo select { width: 100%; padding: 8px 11px; border-radius: var(--radio-2);
+    border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
+    font: inherit; font-size: .9rem; }
+  .campo input:focus, .campo select:focus { outline: none; border-color: var(--acento); }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 18px; }
+  .fila-sup { display: flex; align-items: center; gap: 10px; }
+  .esp { flex: 1; }
+  td .boton { padding: 3px 10px; font-size: .78rem; }
+</style>
+</head>
+<body>
+<div class="estrellas"></div>
+
+<header class="barra">
+  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <nav>
+    <a href=".">El proyecto</a>
+    <a href="taller">Taller</a>
+    <a href="usuarios" class="activo">Usuarios</a>
+  </nav>
+</header>
+
+<div class="envoltorio" style="padding-bottom:60px">
+  <h2 style="margin-top:26px">Usuarios del taller</h2>
+  <p class="pista">Cada revisor clasifica los eventos por su cuenta: dos personas pueden opinar del
+  mismo evento sin verse. Por eso hace falta una cuenta por persona y no una compartida — una cuenta
+  común haría imposible saber quién opinó qué, que es justamente lo que la Etapa 2 necesita medir.</p>
+
+  <div id="aviso"></div>
+
+  <div class="tarjeta" style="margin:18px 0">
+    <h3 style="margin-top:0;font-size:.95rem">Dar de alta</h3>
+    <form id="form-alta">
+      <div class="rejilla">
+        <div class="campo">
+          <label for="nombre">Usuario</label>
+          <input id="nombre" autocomplete="off" required>
+        </div>
+        <div class="campo">
+          <label for="clave">Contraseña</label>
+          <input id="clave" type="password" autocomplete="new-password" required minlength="8">
+        </div>
+        <div class="campo">
+          <label for="rol">Rol</label>
+          <select id="rol">
+            <option value="revisor">Revisor — entra y clasifica</option>
+            <option value="admin">Administrador — además gestiona usuarios</option>
+          </select>
+        </div>
+      </div>
+      <button class="boton primario" type="submit">Crear usuario</button>
+    </form>
+  </div>
+
+  <div class="tarjeta">
+    <div class="fila-sup"><h3 style="margin:0;font-size:.95rem">Cuentas</h3><span class="esp"></span>
+      <span class="tenue" style="font-size:.78rem" id="cuenta-total"></span></div>
+    <div class="tabla-scroll" style="margin-top:12px"><table id="tabla">
+      <thead><tr><th>usuario</th><th>rol</th><th>creado</th><th>último ingreso</th><th></th></tr></thead>
+      <tbody></tbody></table></div>
+    <p class="pista" style="margin-top:12px">Dar de baja una cuenta <b>no borra sus
+    clasificaciones</b>: son juicio humano y quedan atribuidas al nombre, igual que un documento de
+    revisión sobrevive a la rama que lo originó.</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+
+const api = async (ruta, op) => {
+  const r = await fetch(ruta, op);
+  if (r.status === 401) { location.href = 'login?destino=' + encodeURIComponent('/usuarios'); return; }
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
+  return r.json();
+};
+
+const avisar = (texto, clase = '') => {
+  $('#aviso').innerHTML = texto ? `<div class="aviso ${clase}" style="margin:14px 0">${texto}</div>` : '';
+};
+
+const fecha = (iso) => iso ? new Date(iso).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+let yo = null;
+
+async function cargar() {
+  let d;
+  try {
+    d = await api('api/usuarios');
+  } catch (e) {
+    avisar(`<strong>No se pudo cargar.</strong> ${e.message}` +
+           (String(e.message).includes('administrador')
+             ? ' Esta pantalla es solo para administradores.' : ''));
+    document.querySelector('#form-alta').style.display = 'none';
+    return;
+  }
+  if (!d) return;
+  $('#cuenta-total').textContent = `${d.usuarios.length} cuenta(s)`;
+  $('#tabla tbody').innerHTML = d.usuarios.map((u) => `
+    <tr>
+      <td><b>${u.nombre}</b>${u.creado_por === '.env' ? ' <span class="chip oficial">del .env</span>' : ''}</td>
+      <td>${u.rol === 'admin' ? 'Administrador' : 'Revisor'}</td>
+      <td class="tenue" style="font-size:.8rem">${fecha(u.creado_en)}</td>
+      <td class="tenue" style="font-size:.8rem">${fecha(u.ultimo_ingreso)}</td>
+      <td style="white-space:nowrap;text-align:right">
+        <button class="boton" data-clave="${u.nombre}">Cambiar contraseña</button>
+        ${u.nombre === (yo && yo.nombre) ? ''
+          : `<button class="boton" data-baja="${u.nombre}">Dar de baja</button>`}
+      </td>
+    </tr>`).join('');
+
+  document.querySelectorAll('[data-clave]').forEach((b) =>
+    b.addEventListener('click', () => cambiarClave(b.dataset.clave)));
+  document.querySelectorAll('[data-baja]').forEach((b) =>
+    b.addEventListener('click', () => darDeBaja(b.dataset.baja)));
+}
+
+async function cambiarClave(nombre) {
+  const clave = prompt(`Contraseña nueva para ${nombre} (mínimo 8 caracteres).\n` +
+                       `Se cierran todas sus sesiones abiertas.`);
+  if (!clave) return;
+  try {
+    await api(`api/usuarios/${encodeURIComponent(nombre)}/contrasena`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contrasena: clave }),
+    });
+    avisar(`Contraseña de <b>${nombre}</b> cambiada. Sus sesiones abiertas se cerraron.`, 'info');
+  } catch (e) { avisar(e.message); }
+}
+
+async function darDeBaja(nombre) {
+  if (!confirm(`¿Dar de baja a ${nombre}?\n\nSus clasificaciones NO se borran: quedan atribuidas a su nombre.`)) return;
+  try {
+    await api(`api/usuarios/${encodeURIComponent(nombre)}`, { method: 'DELETE' });
+    avisar(`<b>${nombre}</b> dado de baja.`, 'info');
+    cargar();
+  } catch (e) { avisar(e.message); }
+}
+
+$('#form-alta').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await api('api/usuarios', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: $('#nombre').value, contrasena: $('#clave').value, rol: $('#rol').value,
+      }),
+    });
+    avisar(`Usuario <b>${$('#nombre').value}</b> creado.`, 'info');
+    $('#nombre').value = ''; $('#clave').value = '';
+    cargar();
+  } catch (err) { avisar(err.message); }
+});
+
+api('api/yo').then((u) => { yo = u; return cargar(); }).catch(() => cargar());
+</script>
+<script src="estatico/cuenta.js" defer></script>
+</body>
+</html>

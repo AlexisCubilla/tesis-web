@@ -480,3 +480,66 @@ debajo del nodo: hace falta ver en qué se diferencian dos ramas, y un nombre no
 una rama nueva y dejaría huérfano todo lo calculado. El nombre es una etiqueta para humanos, no parte
 de la identidad del resultado — dos ramas con la misma configuración y distinto nombre son la misma
 rama, y así se comportan.
+
+---
+
+## A16 — El taller pide sesión, y las dos rutas del Document Server quedan afuera
+
+**Decisión.** Todo el sitio está detrás de usuario y contraseña (`backend/cuentas.py`). El
+administrador se define en el `.env` y se siembra en cada arranque; el resto de las cuentas las crea
+él desde `/usuarios`. La sesión es una cookie `HttpOnly` con un testigo opaco cuyo **hash** —no el
+testigo— se guarda en la base.
+
+**Por qué no alcanzaba con poner autenticación adelante.** Es lo que este documento recomendaba antes
+(nginx, oauth2-proxy), y sigue siendo válido para *proteger*. Pero la clasificación de eventos
+necesita algo que un proxy no da: **saber quién es cada uno adentro de la aplicación**. Dos revisores
+tienen que poder opinar del mismo evento sin verse, y eso exige una identidad que llegue hasta la
+consulta SQL. La reja y la identidad resultaron ser el mismo problema.
+
+**Tres cosas quedan abiertas, y cada una por su motivo:**
+
+| Ruta | Por qué |
+|---|---|
+| `/login`, `/api/sesion`, `/api/acceso` | Sin ellas no hay forma de iniciar sesión. |
+| `/estatico/*` | Es el CSS y el JS —código, no datos— y la pantalla de ingreso lo necesita para dibujarse. |
+| `/api/salud` | El healthcheck del contenedor no tiene con qué autenticarse. Devuelve `{"vivo": true}` y nada más; `/api/estado`, que sí cuenta la configuración, quedó cerrada. |
+| `GET /api/revision/{doc}/archivo`<br>`POST /api/revision/{doc}/callback` | **Las usa el Document Server**, que corre en otro contenedor y no tiene credenciales. Su llave es la *ficha* del documento. Meterlas detrás de la sesión rompe la revisión experta de una forma que no se parece a su causa: el editor abre y el guardado no llega nunca. Hay un test que lo afirma. |
+
+**Lo que esto NO cubre.** Los websockets del proxy de OnlyOffice no pasan por el middleware HTTP de
+Starlette, así que quedan fuera de la sesión. Es un hueco angosto —hace falta la clave de un
+documento, que solo se entrega a quien ya entró— pero está, y conviene que esté escrito.
+
+---
+
+## A17 — La clasificación de eventos es por persona y por rama, y guarda una copia del evento
+
+**Decisión.** Doble clic sobre un evento —en la línea de tiempo o en la tabla— abre un diálogo con
+las tres señales del tramo y una encuesta de cinco opciones más un comentario. La respuesta se guarda
+en `data/revision/clasificacion.sqlite` con clave `(nodo, event_id, usuario)`.
+
+**Por persona.** La coincidencia entre revisores independientes es lo único que, sin ground truth,
+permite saber si la pregunta está bien planteada. Se pierde entera si el segundo revisor ve la
+respuesta del primero, así que cada uno ve solo la suya.
+
+**Por rama.** Un evento con otro umbral de dedup o con otra fracción de candidatos **no es el mismo
+evento**: tiene otro rango, otras ventanas y otra prioridad. Heredarle la respuesta sería inventar un
+juicio que nadie emitió. El costo asumido es que explorar ramas obliga a reclasificar, y se prefirió
+ese costo antes que un dato que parece un juicio sin serlo.
+
+**Con una copia del evento adentro.** Hoja, segmento, rango, tramos y prioridad se copian en la fila
+al darla de alta. Sin eso, borrar una rama dejaría opiniones colgando de un identificador que ya no
+resuelve a nada. Es la misma decisión que toma `revision.py` con los documentos huérfanos, y por eso
+el borrado en cascada ahora también avisa cuando hay clasificaciones en juego.
+
+**Solo el alta escribe esa copia.** Una corrección posterior cambia la respuesta y el comentario,
+nunca el contexto: si no, una corrección hecha desde otra corrida podría reescribir el rango con el
+que se emitió el juicio original.
+
+**Sin opción premarcada.** Ninguna de las cinco viene elegida, ni siquiera «Neutral». Un valor por
+defecto se convierte en la respuesta de quien duda, y el reporte no podría distinguir «dijo neutral»
+de «no contestó».
+
+**Por qué la encuesta no reemplaza a la planilla de `revision.py`.** Son dos preguntas distintas. La
+planilla no encajona al experto porque la taxonomía de la Etapa 2 es lo que él tiene que producir; la
+encuesta hace la pregunta previa —¿esto es una anomalía?— que sí tiene respuesta cerrada y que hace
+falta poder contar, comparar entre revisores y llevar a un reporte.

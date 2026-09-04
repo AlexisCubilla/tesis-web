@@ -59,6 +59,58 @@ En la práctica:
 | Tamaño de ventana, paso, dedup | todo desde el ventaneo | ~7-30 s |
 | Limpieza o selección de hojas | toda la cadena | ~30 s |
 
+## Cuentas
+
+El taller pide usuario y contraseña. Se define **una** cuenta en el `.env`, la del administrador, y
+el resto las crea él desde la pantalla **Usuarios**:
+
+```ini
+ADMIN_USUARIO=admin
+ADMIN_CONTRASENA=poneleUnaDeVerdad
+```
+
+**Sin `ADMIN_CONTRASENA` nadie puede entrar.** El taller arranca igual y la pantalla de ingreso lo
+explica, en vez de rechazar cada intento sin decir por qué.
+
+Se siembra en **cada arranque**, no solo la primera vez. Eso la vuelve una llave de repuesto: si
+alguien queda afuera o se pierde la base de cuentas, se cambia acá y se reinicia. Las contraseñas se
+guardan hasheadas con scrypt (biblioteca estándar, sin dependencias nuevas); la sesión es una cookie
+`HttpOnly` de la que en la base solo queda el hash.
+
+Hay dos roles. **Revisor** entra y clasifica; **administrador** además da de alta y de baja cuentas.
+Dar de baja a alguien **no borra sus clasificaciones**: son juicio humano y quedan atribuidas a su
+nombre.
+
+> Hace falta una cuenta por persona, no una compartida. No es burocracia: la clasificación de eventos
+> es por revisor, y una cuenta común haría imposible saber quién opinó qué — que es justamente lo que
+> la Etapa 2 necesita poder medir.
+
+## Clasificar eventos
+
+En el último paso, **doble clic sobre un evento** —en la línea de tiempo o en cualquier fila de la
+tabla— abre un diálogo con las tres señales de ese tramo y una pregunta:
+
+> ¿Este evento representa un comportamiento anómalo?
+> · Definitivamente no · No · Neutral · Sí · Definitivamente sí ·
+
+Más un campo de comentarios. Un clic simple sigue haciendo lo de siempre: abrir las señales debajo de
+la tabla.
+
+**Cada revisor ve solo lo suyo.** Dos personas pueden clasificar el mismo evento sin verse, que es lo
+que permite después medir si coinciden. La tabla marca en la columna «mi juicio» lo que ya
+respondiste y cuenta cuánto llevás, para poder retomar la revisión días después.
+
+Tres cosas que conviene saber:
+
+| | |
+|---|---|
+| **Se puede corregir** | Volver a abrir un evento trae la respuesta y el comentario cargados. Corregir pisa la respuesta pero conserva cuándo lo miraste por primera vez. |
+| **La clasificación es de esa rama** | Un evento con otro umbral de dedup no es el mismo evento: tiene otro rango y otra prioridad. La respuesta no se hereda entre ramas, a propósito. |
+| **Sobrevive al borrado** | Cada respuesta guarda una copia de la hoja, el rango y la prioridad del evento. Si la rama se borra, la respuesta sigue siendo legible — y el borrado avisa antes. |
+
+Vive en `data/revision/clasificacion.sqlite`, junto a lo demás que no se recalcula. Los reportes sobre
+estas respuestas son el paso siguiente y todavía no están.
+
 ## Configuración
 
 Todo lo que depende de la máquina vive en un `.env`. Copiá el ejemplo y ajustá lo que necesites:
@@ -113,6 +165,7 @@ mise install          # Python 3.11
 mise run venv         # crea .venv
 mise run install      # deps + el paquete `tesis` desde $RUTA_TESIS
 mise run datos        # lee el Excel una vez y precalcula la tabla cruda (~40 s)
+# ↑ y antes de levantarlo, poné ADMIN_CONTRASENA en el .env, o no vas a poder entrar
 mise run check        # verifica que esté todo en su lugar
 mise run dev          # levanta el taller y muestra en qué direcciones responde
 ```
@@ -164,17 +217,22 @@ saltea el `pip install -e /tesis` del arranque y el script no encuentra el paque
 
 ```
 backend/
-  etapas.py      definición de las 6 etapas y sus envoltorios sobre `tesis`
-  almacen.py     SQLite (árbol) + caché en disco + hash de configuración
-  revision.py    los documentos que comenta el experto, con su historial de versiones
-  trabajos.py    ejecución en segundo plano (una corrida tarda decenas de segundos)
-  main.py        API y servidor de la web
+  etapas.py        definición de las 6 etapas y sus envoltorios sobre `tesis`
+  almacen.py       SQLite (árbol) + caché en disco + hash de configuración
+  cuentas.py       usuarios, contraseñas y sesiones
+  clasificacion.py la encuesta: qué opina cada revisor de cada evento
+  revision.py      los documentos que comenta el experto, con su historial de versiones
+  trabajos.py      ejecución en segundo plano (una corrida tarda decenas de segundos)
+  main.py          API y servidor de la web
 web/
   index.html     página didáctica del proyecto
   taller.html    el banco de trabajo
+  login.html     la pantalla de ingreso
+  usuarios.html  alta y baja de cuentas (solo administrador)
   revision.html  el editor donde el experto comenta un entregable
   analisis.html  la pantalla de análisis de una rama
   app.js         formularios, árbol de ramas y qué se muestra en cada etapa
+  cuenta.js      quién está adentro y cómo salir, en la barra de las cuatro pantallas
   analisis.js    los cuatro cortes de la pantalla de análisis
   grafico.js     el motor de gráficos, único que conoce la librería
   estilos.css    la paleta entera, en variables: un solo bloque, tema oscuro
@@ -240,7 +298,7 @@ visualización de sus datos. Cada etapa muestra lo suyo:
 | Características | el catálogo de las 72, y cómo se reparte cada una en desvíos estándar |
 | Filtrado | cuánto se mueve cada característica con el corte real marcado, y el mapa de correlación que explica cuáles repiten a otra |
 | Detección | la distribución de puntajes de cada método, en su propio panel |
-| Eventos | dónde cae cada evento a lo largo del registro de su hoja, y la tabla del entregable (al hacer clic en una fila, sus tres señales) |
+| Eventos | dónde cae cada evento a lo largo del registro de su hoja, y la tabla del entregable (clic en una fila = sus tres señales; **doble clic = clasificarlo**) |
 
 **Las dos formas de avanzar** están dichas con todas las letras, sin nada implícito:
 
@@ -329,7 +387,9 @@ Por lo mismo, la revisión tiene su **propia base** (`data/revision/revision.sql
 `ejecuciones.sqlite`. `mise run limpiar` borra el árbol entero para empezar de cero — está bien,
 porque se recalcula — y se habría llevado puesto el trabajo del experto de paso.
 
-Respaldar es copiar `data/revision/`. Ahí están los archivos, todas sus versiones y el registro.
+Respaldar es copiar `data/revision/`. Ahí están los archivos del experto, todas sus versiones y el
+registro — y también `cuentas.sqlite` (los usuarios) y `clasificacion.sqlite` (lo que cada revisor
+opinó de cada evento). Las tres bases están ahí por el mismo motivo: no se recalculan.
 
 ### El resumen es un índice, no la verdad
 
@@ -344,12 +404,12 @@ sería poner lo más valioso en el lugar más frágil.
 
 ### Si el taller queda expuesto en internet
 
-El taller **no tiene usuarios ni contraseña** — ver el aviso de `HOST` en `.env.example`. Cualquiera
-que llegue puede lanzar ejecuciones y borrar ramas. Puertas afuera hay que ponerle autenticación
-adelante (nginx, oauth2-proxy, lo que sea); esto vale para todo el sitio, no solo para la revisión.
+El taller **pide usuario y contraseña** (ver «Cuentas» más arriba), así que no queda abierto de par
+en par. Lo que la sesión **no** hace es cifrar el tráfico: puertas afuera hace falta HTTPS adelante
+(un proxy inverso alcanza) y `COOKIE_SEGURA=1` en el `.env`, o la cookie viaja en claro.
 
-Pero **dos rutas no pueden pedir autenticación**, porque quien las usa es el Document Server y no
-tiene con qué autenticarse:
+**Dos rutas no pueden pedir sesión**, porque quien las usa es el Document Server y no tiene con qué
+autenticarse:
 
 ```
 GET  /api/revision/{doc}/archivo     baja el archivo para abrirlo
@@ -362,7 +422,11 @@ archivo la exigen: sin ella contestan `403`. El Document Server no necesita sabe
 las URLs que le damos.
 
 La ficha reemplaza a JWT para este problema y no le pide nada a la otra punta. Lo que **no** hace es
-proteger el resto del taller: eso es trabajo de la autenticación de adelante.
+proteger el resto del taller: de eso se ocupa la sesión.
+
+Hay un test que afirma que esas dos rutas siguen abiertas y que el resto no. Romperlo es fácil —
+alcanza con «cerrar todo por las dudas»— y el síntoma no se parece a la causa: el editor abre bien y
+el guardado no llega nunca.
 
 ### Cómo se configura
 
