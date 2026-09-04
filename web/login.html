@@ -60,11 +60,28 @@
 'use strict';
 const $ = (s) => document.querySelector(s);
 
-/** A dónde volver después de entrar. Solo se aceptan rutas de este mismo sitio: un `destino`
- *  absoluto convertiría esta pantalla en un trampolín para mandar gente a otro lado. */
+/** A dónde volver después de entrar.
+ *
+ *  El `destino` se resuelve contra ESTA página, no contra la raíz del dominio: el taller puede
+ *  colgar de un prefijo (`https://…/tesis/`) del que el servidor no se entera —el proxy se lo saca
+ *  antes— así que manda un destino relativo (`taller`), y resolverlo acá le devuelve el prefijo.
+ *  Un destino que ya venga con el prefijo puesto (el que arma el frontend con `location.pathname`)
+ *  sobrevive igual: resolverlo no lo cambia.
+ *
+ *  Y se exige que caiga en este mismo sitio, porque `//otro-sitio`, `http://otro-sitio` o
+ *  `https:/otro-sitio` convertirían esta pantalla en un trampolín para mandar gente a cualquier
+ *  parte. Resolver con `URL` y comparar el origen los descarta a los tres de una: no hay que
+ *  adivinar de qué formas se puede escribir una dirección de otro lado. */
 function destino() {
-  const pedido = new URLSearchParams(location.search).get('destino') || '/taller';
-  return (pedido.startsWith('/') && !pedido.startsWith('//')) ? pedido : '/taller';
+  const pedido = new URLSearchParams(location.search).get('destino') || '';
+  try {
+    const u = new URL(pedido, location.href);
+    // Ni vacío ni esta misma pantalla: las dos cosas serían un bucle de recargas contra el ingreso.
+    if (pedido && u.origin === location.origin && !u.pathname.endsWith('/login')) {
+      return u.pathname + u.search;
+    }
+  } catch (e) { /* destino inservible: al taller */ }
+  return 'taller';
 }
 
 function avisar(texto, clase = '') {

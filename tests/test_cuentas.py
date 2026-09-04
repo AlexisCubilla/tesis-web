@@ -82,9 +82,26 @@ def test_una_navegacion_sin_sesion_redirige_al_ingreso(taller):
     cliente, _ = taller
     r = cliente.get("/taller", follow_redirects=False)
     assert r.status_code == 303
-    assert r.headers["location"].startswith("/login")
+    assert r.headers["location"].startswith("login")
     # El destino viaja pegado para volver a donde se iba después de entrar.
-    assert "destino=%2Ftaller" in r.headers["location"]
+    assert "destino=taller" in r.headers["location"]
+
+
+def test_la_redireccion_al_ingreso_no_arranca_en_la_raiz(taller):
+    """Ni el destino tampoco: los dos tienen que sobrevivir a un prefijo.
+
+    Publicado bajo `https://…/tesis/`, el proxy le saca el prefijo antes de que la petición llegue
+    al taller: acá se ve `/taller` y no hay encabezado que cuente el resto. Un `location` que
+    empiece con `/` lo resuelve el navegador contra la raíz del dominio, fuera del prefijo, y el
+    ingreso contesta 404 — y el destino, si arranca en `/`, hace lo mismo después de entrar.
+
+    El síntoma no se parece a la causa: la página carga bien y el 404 aparece recién al redirigir.
+    """
+    cliente, _ = taller
+    for ruta in ("/", "/taller", "/usuarios", "/revision?doc=abc"):
+        location = cliente.get(ruta, follow_redirects=False).headers["location"]
+        assert not location.startswith("/"), f"{ruta} redirige a la raíz: {location}"
+        assert "destino=%2F" not in location, f"{ruta} manda un destino absoluto: {location}"
 
 
 def test_el_ingreso_y_lo_estatico_quedan_abiertos(taller):

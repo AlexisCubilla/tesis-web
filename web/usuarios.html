@@ -81,7 +81,12 @@ const $ = (s) => document.querySelector(s);
 
 const api = async (ruta, op) => {
   const r = await fetch(ruta, op);
-  if (r.status === 401) { location.href = 'login?destino=' + encodeURIComponent('/usuarios'); return; }
+  // `location.pathname` y no `/usuarios`: si el taller cuelga de un prefijo, el literal lo perdería
+  // y al volver del ingreso caería en un 404. Igual que en `app.js`.
+  if (r.status === 401) {
+    location.href = 'login?destino=' + encodeURIComponent(location.pathname + location.search);
+    return;
+  }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
   return r.json();
 };

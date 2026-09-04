@@ -1185,8 +1185,16 @@ async def exigir_sesion(request: Request, call_next):
     if request.state.usuario is None and not abierta:
         if ruta.startswith("/api/"):
             return JSONResponse({"detail": "Hace falta iniciar sesión"}, status_code=401)
-        destino = ruta + (f"?{request.url.query}" if request.url.query else "")
-        return RedirectResponse(f"/login?destino={quote(destino, safe='')}", status_code=303)
+        # La redirección va RELATIVA, y el destino también. El taller puede estar publicado bajo un
+        # prefijo (`https://…/tesis/`) que el proxy le saca antes de que la petición llegue acá: acá
+        # se ve `/taller`, nunca `/tesis/taller`, y no hay encabezado que cuente el prefijo. Con
+        # `/login` absoluto el navegador lo resolvía contra la raíz del dominio —fuera del prefijo,
+        # donde no hay nada escuchando— y la pantalla de ingreso contestaba 404. Relativa, la
+        # resuelve contra la dirección que él pidió, prefijo incluido, y en la raíz da lo mismo.
+        #
+        # Es la misma razón por la que el frontend enlaza todo relativo (`estatico/…`, `taller`).
+        destino = ruta.lstrip("/") + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"login?destino={quote(destino, safe='')}", status_code=303)
 
     return await call_next(request)
 
