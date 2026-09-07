@@ -592,9 +592,55 @@ def get_analisis(clave: str, detector: str | None = None):
     }
 
 
+def _serie_del_segmento(clave: str, hoja: str, segmento) -> "object | None":
+    """La serie limpia completa del tramo contiguo donde cae un evento, o `None` si no se puede.
+
+    De dónde sale. El ventaneo agrupa por `segment` y numera cada ventana con su posición **dentro
+    de ese grupo** (`windowing.make_windows`), así que el `start` de un evento es un índice sobre
+    estas filas y sobre ninguna otra cosa. Reconstruir el contexto pidiéndole las filas a la etapa
+    `datos` —el ancestro de esta rama— es lo único que da el mismo sistema de coordenadas.
+
+    Por qué no se reconstruye desde las ventanas, que ya están cargadas acá. Porque la
+    deduplicación se lleva la mayoría: en la rama de la tesis quedan 6.102 ventanas de las ~22.800
+    que habría con paso 1, así que pegar ventanas dejaría huecos grandes justo en la parte
+    tranquila del registro, que es la que hace falta ver.
+
+    Devuelve `None` en vez de fallar si el ancestro perdió su caché: el contexto es una mejora del
+    dibujo, y quedarse sin él tiene que degradar el gráfico, no romper la pantalla.
+    """
+    try:
+        for n in almacen.cadena_hasta(_con, clave):
+            if n["etapa"] == "datos" and n["tiene_resultado"]:
+                df = almacen.cargar_resultado(n["clave"])
+                col = "segment" if "segment" in df.columns else None
+                sub = df[df["SheetName"] == hoja]
+                if col is not None:
+                    sub = sub[sub[col] == segmento]
+                return sub if len(sub) else None
+    except Exception:
+        return None
+    return None
+
+
 @app.get("/api/nodo/{clave}/evento/{event_id}")
-def get_evento(clave: str, event_id: int):
-    """Las series crudas del tramo de un evento, para dibujarlo."""
+def get_evento(clave: str, event_id: int, margen: int | None = None):
+    """Las series crudas de un evento **con lo que pasa antes y después**.
+
+    POR QUÉ NO ALCANZA CON EL EVENTO SOLO. La pregunta que se le hace al revisor es «¿esto es un
+    comportamiento anómalo?», y dibujarle únicamente el tramo marcado es pedirle que reconozca un
+    valor atípico viendo una muestra de tamaño uno: no tiene contra qué compararlo. El evento 6 de
+    la rama de la tesis abarca 100 mediciones de las ~588 de su hoja; sin contexto se ve el 17 % del
+    registro y ninguna línea de base.
+
+    CUÁNTO CONTEXTO. Por omisión, tanto a cada lado como largo tiene el evento, con un piso de una
+    ventana. Así el evento ocupa **siempre el tercio central** del dibujo, mida lo que mida: la
+    proporción entre lo marcado y lo normal no cambia de un evento a otro, que es lo que permite
+    comparar dos eventos sin recalibrar el ojo. `margen` lo fuerza a un número de mediciones.
+
+    El rango pedido se recorta contra los bordes del tramo, así que un evento pegado al comienzo
+    trae menos contexto por izquierda. Por eso el `contexto` que se devuelve dice dónde cae el
+    evento dentro de lo dibujado en lugar de dar por sentado que está al medio.
+    """
     nodo = almacen.obtener(_con, clave)
     if nodo is None or nodo["etapa"] != "eventos" or not nodo["tiene_resultado"]:
         raise HTTPException(404, "No hay eventos en ese nodo")
@@ -616,11 +662,38 @@ def get_evento(clave: str, event_id: int):
 
     import numpy as np
 
-    largo = int(fila["end"] - fila["start"])
+    ini, fin = int(fila["start"]), int(fila["end"])
+    largo = fin - ini
     señales = list(ventanas.signal_columns)
+    tamano_ventana = int(ventanas.values.shape[1]) if len(ventanas.values) else largo
+
+    # ---- El camino bueno: la serie completa del tramo, recortada alrededor del evento ------
+    serie = _serie_del_segmento(clave, fila["SheetName"], fila["segment"])
+    if serie is not None:
+        m = int(margen) if margen is not None else max(largo, tamano_ventana)
+        m = max(0, min(m, 20_000))
+        desde = max(0, ini - m)
+        hasta = min(len(serie), fin + m)
+        recorte = serie.iloc[desde:hasta][señales].to_numpy(dtype=float)
+        return {
+            "evento": json.loads(fila.to_json()),
+            "senales": señales,
+            "valores": [[None if np.isnan(v) else float(v) for v in f] for f in recorte],
+            # Dónde empieza y termina el evento DENTRO de lo dibujado, y en qué medición del tramo
+            # arranca todo: con eso el frontend sombrea la zona marcada y numera el eje con la
+            # posición real en el registro en vez de con un cero que no significa nada.
+            "contexto": {
+                "desde": desde, "hasta": hasta,
+                "evento_desde": ini - desde, "evento_hasta": fin - desde,
+                "tramo": int(len(serie)),
+            },
+        }
+
+    # ---- El de reserva: pegar las ventanas del evento, sin contexto -----------------------
+    # Solo si el nodo `datos` de la rama perdió su caché. Es exactamente lo que hacía antes.
     acum = np.full((largo, len(señales)), np.nan)
     for p in posiciones:
-        desde = int(meta.loc[p, "start"] - fila["start"])
+        desde = int(meta.loc[p, "start"] - ini)
         bloque = ventanas.values[p]
         # Una ventana que arranca cerca del final se extiende más allá del tramo del evento
         # (sobre todo con el límite de ventanas por evento activo): se recorta al rango.
@@ -632,6 +705,8 @@ def get_evento(clave: str, event_id: int):
         "evento": json.loads(fila.to_json()),
         "senales": señales,
         "valores": [[None if np.isnan(v) else float(v) for v in fila_v] for fila_v in acum],
+        "contexto": {"desde": ini, "hasta": fin, "evento_desde": 0, "evento_hasta": largo,
+                     "tramo": None, "sin_contexto": True},
     }
 
 

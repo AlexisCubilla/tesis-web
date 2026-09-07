@@ -300,6 +300,28 @@ window.Grafico = (function () {
           itemStyle: { color: p.color || serie(i) },
           connectNulls: false, sampling: 'lttb',
           emphasis: { focus: 'none' },
+          /* `cfg.marca` sombrea un rango del eje x en todos los paneles: lo usa el diálogo de
+             clasificación para señalar qué parte de lo dibujado es el evento y qué parte es el
+             contexto que se agregó alrededor.
+
+             EL TINTE ES NEUTRO A PROPÓSITO. La tentación es pintarlo de rojo —«acá está la
+             anomalía»—, y sería un error: el revisor está mirando esto justamente para decidir si
+             es una anomalía o no. Un color de estado le estaría dando la respuesta antes de la
+             pregunta, que es la forma más barata de arruinar la medición de coincidencia entre
+             revisores. El sombreado dice «esto es lo que marcaron los métodos», no «esto está
+             mal», y para eso alcanza con un lavado de luz.
+
+             El rótulo va solo en el primer panel: repetido en los tres sería la misma palabra tres
+             veces sobre el mismo rango vertical. */
+          markArea: cfg.marca ? {
+            silent: true,
+            itemStyle: { color: varCss('--marca-evento') },
+            label: i === 0 && cfg.marca.etiqueta
+              ? { show: true, position: 'insideTop', color: c.tenue, fontSize: 10,
+                  formatter: cfg.marca.etiqueta }
+              : { show: false },
+            data: [[{ xAxis: cfg.marca.desde }, { xAxis: Math.max(cfg.marca.desde, cfg.marca.hasta - 1) }]],
+          } : undefined,
         });
       });
 

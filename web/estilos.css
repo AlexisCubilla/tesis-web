@@ -128,6 +128,11 @@
   --boton-hover: rgba(255, 255, 255, .09);
   --fila-hover: rgba(127, 168, 214, .07);
   --opcion-activa: rgba(21, 68, 115, .30);
+  /* El tramo que marcaron los detectores, sombreado sobre la señal cuando se dibuja con contexto
+     alrededor. NEUTRO y no rojo: quien mira ese gráfico está decidiendo si eso es una anomalía, y
+     un color de estado le daría la respuesta antes de la pregunta. Dice «esto es lo que marcaron
+     los métodos», no «esto está mal». */
+  --marca-evento: rgba(255, 255, 255, .055);
   /* La fila de un evento contestado, teñida según LA RESPUESTA: `--ok` si es anomalía, `--peligro`
      si no lo es, `--texto` si quedó neutral. Cada una va en dos alturas porque `tbody tr:hover`
      empata en especificidad con el selector de atributo, así que sin la segunda la fila que se

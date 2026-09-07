@@ -1610,6 +1610,7 @@ async function abrirDialogoEvento(id) {
       <button class="boton plano" id="cerrar-dlg" title="Cerrar (Esc)">✕</button>
     </div>
     <div id="caja-dlg-ev"></div>
+    ${leyendaContexto(d)}
     <p class="porque">${ev.features_top || ''}</p>
 
     <form class="encuesta" id="form-clas">
@@ -1642,6 +1643,7 @@ async function abrirDialogoEvento(id) {
     xNombre: 'medición',
     sustantivo: 'mediciones',
     paneles: d.senales.map((s, i) => ({ nombre: s, valores: d.valores.map((f) => f[i]) })),
+    ...conContexto(d),
   });
   /* No hace falta forzar un `resize`: el diálogo ya está abierto y con tamaño cuando se crea el
      gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
@@ -1674,6 +1676,40 @@ async function abrirDialogoEvento(id) {
   });
 }
 
+/** Las opciones de `Grafico.lineas` que agregan el contexto alrededor de un evento.
+ *
+ *  Dos cosas, y las dos hacen falta juntas. El SOMBREADO dice qué parte de la curva es el tramo
+ *  que marcaron los métodos; sin él, con contexto alrededor no se sabría dónde mirar. Y el EJE
+ *  pasa a numerar con la posición real dentro del tramo contiguo en vez de con un cero: antes el
+ *  eje arrancaba en 0 en el borde del evento, un origen que no existe en el registro y que hacía
+ *  imposible relacionar dos eventos de la misma hoja.
+ *
+ *  Si el backend no pudo traer el contexto —el nodo `datos` de la rama perdió su caché— devuelve
+ *  `sin_contexto` y acá no se agrega nada: el gráfico queda como antes, que sigue siendo correcto.
+ */
+function conContexto(d) {
+  const c = d.contexto;
+  if (!c || c.sin_contexto) return {};
+  return {
+    // Sin rótulo dentro del gráfico: cae justo sobre la curva de la primera señal, que es la
+    // que más veces sube ahí. Lo dice `leyendaContexto()` debajo, donde no compite con nada.
+    marca: { desde: c.evento_desde, hasta: c.evento_hasta },
+    formatoX: (i) => String(c.desde + i),
+  };
+}
+
+/** La frase que explica el sombreado. Sin ella el gráfico muestra dos cosas y nombra ninguna. */
+function leyendaContexto(d) {
+  const c = d.contexto;
+  if (!c || c.sin_contexto) return '';
+  const antes = c.evento_desde;
+  const despues = (c.hasta - c.desde) - c.evento_hasta;
+  return `<p class="pista" style="margin:6px 0 0">La <b>zona sombreada</b> es el tramo que marcaron `
+       + `los métodos. A los lados hay ${antes} y ${despues} mediciones de contexto: son señal del `
+       + `mismo tramo continuo que nadie marcó, para poder comparar contra lo que el pipeline `
+       + `considera normal.</p>`;
+}
+
 async function verEvento(id) {
   const cont = $('#detalle-evento');
   cont.innerHTML = '<p class="tenue" style="font-size:.84rem">Cargando…</p>';
@@ -1687,12 +1723,14 @@ async function verEvento(id) {
         <span class="esp"></span><span class="mono tenue" style="font-size:.76rem">
         mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos</span></div>
       <div id="caja-ev"></div>
+      ${leyendaContexto(d)}
       <p class="mono tenue" style="font-size:.74rem;margin-top:8px">${ev.features_top || ''}</p></div>`;
     Grafico.lineas($('#caja-ev'), {
       titulo: `Señales del evento ${id}`,
       xNombre: 'medición',
       sustantivo: 'mediciones',
       paneles: d.senales.map((s, i) => ({ nombre: s, valores: d.valores.map((f) => f[i]) })),
+      ...conContexto(d),
     });
   } catch (e) {
     cont.innerHTML = `<p class="tenue" style="font-size:.84rem">No se pudo cargar: ${e.message}</p>`;
