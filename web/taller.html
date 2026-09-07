@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Taller — Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
+<script>
+/* El tema, ANTES del primer cuadro. Va inline en el `<head>` y no en `tema.js` a propósito: ese
+   archivo se carga al final del cuerpo, cuando el navegador ya pintó, y quien tenga el claro
+   guardado vería un destello oscuro en cada carga. Es una de las tres fallas que el ADR A8 le
+   achacaba al interruptor; esta es su arreglo. */
+try { document.documentElement.dataset.tema = localStorage.getItem('tema') || 'oscuro'; }
+catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
+</script>
 <style>
   .envoltorio { max-width: 1320px; }
 
@@ -317,5 +325,6 @@
 <script src="estatico/analisis.js"></script>
 <script src="estatico/app.js"></script>
 <script src="estatico/cuenta.js" defer></script>
+<script src="estatico/tema.js" defer></script>
 </body>
 </html>

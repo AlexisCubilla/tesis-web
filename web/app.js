@@ -100,6 +100,12 @@ async function iniciar() {
       <span class="mono">mise run datos</span> y recargá la página.</div>`;
   }
 
+  /* Los <canvas> no heredan las variables CSS: `grafico.js` se repinta solo al cambiar de tema,
+     pero lo que arma `cargarVisual` incluye gradientes y colores leídos al construir la opción, así
+     que se rehace entero. Los datos se vuelven a pedir al backend, que es local y contesta de
+     memoria: no vale la pena cachearlos para esto. */
+  addEventListener('tema-cambiado', () => { if (S.sel) cargarVisual(); });
+
   await recargar();
 
   // Compatibilidad con los enlaces de la pantalla de análisis, que ahora es una pestaña de acá.

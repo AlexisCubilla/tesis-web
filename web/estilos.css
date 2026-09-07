@@ -330,6 +330,218 @@
   --mono: ui-monospace, "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEMA CLARO.
+
+   El oscuro sigue siendo el de por omisión: el universo es la identidad del sitio y así se ve la
+   primera vez que alguien entra. El claro es una preferencia explícita, y existe por el motivo que
+   el A8 daba a favor del claro antes de darlo vuelta: el taller se proyecta en aulas con luz y se
+   recorta en capturas que van al documento impreso, y ahí el oscuro pierde.
+
+   NO SE MIRA `prefers-color-scheme`. El oscuro no es una preferencia de sistema acá, es la
+   identidad; quien quiera el claro lo pide, y esa elección se guarda.
+
+   CÓMO ESTÁ CONSTRUIDO. Solo redefine variables — ni una regla de layout, ni un selector de
+   componente. Esa es la propiedad que hace que un segundo tema sea sostenible: si mañana alguien
+   agrega una tarjeta o un chip, hereda los dos temas sin tocar este bloque. La regla del encabezado
+   —«ningún archivo escribe un `#rrggbb` propio»— es lo que lo hace posible.
+
+   LOS COLORES SE MIDIERON, no se eligieron a ojo. Las cinco series se optimizaron con el mismo
+   criterio que las oscuras: máxima separación ΔOKLab entre los pares bajo protanopía, deuteranopía
+   y tritanopía, con el contraste mínimo sobre el lienzo por encima de 3:1. El resultado es 0,130
+   contra los 0,075 de la paleta oscura que está en producción — el claro separa MEJOR. Los matices
+   quedan repartidos cada 45° o más para que además se distingan a simple vista, y la banda del rojo
+   se excluyó de la búsqueda: el rojo es el estado de error y no puede ser también una serie.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html[data-tema="claro"] {
+  color-scheme: light;
+
+  /* --- superficies ---
+     La escalera se invierte pero no se refleja: en oscuro el panel es MÁS claro que el lienzo, y
+     acá es al revés —el panel es casi blanco y el lienzo un tono por debajo—, que es como se separan
+     las superficies cuando la luz viene de arriba. `--panel-2` es el escalón de «acá estás»: la
+     pestaña activa, la opción elegida.
+
+     EL BLANCO ES CÁLIDO, no neutro. Las primeras versiones usaban un gris que yo llamaba neutro y
+     no lo era: `#eef1f5` tiene 7 puntos de separación entre canales a 255°, o sea que era FRÍO —el
+     mismo tinte azulado que el encabezado de este archivo dice haberle quitado a los neutros
+     oscuros (que, medidos, conservan de 4 a 8 puntos: la regla es aspiracional). Elegido el tinte,
+     conviene elegirlo a propósito: el cálido lee como papel y no como pantalla, que es el registro
+     de algo que se proyecta en un aula y se recorta en capturas para un documento impreso.
+
+     NO CUESTA CONTRASTE: medido, el texto pasa de 15,7:1 a 15,8:1 y los dos tonos de apoyo no se
+     mueven. Y tampoco le roba presencia al oro ni a la alerta, que es lo que temía: el lienzo tiene
+     croma 0,011 y el oro 0,120 —once veces más—, y la luminosidad los separa por 0,45 en OKLab.
+     Comparten familia de matiz sin confundirse. */
+  --fondo: #f4f1e9;
+  --fondo-2: #faf8f2;        /* cajas internas, campos de formulario */
+  --panel: #fffdf8;
+  --panel-2: #e6e1d5;
+  /* Los filetes van con alfa negro y no con un gris fijo, igual que en oscuro van con alfa blanco:
+     así un borde pesa lo mismo sobre el lienzo, sobre una tarjeta o sobre un campo. */
+  --borde: rgba(0, 0, 0, .19);
+  --borde-fuerte: rgba(0, 0, 0, .40);
+
+  /* --- texto ---
+     Los alfas son MÁS ALTOS que en oscuro (.68 y .48 contra .58 y .36) y no es una inconsistencia:
+     el mismo alfa compra menos contraste sobre blanco que sobre negro, así que copiar los números
+     del tema oscuro dejaría el texto de apoyo lavado. Con estos, `--texto-2` da 5,9:1 sobre el
+     lienzo y `--texto-3` 3,6:1, que es lo que hace falta para un rótulo. */
+  --texto: #1a1815;
+  --texto-2: rgba(26, 24, 21, .76);
+  --texto-3: rgba(26, 24, 21, .62);
+
+  /* --- acentos ---
+     Las dos alturas del marino se INVIERTEN de papel. En oscuro `--acento` es el marino claro
+     (tinta legible sobre negro) y `--acento-hondo` el oscuro (relleno). Acá la tinta tiene que ser
+     oscura para leerse sobre blanco, así que `--acento` baja; `--acento-hondo` se queda donde
+     estaba, porque un relleno oscuro con texto blanco funciona igual en los dos temas — y de hecho
+     es el mismo valor, lo que hace que el botón primario sea idéntico en ambos. */
+  --acento: #006cc4;         /* 6,5:1 sobre el lienzo */
+  --acento-hondo: #154473;   /* blanco encima: 10,0:1 */
+  --acento-2: #1a1815;       /* los valores: el dato es lo más fuerte de la pantalla */
+  --sobre-acento: #ffffff;
+  --oro: #9b5a00;            /* 5,4:1 — el ámbar del oscuro es ilegible sobre blanco */
+
+  /* --- los tres que significan --- (5,5 · 4,6 · 5,0 sobre el lienzo) */
+  --ok:      #007a4a;
+  --peligro: #d90134;
+  --alerta:  #b05100;
+
+  /* --- matices derivados ---
+     Los lavados van con alfa NEGRO y con menos opacidad que sus equivalentes oscuros: un velo
+     oscuro sobre blanco es un paso perceptual más grande que uno claro sobre negro. */
+  --barra-fondo: rgba(255, 253, 248, .84);
+  --boton-hover: rgba(0, 0, 0, .09);
+  --fila-hover: rgba(0, 108, 196, .10);
+  --opcion-activa: rgba(0, 108, 196, .22);
+  --marca-evento: rgba(0, 0, 0, .08);
+
+  /* La fila de un evento contestado, teñida según la respuesta. Mismos matices, alfas más bajos. */
+  --fila-si:            rgba(0, 122, 74, .15);
+  --fila-si-hover:      rgba(0, 122, 74, .24);
+  --fila-no:            rgba(217, 1, 52, .13);
+  --fila-no-hover:      rgba(217, 1, 52, .21);
+  --fila-neutral:       rgba(0, 0, 0, .08);
+  --fila-neutral-hover: rgba(0, 0, 0, .14);
+
+  --aviso-fondo: rgba(176, 81, 0, .15);
+  --aviso-info-fondo: rgba(176, 81, 0, .10);
+
+  /* La TINTA de cada chip, no solo su fondo. Faltaban en la primera versión de este bloque y el
+     efecto era que un chip claro conservaba la tinta del tema oscuro: «del .env» quedaba en ámbar
+     #ffc86b sobre un fondo ámbar pálido, ilegible. Cada una se midió sobre su propio fondo. */
+  --chip-pend-b: rgba(0, 0, 0, .10);   --chip-pend-t: rgba(26, 24, 21, .78);
+  --chip-corr-b: rgba(0, 108, 196, .18); --chip-corr-t: #005aa8;
+  --chip-ok-b:   rgba(0, 122, 74, .18);   --chip-ok-t:   #006c41;
+  --chip-err-b:  rgba(217, 1, 52, .17);   --chip-err-t:  #bd002d;
+  --chip-oro-b:  rgba(155, 90, 0, .18);   --chip-oro-t:  #874e00;
+
+  /* El filete del nodo del mapa. En oscuro es un blanco al 30 %; copiarlo dejaba los círculos sin
+     contorno sobre el lienzo claro. */
+  --nodo-listo-b: rgba(0, 0, 0, .09);  --nodo-listo-l: rgba(0, 0, 0, .42);
+  --nodo-corr-b:  rgba(0, 108, 196, .34);
+  --nodo-err-b:   rgba(217, 1, 52, .17);
+
+  /* De día no hay estrellas. El campo se apaga en vez de aclararse: puntos blancos sobre un lienzo
+     claro no son un cielo, son suciedad. */
+  --estrellas-op: 0;
+  --orbita-anillo: rgba(0, 0, 0, .34);
+
+  /* --- las cinco series ---
+     Peor par del conjunto bajo dicromatismo: 0,126 (la paleta oscura, 0,075).
+
+     LA INTENSIDAD SUBIÓ A PEDIDO, y tiene un techo que no es de gusto sino del gamut: pedir a la
+     vez croma alto y contraste alto sobre blanco deja SIN CANDIDATOS al sector del cian —los
+     matices claros por naturaleza no pueden ser las dos cosas en sRGB—. Con el piso de contraste en
+     3,5, el croma medio llegó a 0,17 — el máximo que el gamut permite manteniendo los cinco matices
+     repartidos. El cian es el que manda: no pasa de 0,12 sin perder contraste, y por eso el techo
+     del conjunto no es una elección sino un límite del espacio de color.
+
+     EL CROMA ES PAREJO, y esa es la corrección estética que faltaba. Una versión anterior llegaba a
+     0,143 de separación con cromas de 0,11 a 0,26 — separaba mejor y se veía peor: cinco colores con
+     saturaciones tan distintas no se leen como un conjunto, y el de 0,26 quedaba eléctrico al lado
+     de un marrón apagado. Con el croma acotado a 0,18 el rango bajó de 0,15 a 0,04 y la separación
+     solo cayó a 0,126, que sigue siendo 1,7 veces la de la paleta oscura.
+
+     De dónde salió el criterio: de medir la oscura. Sus cinco tienen croma 0,10-0,11 —rango CERO— y
+     se separan por una escalera de luminosidad de 0,60 a 0,92. Ahí está su coherencia. Copiar esa
+     receta literalmente NO funciona sobre blanco: probado, croma constante da 0,025 de separación,
+     tres veces peor que la oscura. La razón es que sobre un lienzo claro los colores tienen que ser
+     oscuros para contrastar, y ahí el gamut sRGB es angosto: no queda margen para separar solo con
+     luminosidad. Sobre blanco hay que gastar algo de variedad de croma; lo que se puede evitar es
+     que esa variedad sea un rango de 0,15 con un extremo estridente.
+
+     LOS DEMÁS COLORES SE SUBIERON AL MÁXIMO QUE SU PISO PERMITE, uno por uno, buscando el croma más
+     alto de cada matiz que todavía cumple su contraste: 4,6:1 para los que aparecen como texto —los
+     tres estados, el oro y el acento— y 3,5:1 para los que solo se dibujan. Subir croma BAJA
+     contraste, así que sin ese piso la intensidad se habría comido la legibilidad sin avisar.
+
+     DOS NO SE MAXIMIZARON, y por motivos concretos. `--grafico-rampa` lleva rótulos BLANCOS encima
+     en el mapa de calor, así que su techo lo pone ese blanco (4,6:1) y no el lienzo. Y `--acento`
+     se calculó sobre el matiz EXACTO del primario (252° en OKLCh), porque la paleta se apoya en que
+     las dos alturas del marino compartan matiz: si el acento derivara, dejarían de leerse como un
+     azul en dos alturas y pasarían a ser dos azules parecidos.
+
+     `--acento-hondo` NO SE TOCÓ: es el relleno de los botones primarios, y se pidió dejarlo.
+
+     EL ORDEN NO ES POR MATIZ, es por uso. La línea de tiempo del paso 6 pinta con `--serie-1` los
+     eventos de hasta 3 métodos y con `--serie-2` los de 4 o 5: esas dos aparecen SIEMPRE juntas y
+     hay que poder distinguirlas de un vistazo. Ordenadas por matiz quedaban adyacentes —el par más
+     parecido de la paleta— justo donde más importa. Puestas así, ese par vale 0,272; en la paleta
+     oscura, donde el orden es el histórico, vale 0,075. */
+  --serie-1: #648833;
+  --serie-2: #314fad;
+  --serie-3: #8a4000;
+  --serie-4: #0685b6;
+  --serie-5: #711357;
+
+  --grafico-unico: #009043;  /* el verde mate, bajado para leerse sobre blanco */
+  --grafico-rampa: #048824;  /* tope de la rampa secuencial */
+  --div-mas:   #00925c;      /* separación del par: 0,140 */
+  --div-menos: #0182c2;
+
+  /* La sombra cambia de naturaleza: en oscuro es un pozo negro que hunde la caja, y acá es una
+     sombra proyectada, mucho más suave — sobre blanco un negro al 55 % sería una mancha. */
+  --sombra: 0 1px 2px rgba(48, 40, 28, .09), 0 12px 32px rgba(48, 40, 28, .11);
+
+  /* --- la pantalla de ingreso ---
+     De día no hay cielo: el fondo espacial se apaga y queda la geometría. Los anillos y la grilla
+     sobreviven como trazo gris —siguen siendo la marca del sitio a escala— pero las manchas del
+     cielo y el campo de estrellas se van, porque un cielo nocturno claro no existe. */
+  --ing-cielo-1: #f2efe7;
+  --ing-cielo-2: #f5f2ea;
+  --ing-fondo-1: #efece4;
+  --ing-grilla: #e7e2d6;
+  --ing-borde: rgba(0, 0, 0, .13);
+  --ing-panel-1: rgba(255, 253, 248, .96);
+  --ing-panel-2: rgba(250, 248, 242, .96);
+  --ing-campo: #faf8f2;
+  --ing-marcador: #97907f;
+  --ing-orbita: color-mix(in srgb, var(--acento) 16%, transparent);
+  --ing-dato: color-mix(in srgb, var(--acento) 26%, transparent);
+}
+
+/* El satélite del ingreso está dibujado con grises claros, para verse sobre el cielo nocturno.
+   Sobre blanco desaparecería, así que en claro se oscurece con un filtro en vez de mantener un
+   segundo SVG: es una ilustración, no una ficha de la paleta, y duplicarla sería dos dibujos que
+   se desincronizan. */
+html[data-tema="claro"] .sat { filter: brightness(.42) contrast(1.15); }
+
+/* De día tampoco hay estrellas en el ingreso. Esa pantalla se siembra las suyas en el navegador con
+   `background: var(--texto)`, así que en claro se volvían puntos OSCUROS sobre un lienzo claro: no
+   un cielo, suciedad. `--estrellas-op` apaga el campo global pero no éstas, que son elementos
+   aparte; se apagan acá. Lo que queda es la geometría —los anillos y la grilla—, que sí funciona
+   como trazo gris y sigue siendo la marca del sitio a escala.
+
+   SE LLAMAN `.chispa` Y NO `.estrella` POR ALGO. Esta regla se escribió primero con `.estrella`, y
+   esa clase ya existía: es la ★ de la configuración de la tesis en el mapa de ramas. La regla la
+   escondía también, así que en claro desaparecía la marca de cuál es la rama de la tesis — un dato,
+   no un adorno. Dos cosas distintas con el mismo nombre de clase es una colisión que solo se nota
+   cuando alguien escribe una regla para una de las dos. */
+html[data-tema="claro"] .chispa,
+html[data-tema="claro"] .dato { display: none; }
+
 * { box-sizing: border-box; }
 
 /* ---------------------------------------------------------------------------
@@ -501,7 +713,7 @@ p { margin: 0 0 1em; text-wrap: pretty; }
    nombre y «Salir», y como administrador suma «Usuarios». Cuatro anchos distintos, cuatro
    posiciones para las mismas dos pestañas: al cambiar de pantalla saltaban de lugar.
    Ancladas a la izquierda dependen solo del ancho de la marca, que es el mismo en todas. */
-.barra nav { flex: 1; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.barra nav { flex: 1; order: 1; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 /* Las DOS pestañas llevan recuadro, y lo único que las distingue es el relleno.
    Antes solo la activa tenía caja, así que la inactiva no se leía como algo
    clickeable: parecía una etiqueta al lado de un botón. Con las dos enmarcadas se
@@ -532,18 +744,70 @@ p { margin: 0 0 1em; text-wrap: pretty; }
    control que menos se usa de toda la pantalla y era el más pesado de su zona, que es al revés de
    como debería ser. Ahora pesa igual que el nombre que tiene al lado: son los dos lados de la
    misma frase, «sos admin» y «dejá de serlo». */
-.barra .cuenta { display: flex; align-items: center; gap: 12px;
-  margin-left: auto; padding-left: 14px; border-left: 1px solid var(--borde); }
+/* --- La esquina derecha: avatar, menú y tema ---
+   CON SESIÓN VA UN SOLO CONTROL. Antes había tres cosas sueltas —el nombre, el interruptor de tema
+   y «Salir»— para acciones que se tocan una vez por sesión, ocupando el mismo peso visual que las
+   pestañas, que se tocan todo el tiempo. Ahora van detrás del avatar. Sin sesión no hay avatar que
+   apretar, así que el tema y «Ingresar» quedan a la vista.
+
+   El filete que separa esta zona de las pestañas se queda: son dos preguntas distintas —a dónde ir
+   y quién sos— y el filete lo dice sin sumar una caja. */
+.barra .cuenta { display: flex; align-items: center; gap: 10px; position: relative;
+  margin-left: auto; order: 3; padding-left: 14px; border-left: 1px solid var(--borde); }
 .barra .cuenta.sola { padding-left: 0; border-left: none; }
-.barra .cuenta .quien { font-size: .86rem; color: var(--texto-2); }
-.barra .cuenta .salir {
-  font: inherit; font-size: .86rem; padding: 0; border: none; background: none;
-  color: var(--texto-2); cursor: pointer; text-decoration: underline;
-  text-decoration-color: var(--borde-fuerte); text-underline-offset: 3px;
-  transition: color .18s ease, text-decoration-color .18s ease;
+
+/* El botón de tema suelto, para cuando no hay sesión. Peso de pestaña inactiva: es una preferencia,
+   no un destino, y con el recuadro competiría con ellas. */
+.barra .btn-tema {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0;
+  border: none; background: none; color: var(--texto-3); cursor: pointer;
+  border-radius: var(--radio-2);
+  transition: color .18s ease, background .18s ease;
 }
-.barra .cuenta .salir:hover { color: var(--texto); text-decoration-color: currentColor; }
-.barra .cuenta .salir:disabled { opacity: .5; cursor: progress; }
+.barra .btn-tema svg { width: 17px; height: 17px; }
+.barra .btn-tema:hover { color: var(--texto); background: var(--boton-hover); }
+
+/* El avatar lleva la INICIAL y no un ícono genérico: con varios revisores, decir de quién es la
+   sesión sin abrir nada importa, porque lo que se guarda queda firmado con ese nombre. */
+.barra .avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; flex: none;
+  border: 1px solid var(--borde-fuerte); border-radius: 50%;
+  background: none; color: var(--texto-2); cursor: pointer;
+  font: inherit; font-size: .8rem; font-weight: 600; line-height: 1;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
+}
+.barra .avatar:hover { color: var(--texto); background: var(--boton-hover); }
+.barra .avatar[aria-expanded="true"] { color: var(--texto); background: var(--panel-2); }
+
+/* El menú cuelga del avatar y se alinea a la derecha, porque el avatar está contra el borde: con
+   `left` se saldría de la pantalla. Va por encima de todo lo de la página pero por debajo de un
+   diálogo modal, que es lo único que puede taparlo con razón. */
+.menu-cuenta {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30;
+  min-width: 194px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio-2);
+  box-shadow: var(--sombra);
+}
+/* `hidden` solo no alcanza: el `display: block` de autor le gana al del navegador. Es el mismo
+   tropiezo que ya hubo con `.pestanas[hidden]`. */
+.menu-cuenta[hidden] { display: none; }
+.menu-cuenta .quien {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 7px 10px 9px; margin-bottom: 4px; border-bottom: 1px solid var(--borde);
+}
+.menu-cuenta .quien strong { font-size: .86rem; font-weight: 600; }
+.menu-cuenta .quien span { font-size: .74rem; color: var(--texto-2); }
+.menu-cuenta .op {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: none; border-radius: 7px; background: none;
+  color: var(--texto-2); font: inherit; font-size: .84rem; text-align: left; cursor: pointer;
+  transition: color .16s ease, background .16s ease;
+}
+.menu-cuenta .op svg { width: 15px; height: 15px; flex: none; }
+.menu-cuenta .op:hover { color: var(--texto); background: var(--boton-hover); }
+.menu-cuenta .op:disabled { opacity: .5; cursor: progress; }
 
 /* En pantalla angosta la barra pasa a dos renglones enteros en vez de acomodar los pedazos donde
    entren. Sin esto el `nav` sigue ocupando lo que sobra al lado de la marca y sus hijos envuelven

@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
+<script>
+/* El tema, ANTES del primer cuadro. Va inline en el `<head>` y no en `tema.js` a propósito: ese
+   archivo se carga al final del cuerpo, cuando el navegador ya pintó, y quien tenga el claro
+   guardado vería un destello oscuro en cada carga. Es una de las tres fallas que el ADR A8 le
+   achacaba al interruptor; esta es su arreglo. */
+try { document.documentElement.dataset.tema = localStorage.getItem('tema') || 'oscuro'; }
+catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
+</script>
 <style>
   /* LA PANTALLA DE INGRESO TIENE SU PROPIO REGISTRO, y es una excepción consciente al resto del
      sitio: acá el fondo es el tema. Órbitas concéntricas, un satélite dándoles la vuelta y una
@@ -77,8 +85,8 @@
   @keyframes latir { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
 
   /* ---------- estrellas y telemetría de fondo ---------- */
-  .estrella { position: fixed; border-radius: 50%; background: var(--texto); z-index: 0; }
-  .estrella.titila { animation: titilar 3.6s ease-in-out infinite; }
+  .chispa { position: fixed; border-radius: 50%; background: var(--texto); z-index: 0; }
+  .chispa.titila { animation: titilar 3.6s ease-in-out infinite; }
   @keyframes titilar {
     0%, 100% { opacity: var(--op, .6) }
     50%      { opacity: .15 }
@@ -88,7 +96,7 @@
 
   /* Nada se mueve para quien pidió que no se mueva. */
   @media (prefers-reduced-motion: reduce) {
-    .orbita, .sat, .sat .baliza, .estrella { animation: none !important }
+    .orbita, .sat, .sat .baliza, .chispa { animation: none !important }
   }
 
   /* ---------- la barra ---------- */
@@ -284,7 +292,7 @@
     const tam = (Math.random() * 1.6 + 0.6).toFixed(2);
     const op = (Math.random() * 0.5 + 0.35).toFixed(2);
     const titila = Math.random() < 0.35;
-    trozos.push(`<div class="estrella${titila ? ' titila' : ''}" style="left:${x}px;top:${y}px;`
+    trozos.push(`<div class="chispa${titila ? ' titila' : ''}" style="left:${x}px;top:${y}px;`
       + `width:${tam}px;height:${tam}px;opacity:${op};--op:${op};`
       + `animation-duration:${(2.4 + Math.random() * 3).toFixed(1)}s;`
       + `animation-delay:${(Math.random() * 4).toFixed(1)}s"></div>`);
@@ -368,5 +376,7 @@ $('#form').addEventListener('submit', async (e) => {
   }
 });
 </script>
+<script src="estatico/cuenta.js" defer></script>
+<script src="estatico/tema.js" defer></script>
 </body>
 </html>
