@@ -43,7 +43,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   body { min-height: 100vh; margin: 0; overflow-x: hidden; }
 
   /* ---------- el fondo ---------- */
-  .cielo {
+  .ing-cielo {
     position: fixed; inset: 0; z-index: 0;
     background:
       radial-gradient(ellipse 120% 80% at 20% -10%, var(--ing-cielo-1) 0%, transparent 60%),
@@ -53,7 +53,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 
   /* Grilla de seguimiento, difuminada hacia los bordes con una máscara: sin ella el patrón llega
      al filo de la pantalla y se lee como un fondo de planilla en vez de como un instrumento. */
-  .grilla {
+  .ing-grilla {
     position: fixed; inset: 0; z-index: 0; opacity: .25;
     background-image:
       linear-gradient(var(--ing-grilla) 1px, transparent 1px),
@@ -64,46 +64,45 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   }
 
   /* ---------- las órbitas ---------- */
-  .aro {
+  .ing-aro {
     position: fixed; top: 50%; left: 50%; z-index: 0;
     border: 1px solid var(--ing-orbita); border-radius: 50%;
     transform: translate(-50%, -50%);
   }
-  .aro.o1 { width: 640px; height: 640px; animation: girar 34s linear infinite; }
-  .aro.o2 { width: 920px; height: 920px; opacity: .64; animation: girar 54s linear infinite reverse; }
-  .aro.o3 { width: 1220px; height: 1220px; opacity: .43; }
+  .ing-aro.o1 { width: 640px; height: 640px; animation: girar 34s linear infinite; }
+  .ing-aro.o2 { width: 920px; height: 920px; opacity: .64; animation: girar 54s linear infinite reverse; }
+  .ing-aro.o3 { width: 1220px; height: 1220px; opacity: .43; }
   @keyframes girar { to { transform: translate(-50%, -50%) rotate(360deg) } }
 
-  /* LOS ANILLOS SE LLAMAN `.aro` Y NO `.orbita`, POR LA MISMA RAZÓN QUE LAS ESTRELLAS SE LLAMAN
-     `.chispa`: `orbita` ya existía, y allá es el bloque del globo de la portada en `index.html`
-     —dibujo más pie—. Una regla de tema escrita para estos anillos escondió aquel globo entero.
-     Segunda vez que pasa en esta pantalla: el nombre genérico y bonito es la trampa, porque es
-     justo el que a otro le va a parecer bueno. El token de color sí se llama `--ing-orbita`, y ahí
-     no hay riesgo: el prefijo `--ing-` ya dice de quién es.
+  /* TODA ESTA ESCENA LLEVA `ing-` y no un nombre lindo. Los anillos se llamaron `.orbita` y las
+     estrellas `.estrella`; las dos clases ya existían en otra pantalla —el globo de la portada y la
+     ★ de la rama de la tesis— y una regla de tema en `estilos.css`, que es compartida, las escondió
+     por accidente. El porqué largo está allá, al lado de esa regla. Acá alcanza con la consecuencia:
+     una pieza nueva de este dibujo nace con `ing-`, sin pensarlo y sin revisar las otras pantallas.
 
      El satélite va montado en el anillo interno y contragira para no dar vueltas sobre sí mismo,
      que es lo que no hace un satélite estabilizado en tres ejes. */
-  .caja-sat { position: absolute; top: -15px; left: 50%; width: 30px; height: 30px; margin-left: -15px; }
-  .sat { width: 100%; height: 100%; display: block;
+  .ing-caja-sat { position: absolute; top: -15px; left: 50%; width: 30px; height: 30px; margin-left: -15px; }
+  .ing-sat { width: 100%; height: 100%; display: block;
     filter: drop-shadow(0 0 6px rgba(200, 208, 220, .35));
     animation: contragirar 34s linear infinite; }
-  .sat .baliza { animation: latir 2.4s ease-in-out infinite; }
+  .ing-sat .ing-baliza { animation: latir 2.4s ease-in-out infinite; }
   @keyframes contragirar { from { transform: rotate(0) } to { transform: rotate(-360deg) } }
   @keyframes latir { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
 
   /* ---------- estrellas y telemetría de fondo ---------- */
-  .chispa { position: fixed; border-radius: 50%; background: var(--texto); z-index: 0; }
-  .chispa.titila { animation: titilar 3.6s ease-in-out infinite; }
+  .ing-chispa { position: fixed; border-radius: 50%; background: var(--texto); z-index: 0; }
+  .ing-chispa.titila { animation: titilar 3.6s ease-in-out infinite; }
   @keyframes titilar {
     0%, 100% { opacity: var(--op, .6) }
     50%      { opacity: .15 }
   }
-  .dato { position: fixed; width: 4px; height: 4px; border-radius: 50%;
+  .ing-dato { position: fixed; width: 4px; height: 4px; border-radius: 50%;
     background: var(--ing-dato); z-index: 0; }
 
   /* Nada se mueve para quien pidió que no se mueva. */
   @media (prefers-reduced-motion: reduce) {
-    .aro, .sat, .sat .baliza, .chispa { animation: none !important }
+    .ing-aro, .ing-sat, .ing-sat .ing-baliza, .ing-chispa { animation: none !important }
   }
 
   /* ---------- la barra ---------- */
@@ -199,18 +198,18 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 </head>
 <body>
 
-<div class="cielo"></div>
-<div class="grilla"></div>
+<div class="ing-cielo"></div>
+<div class="ing-grilla"></div>
 
 <!-- Las tres órbitas y el satélite. Decorativo, así que `aria-hidden`: no hay nada acá que un
      lector de pantalla necesite anunciar. -->
 <div aria-hidden="true">
-  <div class="aro o1">
-    <div class="caja-sat">
+  <div class="ing-aro o1">
+    <div class="ing-caja-sat">
       <!-- El CubeSat, dibujado. Es una ILUSTRACIÓN y no un ícono del sistema: sus tonos internos
            son sombreado del objeto —panel, brazo, cuerpo, antena—, no fichas de la paleta, igual
            que la textura de la Tierra en la portada trae los suyos. -->
-      <svg class="sat" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+      <svg class="ing-sat" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
         <g stroke="#8b929c" stroke-width="0.6">
           <rect x="1" y="14" width="12" height="12" fill="#1a2030" stroke="#4a5568"/>
           <line x1="1" y1="17.3" x2="13" y2="17.3"/>
@@ -238,12 +237,12 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
         <path d="M24 22 q5 -1 6 3" stroke="#9aa1ac" stroke-width="0.7" fill="none"/>
         <ellipse cx="30.3" cy="25.4" rx="2.1" ry="1.3" fill="#dfe2e7" stroke="#9aa1ac"
                  stroke-width="0.4" transform="rotate(20 30 25)"/>
-        <circle class="baliza" cx="20" cy="26.3" r="0.9" fill="#ffffff"/>
+        <circle class="ing-baliza" cx="20" cy="26.3" r="0.9" fill="#ffffff"/>
       </svg>
     </div>
   </div>
-  <div class="aro o2"></div>
-  <div class="aro o3"></div>
+  <div class="ing-aro o2"></div>
+  <div class="ing-aro o3"></div>
   <div id="fondo-puntos"></div>
 </div>
 
@@ -299,13 +298,13 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
     const tam = (Math.random() * 1.6 + 0.6).toFixed(2);
     const op = (Math.random() * 0.5 + 0.35).toFixed(2);
     const titila = Math.random() < 0.35;
-    trozos.push(`<div class="chispa${titila ? ' titila' : ''}" style="left:${x}px;top:${y}px;`
+    trozos.push(`<div class="ing-chispa${titila ? ' titila' : ''}" style="left:${x}px;top:${y}px;`
       + `width:${tam}px;height:${tam}px;opacity:${op};--op:${op};`
       + `animation-duration:${(2.4 + Math.random() * 3).toFixed(1)}s;`
       + `animation-delay:${(Math.random() * 4).toFixed(1)}s"></div>`);
   }
   for (let i = 0; i < 50; i++) {
-    trozos.push(`<div class="dato" style="left:${Math.random() * W}px;top:${Math.random() * H}px;`
+    trozos.push(`<div class="ing-dato" style="left:${Math.random() * W}px;top:${Math.random() * H}px;`
       + `opacity:${(0.15 + Math.random() * 0.35).toFixed(2)}"></div>`);
   }
   caja.innerHTML = trozos.join('');

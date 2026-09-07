@@ -560,24 +560,31 @@ html[data-tema="claro"] {
    Pero seguía siendo un satélite sin espacio: el problema no era el contraste. Por eso se va, y no
    se tokeniza.
 
-   LOS NOMBRES DE ESTAS CLASES YA COSTARON DOS VECES, y las dos fueron esta misma regla.
+   POR QUÉ TODAS LLEVAN `ing-`. Esta regla rompió otra pantalla dos veces, y las dos por el mismo
+   motivo: nombró una clase que otra pantalla ya usaba para otra cosa.
 
-   `.chispa` se llamó primero `.estrella`, y esa clase ya existía: es la ★ de la configuración de la
-   tesis en el mapa de ramas. La regla la escondía también, así que en claro desaparecía la marca de
-   cuál es la rama de la tesis — un dato, no un adorno.
+   La primera fue `.estrella`, que era además la ★ de la configuración de la tesis en el mapa de
+   ramas; en claro desaparecía la marca de cuál es la rama de la tesis, que es un dato y no un
+   adorno. La segunda fue `.orbita`, que en `index.html` es el bloque del globo de la portada
+   —dibujo más pie—: al sumarla acá desapareció en modo claro la ilustración principal del sitio.
 
-   `.aro` se llamó primero `.orbita`, y esa TAMBIÉN existía: en `index.html` es el bloque del globo
-   de la portada, dibujo más pie. Al sumar `.orbita` a esta lista desapareció el globo entero del
-   inicio en modo claro, que es la ilustración principal del sitio.
+   Las dos veces el arreglo fue rebautizar la clase del ingreso con otro nombre lindo, y las dos
+   veces el nombre lindo era exactamente el problema: `estrella`, `orbita`, `cielo`, `grilla` son
+   los nombres que a CUALQUIER pantalla que dibuje algo le van a parecer buenos, y una hoja de
+   estilos compartida no tiene alcance por archivo. Rebautizar de uno en uno cambia qué clase choca,
+   no que vaya a chocar.
 
-   El patrón es el mismo y conviene nombrarlo: el nombre genérico y bonito —`estrella`, `orbita`—
-   es justo el que a otra pantalla también le va a parecer bueno, y una hoja de estilos compartida
-   no tiene alcance por archivo. Las clases de una escena decorativa van con un nombre que nadie más
-   vaya a querer. Los TOKENS no tienen el problema porque llevan prefijo: `--ing-orbita` convive sin
-   ruido con la clase `.orbita` de la portada. */
-html[data-tema="claro"] .chispa,
-html[data-tema="claro"] .dato,
-html[data-tema="claro"] .aro { display: none; }
+   Así que la escena decorativa del ingreso lleva prefijo entera —`.ing-cielo`, `.ing-grilla`,
+   `.ing-aro`, `.ing-sat`, `.ing-chispa`, `.ing-dato`— igual que sus tokens `--ing-*`, que nunca
+   dieron problema justamente por eso: `--ing-orbita` convive sin ruido con la clase `.orbita` de la
+   portada. Una regla escrita para el ingreso ya no puede alcanzar a otra pantalla por accidente, y
+   agregar una pieza a la escena no obliga a revisar las otras cuatro pantallas antes.
+
+   `.o1`, `.o2` y `.o3` se quedan sin prefijo a propósito: son modificadores, nunca se usan solos y
+   siempre van calificados por `.ing-aro`. */
+html[data-tema="claro"] .ing-chispa,
+html[data-tema="claro"] .ing-dato,
+html[data-tema="claro"] .ing-aro { display: none; }
 
 * { box-sizing: border-box; }
 
