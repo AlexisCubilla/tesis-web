@@ -211,6 +211,54 @@ def delete_nodo(clave: str, forzar: bool = False):
 SERIE_COMPLETA = 20_000
 
 
+#: Los meses como los escribe el Excel de la misión, en inglés y con mayúscula.
+_MESES = {m: i + 1 for i, m in enumerate(
+    "January February March April May June July August September October November December".split())}
+
+#: Año de las hojas que no lo dicen.
+#:
+#: EL ARCHIVO NO TRAE LA FECHA. Las 45 hojas se llaman «March 28», «August 07»…, y solo dos llevan
+#: año: `January 02 2022` y `January 24 2022`. Las 70 columnas del Excel no tienen ninguna fecha
+#: absoluta —el tiempo que trae es relativo al encendido (`sec`/`min`/`hour`/`day`) y el campo GPS
+#: está en `#REF!`—, así que el año de las otras 40 hay que inferirlo.
+#:
+#: POR QUÉ 2021. BIRDS-4 —Tsuru, GuaraníSat-1 y Maya-2— se desplegó desde la ISS el **14 de marzo
+#: de 2021** (lanzamiento el 20-21 de febrero de 2021 en el Cygnus NG-15). La primera hoja en orden
+#: cronológico es `March 28`, catorce días después: encaja con el arranque de operaciones de un
+#: CubeSat recién liberado. Y con este supuesto **ninguna de las 42 hojas cae antes del despliegue**,
+#: que es la comprobación que se rompería si alguna fuera de otro año. Las dos únicas que llevan año
+#: escrito son justamente las que cruzan a 2022, que es cuando el año deja de ser obvio.
+#:
+#: Fuente del despliegue: comunidad Libre Space, «ISS CubeSat Deployment (2021-03-14)», y los
+#: comunicados de PhilSA / Manila Bulletin del 14/03/2021 por Maya-2.
+#:
+#: ES UNA INFERENCIA CON FUENTE EXTERNA, no un dato del repositorio. Lo único que depende de ella es
+#: el ORDEN en que se muestran las hojas; ningún número del pipeline la usa. Si resultara falsa, la
+#: línea de tiempo mostraría la misión en un orden equivocado y nada más.
+ANIO_POR_OMISION = 2021
+
+
+def fecha_de_hoja(nombre: str) -> str | None:
+    """La fecha de una hoja como `AAAA-MM-DD`, o `None` si el nombre no es una fecha.
+
+    Devuelve texto ISO y no una tupla porque el destino es JSON y el frontend ordena comparando
+    cadenas: en ISO el orden alfabético y el cronológico son el mismo, así que no hay que volver a
+    parsear del otro lado ni mantener dos implementaciones del mismo criterio.
+
+    `None` para las hojas que no siguen el patrón —las tres excluidas del estudio se llaman
+    `Test1 w batt`, `Test2 wo batt` y `Anomalous data`— para que el frontend las pueda dejar al
+    final en vez de inventarles una fecha.
+    """
+    import re
+
+    m = re.fullmatch(r"([A-Za-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?", (nombre or "").strip())
+    if m is None or m.group(1).capitalize() not in _MESES:
+        return None
+    mes = _MESES[m.group(1).capitalize()]
+    anio = int(m.group(3)) if m.group(3) else ANIO_POR_OMISION
+    return f"{anio:04d}-{mes:02d}-{int(m.group(2)):02d}"
+
+
 @app.put("/api/nodo/{clave}/etiqueta")
 def put_etiqueta(clave: str, pet: PeticionEtiqueta):
     """Renombra un paso. No toca el hash: es un nombre para humanos, no parte de su identidad."""
@@ -373,6 +421,7 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
 
     # ---- Eventos: el entregable --------------------------------------------------------
     if etapa == "eventos":
+        # (la fecha de cada hoja la resuelve `fecha_de_hoja`, más abajo en este archivo)
         tabla = salida["eventos"]
         meta = salida.get("meta")
         # Para la línea de tiempo hace falta el largo del registro de cada hoja, que no está en la
@@ -382,7 +431,11 @@ def get_datos(clave: str, hoja: str | None = None, limite: int = 300):
             largo_ventana = int(salida.get("tamano_ventana") or 0)
             for hoja, sub in meta.groupby(grupo):
                 pistas.append({"hoja": str(hoja), "desde": int(sub["start"].min()),
-                               "hasta": int(sub["start"].max()) + largo_ventana})
+                               "hasta": int(sub["start"].max()) + largo_ventana,
+                               "fecha": fecha_de_hoja(str(hoja))})
+            # Por largo de registro, que es el orden con el que la línea de tiempo nació. El
+            # frontend reordena según lo que se elija arriba del gráfico; esto es solo un orden
+            # estable de partida para que la respuesta no dependa de cómo agrupó pandas.
             pistas.sort(key=lambda p: p["hasta"] - p["desde"], reverse=True)
         return {
             "tipo": "eventos",

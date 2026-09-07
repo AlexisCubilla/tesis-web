@@ -15,6 +15,7 @@ const S = {
   defs: [], cadena: [], nodos: [],
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
   usuario: null,      // quién mira, o null en modo lectura: gobierna qué controles existen
+  orden: 'prioridad', // cómo se ordenan los eventos del paso 6. Ver `ORDENES`.
   form: null,         // {etapa, padre, modo} cuando el formulario está abierto
   sondeo: null,
   vista: 'paso',      // 'paso' | 'analisis' | 'comparar' — qué se está mirando de la fase
@@ -1155,10 +1156,52 @@ async function cargarClasificacion(clave) {
  */
 let _tablaEventos = null;
 
+/* ---------------------------------------------------------------- orden de los eventos
+   Los dos visuales del paso 6 —la línea de tiempo y la tabla— muestran los mismos 40 eventos, y
+   comparten un solo selector de orden. Un control por visual habría dejado ver la misma lista
+   ordenada de dos formas al mismo tiempo, que es más confuso que útil.
+
+   PERO NO ORDENAN LA MISMA COSA, y eso hay que decirlo en la interfaz y no solo acá. Las filas de
+   la tabla son EVENTOS; los renglones de la línea son HOJAS, con varios eventos cada uno y a veces
+   en dos carriles. Así que «prioridad» en la tabla es «este evento tiene 5 métodos» y en la línea
+   solo puede ser «esta hoja contiene el evento más fuerte» — es un agregado, no el mismo dato.
+   Cronológico sí significa lo mismo en los dos, porque la fecha es de la hoja.
+
+   El orden se calcula en el navegador y no en el servidor: los 40 eventos y las 42 pistas ya
+   están acá, así que cambiar de criterio es instantáneo y no hay una segunda ronda de peticiones
+   que pueda contestar distinto. El backend sigue siendo fuente de DATOS, no de presentación. */
+const ORDENES = {
+  prioridad: {
+    etiqueta: 'prioridad',
+    ayuda: 'Primero los eventos que más métodos marcaron. Para triaje: empezás por los fuertes.',
+    // Desempate por cantidad de tramos: a igual número de métodos, el evento más largo primero.
+    eventos: (a, b) => b.n_detectores - a.n_detectores || b.n_ventanas - a.n_ventanas,
+    // En la línea, «prioridad» de una hoja es la de su evento más fuerte. Ver la nota de arriba.
+    hojas: (fuerza) => (p, q) => (fuerza.get(q.hoja) || 0) - (fuerza.get(p.hoja) || 0)
+                                 || p.hoja.localeCompare(q.hoja),
+  },
+  cronologico: {
+    etiqueta: 'cronológico',
+    ayuda: 'Del 28 de marzo de 2021 al 24 de enero de 2022, como transcurrió la misión.',
+    // La fecha llega en ISO, donde comparar como texto ya es comparar como fecha.
+    eventos: (a, b) => String(FECHAS.get(a.SheetName) || '9999').localeCompare(
+                       String(FECHAS.get(b.SheetName) || '9999')) || a.start - b.start,
+    hojas: () => (p, q) => String(p.fecha || '9999').localeCompare(String(q.fecha || '9999')),
+  },
+};
+
+/** Fecha ISO de cada hoja, del backend. Se rellena al dibujar el paso 6. */
+const FECHAS = new Map();
+
 function verEventos(d) {
   const cols = ['event_id', 'SheetName', 'start', 'end', 'n_ventanas', 'n_detectores', 'features_top']
     .filter((c) => d.columnas.includes(c));
-  const filas = [...d.filas].sort((a, b) => b.n_detectores - a.n_detectores || b.n_ventanas - a.n_ventanas);
+
+  FECHAS.clear();
+  for (const p of (d.pistas || [])) if (p.fecha) FECHAS.set(p.hoja, p.fecha);
+
+  const orden = ORDENES[S.orden] ? S.orden : 'prioridad';
+  const filas = [...d.filas].sort(ORDENES[orden].eventos);
   const rot = { n_detectores: 'métodos', n_ventanas: 'tramos', SheetName: 'hoja', event_id: 'id',
                 start: 'desde', end: 'hasta', features_top: 'qué se desvió' };
   $('#fase-visual').innerHTML = `
@@ -1183,6 +1226,11 @@ function verEventos(d) {
     </div>
     <div id="caja-revision"></div>
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
+      <div class="seg-orden" role="group" aria-label="Orden de los eventos">${
+        Object.entries(ORDENES).map(([k, o]) =>
+          `<button type="button" data-orden="${k}" title="${o.ayuda}"${
+            k === orden ? ' class="activo" aria-pressed="true"' : ' aria-pressed="false"'
+          }>${o.etiqueta}</button>`).join('')}</div>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="avance-clas"></span>
       <span class="tenue" style="font-size:.78rem">${S.usuario
@@ -1201,6 +1249,16 @@ function verEventos(d) {
       ? `<td class="celda-clas">${marcaClasificacion(f.event_id)}</td>` : ''}</tr>`).join('')}</tbody></table></div>
     <div id="detalle-evento" style="margin-top:16px"></div>`;
   _tablaEventos = { d, filas };
+  /* Cambiar el orden redibuja los dos visuales con los datos que ya están en memoria: no vuelve a
+     pedir nada. `S.orden` vive en el estado y no en el DOM para que sobreviva a un repintado de la
+     fase —volver de la pestaña de análisis, por ejemplo— sin volver al orden por omisión. */
+  $('#fase-visual').querySelectorAll('.seg-orden button').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (S.orden === b.dataset.orden) return;
+      S.orden = b.dataset.orden;
+      verEventos(d);
+    });
+  });
   lineaDeEventos($('#caja-linea'), d, filas);
   /* Un clic abre las señales abajo, como siempre; el doble clic abre el diálogo para clasificar.
      Conviven sin pelearse porque el navegador dispara los dos y el segundo no deshace al primero:
@@ -1356,7 +1414,17 @@ function lineaDeEventos(destino, d, filas) {
   if (!pistas.length || !filas.length) return;
 
   const conEventos = new Set(filas.map((f) => f.SheetName));
-  const usadas = pistas.filter((p) => conEventos.has(p.hoja));
+  /* Las hojas se ordenan con el criterio elegido arriba, no con el que trae el backend (que viene
+     por largo de registro). «Cronológico» acomoda los renglones como transcurrió la misión;
+     «prioridad» pone arriba las hojas que contienen los eventos más fuertes — que es un agregado
+     por hoja y no el mismo dato que la columna «métodos» de la tabla, porque un renglón de acá
+     puede tener cinco eventos con cinco prioridades distintas. */
+  const fuerza = new Map();
+  for (const f of filas) {
+    fuerza.set(f.SheetName, Math.max(fuerza.get(f.SheetName) || 0, f.n_detectores));
+  }
+  const cmp = (ORDENES[S.orden] || ORDENES.prioridad).hojas(fuerza);
+  const usadas = pistas.filter((p) => conEventos.has(p.hoja)).sort(cmp);
   const vacias = pistas.length - usadas.length;
   const pistaDe = new Map(usadas.map((p) => [p.hoja, p]));
   const maxDet = Math.max(...filas.map((f) => f.n_detectores), 1);
@@ -1530,10 +1598,26 @@ function lineaDeEventos(destino, d, filas) {
          (partidas ? ` ${partidas} ${partidas === 1 ? 'hoja ocupa' : 'hojas ocupan'} más de un` +
            ' renglón: son eventos que se pisan y van en carriles separados para poder abrir cada' +
            ' uno.' : '') +
-         ' Cuanto más intenso el bloque, más métodos coinciden. El contorno es tu respuesta:' +
-         ' verde de trazo largo si lo marcaste como anomalía, rojo de trazo corto si dijiste que' +
-         ' no lo es, gris punteado si quedó neutral.' +
-         ' Doble clic sobre un evento para verlo y clasificarlo.',
+         /* Qué significa el eje y, que cambia con el selector de arriba. Sin esto el gráfico
+            sugiere una secuencia —está dibujado como una línea de tiempo— y el lector le atribuye
+            un orden temporal que puede no tener. Y en «prioridad» hay que decir que es un agregado
+            POR HOJA: el renglón de arriba contiene el evento más fuerte, no es el evento más
+            fuerte. */
+         (S.orden === 'cronologico'
+           ? ' Los renglones van del 28 de marzo de 2021 al 24 de enero de 2022, como transcurrió' +
+             ' la misión.'
+           : ' Los renglones van por el evento más fuerte de cada hoja, no por el de cada' +
+             ' renglón.') +
+         ' Cuanto más intenso el bloque, más métodos coinciden.' +
+         /* Las dos frases sobre la encuesta solo valen con sesión. Sin ella no hay contornos que
+            describir —`C.mias` viene vacía— y el doble clic no engancha nada, así que prometerlo
+            era mandar a alguien a hacer clic dos veces sobre algo que no iba a pasar. Es el mismo
+            criterio que el resto del modo lectura: no ofrecer lo que no se puede hacer. */
+         (S.usuario
+           ? ' El contorno es tu respuesta: verde de trazo largo si lo marcaste como anomalía,' +
+             ' rojo de trazo corto si dijiste que no lo es, gris punteado si quedó neutral.' +
+             ' Doble clic sobre un evento para verlo y clasificarlo.'
+           : ' Clic sobre un evento para ver sus señales.'),
   });
 }
 

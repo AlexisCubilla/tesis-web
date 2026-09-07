@@ -717,6 +717,26 @@ html:has(dialog[open]) { overflow: hidden; }
 .dlg-evento .porque { font-family: var(--mono); font-size: .74rem; color: var(--texto-2);
   margin: 8px 0 0; }
 
+/* --- Con qué criterio se ordenan los eventos ---
+   Un segmentado y no un `<select>`: son dos opciones y las dos caben escritas, así que esconderlas
+   detrás de un desplegable obligaría a abrirlo para saber qué hay. Con las dos a la vista, además,
+   se lee de una que son alternativas y no una lista larga.
+
+   Lleva UNA sola caja alrededor del par, no una por botón: lo que está enmarcado es la elección, y
+   el relleno dice cuál está tomada — el mismo lenguaje que las pestañas de la barra. Pesa menos
+   que ellas (más chico, tinta tenue) porque cambiar el orden de una tabla es menos que cambiar de
+   pantalla. */
+.seg-orden { display: inline-flex; border: 1px solid var(--borde); border-radius: var(--radio-2);
+  overflow: hidden; }
+.seg-orden button {
+  font: inherit; font-size: .78rem; padding: 4px 10px;
+  border: none; background: none; color: var(--texto-2); cursor: pointer;
+  transition: color .18s ease, background .18s ease;
+}
+.seg-orden button + button { border-left: 1px solid var(--borde); }
+.seg-orden button:hover:not(.activo) { color: var(--texto); background: var(--boton-hover); }
+.seg-orden button.activo { background: var(--panel-2); color: var(--texto); }
+
 .encuesta { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borde); }
 .encuesta > legend, .encuesta .pregunta { font-weight: 650; font-size: .95rem; margin-bottom: 12px; }
 
