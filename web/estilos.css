@@ -18,11 +18,17 @@
    siendo planas por el mismo motivo de siempre: una textura detrás de cinco curvas compite con el
    dato justo donde hay que leerlo.
 
-   QUÉ COLOR SOBREVIVE. El chrome es monocromo: negro, blanco y la escalera de grises, sin una sola
-   separación entre canales. El color que quedó es el que codifica algo, y nada más —los tres
-   estados (verde éxito, rojo error, naranja claro información), las cinco series de los gráficos, y
-   el oro de la configuración de la tesis, que es una marca y no un estado. La regla para agregar
-   color es esa: si no significa nada, no va.
+   QUÉ COLOR SOBREVIVE. El chrome es monocromo. El color que quedó es el que codifica algo, y nada
+   más —los tres estados (verde éxito, rojo error, naranja claro información), las cinco series de
+   los gráficos, y el oro de la configuración de la tesis, que es una marca y no un estado. La regla
+   para agregar color es esa: si no significa nada, no va.
+
+   «MONOCROMO» ACÁ NO QUIERE DECIR SIN TINTE, y esta línea decía otra cosa hasta que se midió.
+   Afirmaba «sin una sola separación entre canales», y los neutros tienen de 4 a 8 puntos: `--fondo`
+   4, `--fondo-2` 5, `--panel` 6, `--panel-2` 8, todos entre 258° y 269°. No es ruido: la separación
+   crece con la luminosidad y el matiz se mantiene, o sea que es un tinte frío RELATIVO y constante
+   —el mismo «punto de frío» que `--texto` sí tenía documentado—. Lo que se quitó no fue el tinte
+   sino su exceso: de 12-45 puntos a 4-8. La afirmación era aspiracional y ahora dice lo que mide.
 
    POR QUÉ SE FUE EL AZUL. Los neutros de antes no eran una paleta azul, eran un tinte: el fondo
    tenía 12 puntos de separación entre canales, `--panel` 29, `--panel-2` 38, `--borde` 43 y
@@ -34,14 +40,20 @@
   color-scheme: dark;
 
   /* --- superficies ---
-     Neutros PUROS, sin separación entre canales. Antes eran azules: el fondo
-     tenía 12 puntos de separación, `--panel` 29, `--panel-2` 38, `--borde` 43 y
-     `--texto-2` 45. Eso no era una paleta azul, era un tinte que se le había
-     filtrado a cada neutro, y el efecto es que todo sea un poco azul y por eso
-     nada sea azul. Los grises van opacos y no con alfa porque `grafico.js` pasa
-     `--panel` a ECharts como fondo del globo, y un alfa ahí deja ver la curva
-     por detrás. `--borde` sí va con alfa: sobre cualquier superficie de la
-     escalera un filete al 11 % da el mismo peso relativo. */
+     Neutros CASI puros: les queda un punto de frío deliberado, de 4 a 8 puntos de
+     separación entre canales según la luminosidad, todos entre 258° y 269°. Antes
+     el tinte era otra cosa: el fondo tenía 12 puntos, `--panel` 29, `--panel-2`
+     38, `--borde` 43 y `--texto-2` 45. Eso no era una paleta azul, era un tinte
+     que se le había filtrado a cada neutro, y el efecto es que todo sea un poco
+     azul y por eso nada sea azul. Lo que se corrigió fue el exceso, no el tinte
+     —el mismo criterio que `--texto`, que lleva su punto de frío a propósito—.
+     Este comentario decía «neutros PUROS, sin separación entre canales» y no era
+     cierto; se corrigió al medirlo para el tema claro.
+
+     Los grises van opacos y no con alfa porque `grafico.js` pasa `--panel` a
+     ECharts como fondo del globo, y un alfa ahí deja ver la curva por detrás.
+     `--borde` sí va con alfa: sobre cualquier superficie de la escalera un filete
+     al 11 % da el mismo peso relativo. */
   --fondo: #07080b;
   --fondo-2: #0c0e11;        /* cajas internas, campos de formulario */
   --panel: #101216;
@@ -362,12 +374,15 @@ html[data-tema="claro"] {
      las superficies cuando la luz viene de arriba. `--panel-2` es el escalón de «acá estás»: la
      pestaña activa, la opción elegida.
 
-     EL BLANCO ES CÁLIDO, no neutro. Las primeras versiones usaban un gris que yo llamaba neutro y
-     no lo era: `#eef1f5` tiene 7 puntos de separación entre canales a 255°, o sea que era FRÍO —el
-     mismo tinte azulado que el encabezado de este archivo dice haberle quitado a los neutros
-     oscuros (que, medidos, conservan de 4 a 8 puntos: la regla es aspiracional). Elegido el tinte,
-     conviene elegirlo a propósito: el cálido lee como papel y no como pantalla, que es el registro
-     de algo que se proyecta en un aula y se recorta en capturas para un documento impreso.
+     EL BLANCO ES CÁLIDO, y la elección nunca fue entre cálido y neutro. La primera versión usaba
+     `#eef1f5`, que tiene 7 puntos de separación entre canales a 255°: era FRÍO. Los neutros del
+     tema oscuro llevan el mismo punto de frío, de 4 a 8 puntos —ver la nota de `--- superficies ---`
+     ahí arriba—, así que la pregunta real era de qué lado caía el tinte, no si lo había.
+
+     Del lado cálido porque lee como papel y no como pantalla, que es el registro de algo que se
+     proyecta en un aula y se recorta en capturas para un documento impreso. Y porque el frío
+     competía con el acento: un lienzo azulado bajo un marino le quita al marino lo que tiene de
+     azul, que es justo el problema que el encabezado describe para la paleta vieja.
 
      NO CUESTA CONTRASTE: medido, el texto pasa de 15,7:1 a 15,8:1 y los dos tonos de apoyo no se
      mueven. Y tampoco le roba presencia al oro ni a la alerta, que es lo que temía: el lienzo tiene
