@@ -632,6 +632,7 @@ p { margin: 0 0 1em; text-wrap: pretty; }
 /* --- Tablas --- */
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
+th.num { text-align: right; }   /* el rótulo, sobre sus números */
 /* Sin versalitas, y sin recuperar mayúscula inicial: las cabeceras salen del
    backend y pueden ser nombres de señal («Vbat (V)») o rótulos traducidos
    («métodos», «hoja»). Una transformación a minúscula corrompería los primeros;
@@ -717,25 +718,54 @@ html:has(dialog[open]) { overflow: hidden; }
 .dlg-evento .porque { font-family: var(--mono); font-size: .74rem; color: var(--texto-2);
   margin: 8px 0 0; }
 
-/* --- Con qué criterio se ordenan los eventos ---
-   Un segmentado y no un `<select>`: son dos opciones y las dos caben escritas, así que esconderlas
-   detrás de un desplegable obligaría a abrirlo para saber qué hay. Con las dos a la vista, además,
-   se lee de una que son alternativas y no una lista larga.
+/* --- Moverse entre eventos, en el encabezado del diálogo ---
+   Va acá arriba y no junto a «Guardar» a propósito: el pie responde «¿qué opino de esto?» y esto
+   responde «¿dónde estoy?». Son dos preguntas distintas y mezclarlas hace que la persona tenga que
+   leer los cinco controles para encontrar el que busca.
 
-   Lleva UNA sola caja alrededor del par, no una por botón: lo que está enmarcado es la elección, y
-   el relleno dice cuál está tomada — el mismo lenguaje que las pestañas de la barra. Pesa menos
-   que ellas (más chico, tinta tenue) porque cambiar el orden de una tabla es menos que cambiar de
-   pantalla. */
-.seg-orden { display: inline-flex; border: 1px solid var(--borde); border-radius: var(--radio-2);
-  overflow: hidden; }
-.seg-orden button {
-  font: inherit; font-size: .78rem; padding: 4px 10px;
-  border: none; background: none; color: var(--texto-2); cursor: pointer;
-  transition: color .18s ease, background .18s ease;
+   Las flechas son tinta sobre el fondo, sin recuadro. El recuadro en esta pantalla lo lleva la
+   acción de guardar, que es la que cierra el juicio; una flecha enmarcada al lado del contador
+   competiría con ella teniendo mucho menos peso en la tarea. Deshabilitadas en los extremos y no
+   escondidas: que el control siga estando dice que ahí se termina la lista. */
+.dlg-evento .nav-ev { display: flex; align-items: center; gap: 4px; }
+.dlg-evento .nav-ev .cuantos {
+  font-family: var(--mono); font-size: .74rem; color: var(--texto-2);
+  min-width: 6.5ch; text-align: center;   /* ancho fijo: «9 de 40» y «40 de 40» no mueven las flechas */
 }
-.seg-orden button + button { border-left: 1px solid var(--borde); }
-.seg-orden button:hover:not(.activo) { color: var(--texto); background: var(--boton-hover); }
-.seg-orden button.activo { background: var(--panel-2); color: var(--texto); }
+.dlg-evento .nav-ev .paso {
+  font: inherit; font-size: 1.1rem; line-height: 1; padding: 3px 8px;
+  border: none; background: none; color: var(--texto-2); cursor: pointer;
+  border-radius: var(--radio-2); transition: color .18s ease, background .18s ease;
+}
+.dlg-evento .nav-ev .paso:hover:not(:disabled) { color: var(--texto); background: var(--boton-hover); }
+.dlg-evento .nav-ev .paso:disabled { color: var(--texto-3); cursor: default; }
+
+/* --- Ordenar la tabla por una columna ---
+   El rótulo entero es el botón: el área de clic es la palabra y no un ícono al lado, que en una
+   cabecera de 11 px sería un blanco de 8 px. Se hereda todo del `<th>` para que el botón no se
+   note como botón — lo que se toca es el rótulo, no un control agregado.
+
+   La flecha OCUPA LUGAR SIEMPRE, aunque no se dibuje: sin eso, ordenar por una columna la
+   ensanchaba y corría todas las de la derecha, y el ojo perdía la fila que estaba siguiendo.
+
+   La columna activa se marca con la tinta plena y la flecha, no con relleno. El relleno en este
+   sitio significa «acá estás» —las pestañas de la barra— y una columna ordenada no es un lugar
+   donde uno esté. */
+th.ordenable { padding: 0; }
+th.ordenable button {
+  font: inherit; color: inherit; letter-spacing: inherit; text-align: inherit;
+  width: 100%; padding: inherit; margin: 0;
+  display: flex; align-items: center; gap: 5px;
+  border: none; background: none; cursor: pointer;
+  transition: color .18s ease;
+}
+th.ordenable:not(.ordenando) button:hover { color: var(--texto); }
+th.ordenando button { color: var(--texto); }
+th.ordenable .flecha { font-size: .62em; min-width: 1em; opacity: .75; }
+/* En una columna numérica el rótulo va a la derecha, sobre sus números, así que el contenido del
+   botón se empuja para ese lado. La flecha queda al final, contra el borde de la columna: es donde
+   menos estorba la lectura de las cifras, que es lo que se viene a mirar acá. */
+th.ordenable.num button { justify-content: flex-end; }
 
 .encuesta { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borde); }
 .encuesta > legend, .encuesta .pregunta { font-weight: 650; font-size: .95rem; margin-bottom: 12px; }

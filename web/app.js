@@ -15,7 +15,9 @@ const S = {
   defs: [], cadena: [], nodos: [],
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
   usuario: null,      // quién mira, o null en modo lectura: gobierna qué controles existen
-  orden: 'prioridad', // cómo se ordenan los eventos del paso 6. Ver `ORDENES`.
+  // Con qué columna se ordena la tabla de eventos. Arranca por prioridad, que es el orden con el
+  // que la tabla llega del paquete de la tesis y el que sirve para triaje. Ver `COLUMNAS_ORDENABLES`.
+  tabla: { campo: 'n_detectores', dir: -1 },
   form: null,         // {etapa, padre, modo} cuando el formulario está abierto
   sondeo: null,
   vista: 'paso',      // 'paso' | 'analisis' | 'comparar' — qué se está mirando de la fase
@@ -57,6 +59,12 @@ const api = async (ruta, op) => {
 const pista = (corta, larga) => `<p class="pista">${corta}</p>` + (larga
   ? `<details class="saber-mas"><summary>Por qué</summary><p>${larga}</p></details>` : '');
 const miles = (v) => typeof v === 'number' ? v.toLocaleString('es') : v;
+/* Texto de una persona metido en una plantilla. Hace falta para el comentario de una
+   clasificación: sin esto, uno que contenga `</textarea>` cierra el campo antes de tiempo y parte
+   el formulario en dos. Lo escribe alguien con sesión, así que no es una vía de ataque, pero sí
+   una forma de romperse la pantalla a uno mismo y no entender por qué. */
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /* Íconos dibujados, no escritos. Ver la nota de `.ico` en `estilos.css`: un glifo como ★ o → se
    dibuja distinto en cada sistema, no hereda el grosor de la fuente y en algunas plataformas sale
@@ -1157,41 +1165,102 @@ async function cargarClasificacion(clave) {
 let _tablaEventos = null;
 
 /* ---------------------------------------------------------------- orden de los eventos
-   Los dos visuales del paso 6 —la línea de tiempo y la tabla— muestran los mismos 40 eventos, y
-   comparten un solo selector de orden. Un control por visual habría dejado ver la misma lista
-   ordenada de dos formas al mismo tiempo, que es más confuso que útil.
+   La línea de tiempo y la tabla ordenan por SEPARADO, y cada una con el criterio que le
+   corresponde. Antes compartían un selector con dos opciones, y eso obligaba a una advertencia en
+   el pie del gráfico: «los renglones van por el evento más fuerte de cada hoja, no por el de cada
+   renglón». Que un criterio necesite una aclaración para no engañar es la señal de que no
+   pertenece ahí. Un renglón de la línea es una HOJA con varios eventos, y ordenar hojas por «su
+   evento más fuerte» produce una secuencia que no responde ninguna pregunta.
 
-   PERO NO ORDENAN LA MISMA COSA, y eso hay que decirlo en la interfaz y no solo acá. Las filas de
-   la tabla son EVENTOS; los renglones de la línea son HOJAS, con varios eventos cada uno y a veces
-   en dos carriles. Así que «prioridad» en la tabla es «este evento tiene 5 métodos» y en la línea
-   solo puede ser «esta hoja contiene el evento más fuerte» — es un agregado, no el mismo dato.
-   Cronológico sí significa lo mismo en los dos, porque la fecha es de la hoja.
+   LA LÍNEA ES SIEMPRE CRONOLÓGICA. Está dibujada como una línea de tiempo, así que su eje y tiene
+   que ser tiempo: de marzo de 2021 a enero de 2022. Sin opciones, y por eso sin advertencia.
 
-   El orden se calcula en el navegador y no en el servidor: los 40 eventos y las 42 pistas ya
-   están acá, así que cambiar de criterio es instantáneo y no hay una segunda ronda de peticiones
-   que pueda contestar distinto. El backend sigue siendo fuente de DATOS, no de presentación. */
-const ORDENES = {
-  prioridad: {
-    etiqueta: 'prioridad',
-    ayuda: 'Primero los eventos que más métodos marcaron. Para triaje: empezás por los fuertes.',
-    // Desempate por cantidad de tramos: a igual número de métodos, el evento más largo primero.
-    eventos: (a, b) => b.n_detectores - a.n_detectores || b.n_ventanas - a.n_ventanas,
-    // En la línea, «prioridad» de una hoja es la de su evento más fuerte. Ver la nota de arriba.
-    hojas: (fuerza) => (p, q) => (fuerza.get(q.hoja) || 0) - (fuerza.get(p.hoja) || 0)
-                                 || p.hoja.localeCompare(q.hoja),
-  },
-  cronologico: {
-    etiqueta: 'cronológico',
-    ayuda: 'Del 28 de marzo de 2021 al 24 de enero de 2022, como transcurrió la misión.',
-    // La fecha llega en ISO, donde comparar como texto ya es comparar como fecha.
-    eventos: (a, b) => String(FECHAS.get(a.SheetName) || '9999').localeCompare(
-                       String(FECHAS.get(b.SheetName) || '9999')) || a.start - b.start,
-    hojas: () => (p, q) => String(p.fecha || '9999').localeCompare(String(q.fecha || '9999')),
-  },
-};
+   LA TABLA SE ORDENA POR SUS COLUMNAS, haciendo clic en el rótulo. Ahí cada fila SÍ es un evento,
+   así que cualquier columna es un criterio legítimo y no hace falta elegir por la persona cuáles
+   valen. Es además la interacción que todo el mundo ya conoce.
+
+   Se ordena en el navegador y no en el servidor: los 40 eventos ya están acá, así que reordenar es
+   instantáneo y no hay una segunda ronda de peticiones que pueda contestar distinto. El backend
+   sigue siendo fuente de DATOS, no de presentación. */
 
 /** Fecha ISO de cada hoja, del backend. Se rellena al dibujar el paso 6. */
 const FECHAS = new Map();
+
+/** Los eventos en orden cronológico: por fecha de la hoja y, dentro de una, por dónde empiezan. */
+const cronologico = (a, b) =>
+  String(FECHAS.get(a.SheetName) || '9999').localeCompare(String(FECHAS.get(b.SheetName) || '9999'))
+  || a.start - b.start;
+
+/* Cómo se ordena cada columna de la tabla, y hacia dónde la primera vez que se la toca.
+   `dir: -1` = descendente primero. Es lo que uno quiere en «métodos» y «tramos» —lo más fuerte
+   arriba— mientras que en un id o una posición lo natural es empezar de menor a mayor. Que el
+   primer clic haga lo esperado ahorra el segundo.
+
+   `hoja` NO se ordena alfabéticamente: se ordena por fecha. Alfabético pondría April antes de
+   March, que sobre nombres de meses es simplemente incorrecto.
+
+   `features_top` no está: es una cadena larga de features y ordenarla alfabéticamente no significa
+   nada. Un rótulo que se puede tocar y no sirve para nada es peor que uno que no se puede tocar. */
+const COLUMNAS_ORDENABLES = {
+  event_id:     { dir: 1,  cmp: (a, b) => a.event_id - b.event_id },
+  SheetName:    { dir: 1,  cmp: cronologico },
+  start:        { dir: 1,  cmp: (a, b) => a.start - b.start },
+  end:          { dir: 1,  cmp: (a, b) => a.end - b.end },
+  n_ventanas:   { dir: -1, cmp: (a, b) => a.n_ventanas - b.n_ventanas },
+  n_detectores: { dir: -1, cmp: (a, b) => a.n_detectores - b.n_detectores || a.n_ventanas - b.n_ventanas },
+  // «Mi juicio» por el valor de la escala (-2 a +2). Lo sin clasificar va al final en los dos
+  // sentidos: no es una respuesta más baja que «definitivamente no», es la ausencia de respuesta.
+  juicio:       { dir: -1, cmp: (a, b) => valorDeJuicio(a.event_id) - valorDeJuicio(b.event_id) },
+};
+
+function valorDeJuicio(id) {
+  const mia = miRespuesta(id);
+  if (!mia) return null;
+  const o = (C.escala || []).find((x) => x.codigo === mia.respuesta);
+  return o ? o.valor : 0;
+}
+
+/** El comparador de la tabla según `S.tabla`, con lo no clasificado siempre al final. */
+function comparadorDeTabla() {
+  const { campo, dir } = S.tabla;
+  const col = COLUMNAS_ORDENABLES[campo];
+  if (!col) return (a, b) => b.n_detectores - a.n_detectores || b.n_ventanas - a.n_ventanas;
+  return (a, b) => {
+    if (campo === 'juicio') {
+      const va = valorDeJuicio(a.event_id), vb = valorDeJuicio(b.event_id);
+      if (va === null && vb === null) return a.event_id - b.event_id;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      return (va - vb) * dir || a.event_id - b.event_id;
+    }
+    return col.cmp(a, b) * dir;
+  };
+}
+
+/** Un `<th>`, ordenable si su columna lo admite.
+ *
+ *  El rótulo va dentro de un `<button>` y no con un `onclick` en el `<th>`: así se llega con
+ *  Tab y se activa con Enter sin escribir nada de manejo de teclado. `aria-sort` en el `<th>` es
+ *  lo que un lector de pantalla anuncia; la flecha es para el resto.
+ *
+ *  La flecha ocupa lugar SIEMPRE, aunque esté invisible, para que activar un orden no corra el
+ *  ancho de la columna y con él toda la tabla.
+ */
+const COLUMNAS_NUMERICAS = new Set(['event_id', 'start', 'end', 'n_ventanas', 'n_detectores']);
+
+function cabeceraOrdenable(campo, rotulo) {
+  const col = COLUMNAS_ORDENABLES[campo];
+  const num = COLUMNAS_NUMERICAS.has(campo) ? ' num' : '';
+  if (!col) return `<th class="${num.trim()}">${rotulo}</th>`;
+  const activa = S.tabla.campo === campo;
+  const asc = S.tabla.dir === 1;
+  return `<th data-campo="${campo}" class="ordenable${num}${activa ? ' ordenando' : ''}"
+    aria-sort="${activa ? (asc ? 'ascending' : 'descending') : 'none'}">
+    <button type="button" title="${activa
+      ? `Ordenado por ${rotulo}, ${asc ? 'de menor a mayor' : 'de mayor a menor'}. Volvé a tocar para invertir.`
+      : `Ordenar por ${rotulo}`}">${rotulo}<span class="flecha" aria-hidden="true">${
+      activa ? (asc ? '▲' : '▼') : ''}</span></button></th>`;
+}
 
 function verEventos(d) {
   const cols = ['event_id', 'SheetName', 'start', 'end', 'n_ventanas', 'n_detectores', 'features_top']
@@ -1200,8 +1269,7 @@ function verEventos(d) {
   FECHAS.clear();
   for (const p of (d.pistas || [])) if (p.fecha) FECHAS.set(p.hoja, p.fecha);
 
-  const orden = ORDENES[S.orden] ? S.orden : 'prioridad';
-  const filas = [...d.filas].sort(ORDENES[orden].eventos);
+  const filas = [...d.filas].sort(comparadorDeTabla());
   const rot = { n_detectores: 'métodos', n_ventanas: 'tramos', SheetName: 'hoja', event_id: 'id',
                 start: 'desde', end: 'hasta', features_top: 'qué se desvió' };
   $('#fase-visual').innerHTML = `
@@ -1226,11 +1294,6 @@ function verEventos(d) {
     </div>
     <div id="caja-revision"></div>
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
-      <div class="seg-orden" role="group" aria-label="Orden de los eventos">${
-        Object.entries(ORDENES).map(([k, o]) =>
-          `<button type="button" data-orden="${k}" title="${o.ayuda}"${
-            k === orden ? ' class="activo" aria-pressed="true"' : ' aria-pressed="false"'
-          }>${o.etiqueta}</button>`).join('')}</div>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="avance-clas"></span>
       <span class="tenue" style="font-size:.78rem">${S.usuario
@@ -1238,7 +1301,8 @@ function verEventos(d) {
         : 'clic = ver señales'}</span></div>
     <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
-      `<th>${rot[c] || c}</th>`).join('')}${S.usuario ? '<th>mi juicio</th>' : ''}</tr></thead>
+      cabeceraOrdenable(c, rot[c] || c)).join('')}${
+      S.usuario ? cabeceraOrdenable('juicio', 'mi juicio') : ''}</tr></thead>
     <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer"${
       atributoTono(f.event_id)}>${cols.map((c) => {
       const v = f[c];
@@ -1249,13 +1313,16 @@ function verEventos(d) {
       ? `<td class="celda-clas">${marcaClasificacion(f.event_id)}</td>` : ''}</tr>`).join('')}</tbody></table></div>
     <div id="detalle-evento" style="margin-top:16px"></div>`;
   _tablaEventos = { d, filas };
-  /* Cambiar el orden redibuja los dos visuales con los datos que ya están en memoria: no vuelve a
-     pedir nada. `S.orden` vive en el estado y no en el DOM para que sobreviva a un repintado de la
-     fase —volver de la pestaña de análisis, por ejemplo— sin volver al orden por omisión. */
-  $('#fase-visual').querySelectorAll('.seg-orden button').forEach((b) => {
-    b.addEventListener('click', () => {
-      if (S.orden === b.dataset.orden) return;
-      S.orden = b.dataset.orden;
+  /* Ordenar por una columna redibuja con los datos que ya están en memoria: no vuelve a pedir
+     nada. `S.tabla` vive en el estado y no en el DOM para que sobreviva a un repintado de la fase
+     —volver de la pestaña de análisis, por ejemplo— sin perder el orden elegido. */
+  $('#fase-visual').querySelectorAll('th[data-campo]').forEach((th) => {
+    th.querySelector('button').addEventListener('click', () => {
+      const campo = th.dataset.campo;
+      // Volver a tocar la misma columna invierte; tocar otra arranca en su sentido natural.
+      S.tabla = S.tabla.campo === campo
+        ? { campo, dir: -S.tabla.dir }
+        : { campo, dir: COLUMNAS_ORDENABLES[campo].dir };
       verEventos(d);
     });
   });
@@ -1267,7 +1334,10 @@ function verEventos(d) {
     tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev)));
     // Sin sesión no hay a quién atribuir un juicio, así que el doble clic no engancha nada: la
     // encuesta no existe en modo lectura en vez de abrirse y fallar al guardar.
-    if (S.usuario) tr.addEventListener('dblclick', () => abrirDialogoEvento(Number(tr.dataset.ev)));
+    if (S.usuario) {
+      tr.addEventListener('dblclick', () =>
+        abrirDialogoEvento(Number(tr.dataset.ev), filas.map((f) => f.event_id), 'tabla'));
+    }
   });
   pintarAvanceClasificacion(filas.length);
   bloqueDeRevision(S.sel);
@@ -1414,17 +1484,15 @@ function lineaDeEventos(destino, d, filas) {
   if (!pistas.length || !filas.length) return;
 
   const conEventos = new Set(filas.map((f) => f.SheetName));
-  /* Las hojas se ordenan con el criterio elegido arriba, no con el que trae el backend (que viene
-     por largo de registro). «Cronológico» acomoda los renglones como transcurrió la misión;
-     «prioridad» pone arriba las hojas que contienen los eventos más fuertes — que es un agregado
-     por hoja y no el mismo dato que la columna «métodos» de la tabla, porque un renglón de acá
-     puede tener cinco eventos con cinco prioridades distintas. */
-  const fuerza = new Map();
-  for (const f of filas) {
-    fuerza.set(f.SheetName, Math.max(fuerza.get(f.SheetName) || 0, f.n_detectores));
-  }
-  const cmp = (ORDENES[S.orden] || ORDENES.prioridad).hojas(fuerza);
-  const usadas = pistas.filter((p) => conEventos.has(p.hoja)).sort(cmp);
+  /* Los renglones van SIEMPRE en orden cronológico, sin opción. Este gráfico está dibujado como
+     una línea de tiempo, así que su eje y tiene que ser tiempo o no tiene que sugerirlo. Antes el
+     backend los mandaba por largo de registro —lo que escalonaba las barras grises y nada más— y
+     después hubo un rato en que se podían ordenar por prioridad, que en un renglón que es una HOJA
+     solo puede significar «la que contiene el evento más fuerte»: un agregado que obligaba a
+     advertirlo en el pie. La tabla es donde cada fila es un evento y donde ordenar por prioridad
+     significa algo; acá no. La fecha viene en ISO, donde comparar texto ya es comparar fecha. */
+  const usadas = pistas.filter((p) => conEventos.has(p.hoja))
+    .sort((p, q) => String(p.fecha || '9999').localeCompare(String(q.fecha || '9999')));
   const vacias = pistas.length - usadas.length;
   const pistaDe = new Map(usadas.map((p) => [p.hoja, p]));
   const maxDet = Math.max(...filas.map((f) => f.n_detectores), 1);
@@ -1496,7 +1564,12 @@ function lineaDeEventos(destino, d, filas) {
     /* El `event_id` va en la posición 4 del dato de la serie de eventos (ver `data` más abajo).
        La pista gris es la serie 0 y es `silent`, así que nunca llega acá. */
     alDobleClic: (info) => {
-      if (info.seriesIndex === 1 && Array.isArray(info.value)) abrirDialogoEvento(Number(info.value[4]));
+      if (info.seriesIndex === 1 && Array.isArray(info.value)) {
+        // Desde la línea se avanza en el tiempo, que es lo que la línea muestra. `filas` puede
+        // venir ordenada por cualquier columna, así que acá se reordena para este recorrido.
+        abrirDialogoEvento(Number(info.value[4]),
+                           [...filas].sort(cronologico).map((f) => f.event_id), 'cronologico');
+      }
     },
     opcion: (c) => {
       const pista = (params, api) => {
@@ -1598,16 +1671,7 @@ function lineaDeEventos(destino, d, filas) {
          (partidas ? ` ${partidas} ${partidas === 1 ? 'hoja ocupa' : 'hojas ocupan'} más de un` +
            ' renglón: son eventos que se pisan y van en carriles separados para poder abrir cada' +
            ' uno.' : '') +
-         /* Qué significa el eje y, que cambia con el selector de arriba. Sin esto el gráfico
-            sugiere una secuencia —está dibujado como una línea de tiempo— y el lector le atribuye
-            un orden temporal que puede no tener. Y en «prioridad» hay que decir que es un agregado
-            POR HOJA: el renglón de arriba contiene el evento más fuerte, no es el evento más
-            fuerte. */
-         (S.orden === 'cronologico'
-           ? ' Los renglones van del 28 de marzo de 2021 al 24 de enero de 2022, como transcurrió' +
-             ' la misión.'
-           : ' Los renglones van por el evento más fuerte de cada hoja, no por el de cada' +
-             ' renglón.') +
+         ' Los renglones van en orden cronológico, del 28 de marzo de 2021 al 24 de enero de 2022.' +
          ' Cuanto más intenso el bloque, más métodos coinciden.' +
          /* Las dos frases sobre la encuesta solo valen con sesión. Sin ella no hay contornos que
             describir —`C.mias` viene vacía— y el doble clic no engancha nada, así que prometerlo
@@ -1641,9 +1705,40 @@ function lineaDeEventos(destino, d, filas) {
 /** El diálogo abierto, si hay uno. Se guarda para no apilar dos con un doble clic apurado. */
 let _dlgEvento = null;
 
-async function abrirDialogoEvento(id) {
+/** El recorrido que sigue «anterior/siguiente», y de dónde sale.
+ *
+ *  CADA VISUAL LLEVA EL SUYO. La tabla se ordena por la columna que se haya tocado y la línea de
+ *  tiempo es siempre cronológica, así que un recorrido único habría hecho que abrir un evento desde
+ *  el gráfico y tocar «siguiente» saltara a un evento que en ese gráfico está en otro lado. Quien
+ *  abrió desde la línea espera avanzar en el tiempo; quien abrió desde la tabla, seguir la lista
+ *  que tiene delante. Por eso el recorrido se pasa al abrir el diálogo y no se deduce adentro.
+ *
+ *  `RECORRIDOS` solo pone nombre a cada uno, para que el contador pueda decir en qué orden va.
+ */
+const RECORRIDOS = { tabla: 'el orden de la tabla', cronologico: 'orden cronológico' };
+
+
+/** Lo tipeado y todavía sin guardar, por evento.
+ *
+ *  Existe para que moverse entre eventos no pueda perder trabajo. Sin esto haría falta preguntar
+ *  «¿seguro que querés salir?» en cada flecha —una interrupción por evento, cuarenta por sesión—
+ *  o perder lo escrito en silencio, que es peor. Guardando el borrador no hay nada que preguntar.
+ *
+ *  Vive en memoria y muere al recargar la página. Es deliberado: un borrador que sobreviviera a la
+ *  recarga sería indistinguible de una respuesta guardada sin serlo, y lo que la Etapa 2 cuenta son
+ *  respuestas emitidas, no intenciones.
+ */
+const BORRADORES = new Map();
+
+async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
   if (_dlgEvento) return;
   const clave = S.sel;
+  /* El recorrido llega de quien abre. Si no llega —una llamada vieja o un botón nuevo que se
+     olvide de pasarlo— se cae al orden de la tabla, que es lo que había antes y sigue siendo
+     razonable; lo que no puede pasar es quedarse sin flechas por eso. */
+  const orden = (recorrido && recorrido.length ? recorrido
+                 : (_tablaEventos && _tablaEventos.filas || []).map((f) => f.event_id));
+  const nombreOrden = RECORRIDOS[comoSeLlama] || RECORRIDOS.tabla;
 
   const dlg = document.createElement('dialog');
   dlg.className = 'dlg-evento';
@@ -1665,99 +1760,170 @@ async function abrirDialogoEvento(id) {
     dlg.remove();
     _dlgEvento = null;
   };
-  const cerrar = () => { dlg.close(); limpiar(); };
+  const cerrar = () => { guardarBorrador(); dlg.close(); limpiar(); };
   dlg.addEventListener('click', (e) => { if (e.target === dlg) cerrar(); });
   dlg.addEventListener('close', limpiar);
   dlg.addEventListener('cancel', limpiar);   // Escape
   dlg.showModal();
 
-  let d;
-  try {
-    d = await api(`api/nodo/${clave}/evento/${id}`);
-  } catch (e) {
-    dlg.querySelector('.cuerpo').innerHTML =
-      `<p class="tenue" style="font-size:.85rem">No se pudo cargar el evento: ${e.message}</p>
-       <button class="boton" id="cerrar-dlg">Cerrar</button>`;
-    dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
-    return;
+  /* El diálogo se abre UNA vez y después solo se repinta por dentro. Cerrarlo y volver a abrirlo en
+     cada «siguiente» perdería el foco, haría parpadear el fondo y volvería a animar la apertura
+     cuarenta veces en una sesión de revisión. */
+  let actual = id;
+
+  /** Guarda en memoria lo que haya en el formulario, si difiere de lo ya registrado. */
+  function guardarBorrador() {
+    const form = dlg.querySelector('#form-clas');
+    if (!form) return;
+    const elegida = form.querySelector('input[name="respuesta"]:checked');
+    const comentario = form.querySelector('#comentario').value;
+    const mia = miRespuesta(actual);
+    const igual = mia && mia.respuesta === (elegida && elegida.value)
+                      && (mia.comentario || '') === comentario;
+    if (!elegida && !comentario.trim()) { BORRADORES.delete(actual); return; }
+    if (igual) { BORRADORES.delete(actual); return; }
+    BORRADORES.set(actual, { respuesta: elegida ? elegida.value : null, comentario });
   }
 
-  const ev = d.evento;
-  const mia = miRespuesta(id);
+  async function irA(otro) {
+    if (otro == null || otro === actual) return;
+    guardarBorrador();
+    Grafico.limpiar(dlg);
+    dlg.querySelector('.cuerpo').innerHTML =
+      '<p class="tenue" style="font-size:.85rem">Cargando…</p>';
+    actual = otro;
+    await pintar(otro);
+  }
 
-  dlg.querySelector('.cuerpo').innerHTML = `
-    <div class="cab">
-      <h4>Evento ${id} · ${ev.SheetName}</h4>
-      <span class="chip ${ev.n_detectores >= 4 ? 'listo' : 'pendiente'}">${ev.n_detectores}/5 métodos</span>
-      <span class="esp"></span>
-      <span class="meta">mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos</span>
-      <button class="boton plano" id="cerrar-dlg" title="Cerrar (Esc)">✕</button>
-    </div>
-    <div id="caja-dlg-ev"></div>
-    ${leyendaContexto(d)}
-    <p class="porque">${ev.features_top || ''}</p>
-
-    <form class="encuesta" id="form-clas">
-      <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
-      <div class="escala">${C.escala.map((o) => `
-        <label><input type="radio" name="respuesta" value="${o.codigo}"
-          ${mia && mia.respuesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
-      <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
-        maxlength="4000">${mia ? (mia.comentario || '') : ''}</textarea>
-      <div class="pie">
-        <button class="boton primario" type="submit" id="guardar-clas">
-          ${mia ? 'Actualizar respuesta' : 'Guardar respuesta'}</button>
-        <button class="boton" type="button" id="cancelar-clas">Cerrar</button>
-        <span class="esp"></span>
-        <span class="tenue" style="font-size:.78rem" id="estado-clas">${
-          mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
-                  { dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
-      </div>
-    </form>`;
-
-  dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
-  dlg.querySelector('#cancelar-clas').addEventListener('click', cerrar);
-
-  Grafico.lineas(dlg.querySelector('#caja-dlg-ev'), {
-    // Sin título propio: el encabezado del diálogo ya dice de qué evento es, y repetirlo dos
-    // renglones más abajo sería la misma frase dos veces. Pero al agrandarlo el gráfico sale de
-    // ese contexto y necesita nombrarse — de eso se ocupa `tituloAgrandado`.
-    titulo: null,
-    tituloAgrandado: `Señales del evento ${id} · ${ev.SheetName}`,
-    xNombre: 'medición',
-    sustantivo: 'mediciones',
-    paneles: d.senales.map((s, i) => ({ nombre: s, valores: d.valores.map((f) => f[i]) })),
-    ...conContexto(d),
-  });
-  /* No hace falta forzar un `resize`: el diálogo ya está abierto y con tamaño cuando se crea el
-     gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
-     gráfico cubre cualquier cambio posterior. */
-
-  dlg.querySelector('#form-clas').addEventListener('submit', async (e) => {
+  /* Flechas del teclado para moverse, que es lo que uno intenta sin pensarlo cuando hay un «‹ ›»
+     en pantalla. No se roban la tecla mientras se escribe el comentario ni mientras se recorren las
+     cinco opciones con el teclado, que son los dos lugares donde la flecha ya significa otra cosa. */
+  dlg.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const foco = document.activeElement;
+    if (foco && (foco.tagName === 'TEXTAREA' || foco.type === 'radio')) return;
+    const i = orden.indexOf(actual);
+    if (i < 0) return;
     e.preventDefault();
-    const elegida = dlg.querySelector('input[name="respuesta"]:checked');
-    const estado = dlg.querySelector('#estado-clas');
-    if (!elegida) { estado.textContent = 'Elegí una de las cinco opciones.'; return; }
-    const boton = dlg.querySelector('#guardar-clas');
-    boton.disabled = true;
-    estado.textContent = 'Guardando…';
-    try {
-      const guardada = await api(`api/nodo/${clave}/evento/${id}/clasificacion`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          respuesta: elegida.value,
-          comentario: dlg.querySelector('#comentario').value,
-        }),
-      });
-      C.mias[String(id)] = guardada;
-      refrescarMarca(id);
-      cerrar();
-    } catch (err) {
-      estado.textContent = `No se pudo guardar: ${err.message}`;
-      boton.disabled = false;
-    }
+    irA(e.key === 'ArrowLeft' ? orden[i - 1] : orden[i + 1]);
   });
+
+  await pintar(id);
+
+  async function pintar(id) {
+    let d;
+    try {
+      d = await api(`api/nodo/${clave}/evento/${id}`);
+    } catch (e) {
+      dlg.querySelector('.cuerpo').innerHTML =
+        `<p class="tenue" style="font-size:.85rem">No se pudo cargar el evento: ${e.message}</p>
+         <button class="boton" id="cerrar-dlg">Cerrar</button>`;
+      dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
+      return;
+    }
+
+    const ev = d.evento;
+    const mia = miRespuesta(id);
+    const borrador = BORRADORES.get(id) || null;
+    // El borrador manda sobre lo guardado: es lo último que la persona escribió.
+    const puesta = borrador ? borrador.respuesta : (mia ? mia.respuesta : null);
+    const comentario = borrador ? borrador.comentario : (mia ? (mia.comentario || '') : '');
+
+    const i = orden.indexOf(id);
+    const anterior = i > 0 ? orden[i - 1] : null;
+    const siguiente = i >= 0 && i < orden.length - 1 ? orden[i + 1] : null;
+
+    dlg.querySelector('.cuerpo').innerHTML = `
+      <div class="cab">
+        <h4>Evento ${id} · ${ev.SheetName}</h4>
+        <span class="chip ${ev.n_detectores >= 4 ? 'listo' : 'pendiente'}">${ev.n_detectores}/5 métodos</span>
+        <span class="esp"></span>
+        <span class="meta">mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos</span>
+        ${i >= 0 ? `<div class="nav-ev">
+          <button class="paso" id="ev-anterior" ${anterior === null ? 'disabled' : ''}
+                  title="Evento anterior (←)" aria-label="Evento anterior">‹</button>
+          <span class="cuantos" title="${i + 1} de ${orden.length}, en ${nombreOrden}">${
+            i + 1} de ${orden.length}</span>
+          <button class="paso" id="ev-siguiente" ${siguiente === null ? 'disabled' : ''}
+                  title="Evento siguiente (→)" aria-label="Evento siguiente">›</button>
+        </div>` : ''}
+        <button class="boton plano" id="cerrar-dlg" title="Cerrar (Esc)">✕</button>
+      </div>
+      <div id="caja-dlg-ev"></div>
+      ${leyendaContexto(d)}
+      <p class="porque">${ev.features_top || ''}</p>
+
+      <form class="encuesta" id="form-clas">
+        <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
+        <div class="escala">${C.escala.map((o) => `
+          <label><input type="radio" name="respuesta" value="${o.codigo}"
+            ${puesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
+        <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
+          maxlength="4000">${esc(comentario)}</textarea>
+        <div class="pie">
+          <button class="boton primario" type="submit" id="guardar-clas">${
+            siguiente !== null ? 'Guardar y seguir' : (mia ? 'Actualizar respuesta' : 'Guardar respuesta')}</button>
+          <button class="boton" type="button" id="cancelar-clas">Cerrar</button>
+          <span class="esp"></span>
+          <span class="tenue" style="font-size:.78rem" id="estado-clas">${
+            borrador ? 'Sin guardar'
+            : mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
+                      { dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
+        </div>
+      </form>`;
+
+    dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
+    dlg.querySelector('#cancelar-clas').addEventListener('click', cerrar);
+    const bAnt = dlg.querySelector('#ev-anterior');
+    const bSig = dlg.querySelector('#ev-siguiente');
+    if (bAnt) bAnt.addEventListener('click', () => irA(anterior));
+    if (bSig) bSig.addEventListener('click', () => irA(siguiente));
+
+    Grafico.lineas(dlg.querySelector('#caja-dlg-ev'), {
+      // Sin título propio: el encabezado del diálogo ya dice de qué evento es, y repetirlo dos
+      // renglones más abajo sería la misma frase dos veces. Pero al agrandarlo el gráfico sale de
+      // ese contexto y necesita nombrarse — de eso se ocupa `tituloAgrandado`.
+      titulo: null,
+      tituloAgrandado: `Señales del evento ${id} · ${ev.SheetName}`,
+      xNombre: 'medición',
+      sustantivo: 'mediciones',
+      paneles: d.senales.map((s, k) => ({ nombre: s, valores: d.valores.map((f) => f[k]) })),
+      ...conContexto(d),
+    });
+    /* No hace falta forzar un `resize`: el diálogo ya está abierto y con tamaño cuando se crea el
+       gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
+       gráfico cubre cualquier cambio posterior. */
+
+    dlg.querySelector('#form-clas').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const elegida = dlg.querySelector('input[name="respuesta"]:checked');
+      const estado = dlg.querySelector('#estado-clas');
+      if (!elegida) { estado.textContent = 'Elegí una de las cinco opciones.'; return; }
+      const boton = dlg.querySelector('#guardar-clas');
+      boton.disabled = true;
+      estado.textContent = 'Guardando…';
+      try {
+        const guardada = await api(`api/nodo/${clave}/evento/${id}/clasificacion`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            respuesta: elegida.value,
+            comentario: dlg.querySelector('#comentario').value,
+          }),
+        });
+        C.mias[String(id)] = guardada;
+        BORRADORES.delete(id);
+        refrescarMarca(id);
+        pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
+        // Guardar el último evento cierra, como antes. En cualquier otro, seguir de largo: es lo
+        // que uno va a querer cuarenta veces seguidas, y volver es una flecha.
+        if (siguiente !== null) irA(siguiente); else cerrar();
+      } catch (err) {
+        estado.textContent = `No se pudo guardar: ${err.message}`;
+        boton.disabled = false;
+      }
+    });
+  }
 }
 
 /** Las opciones de `Grafico.lineas` que agregan el contexto alrededor de un evento.
