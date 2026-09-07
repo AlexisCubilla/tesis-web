@@ -1135,15 +1135,57 @@ async def revalidar_el_frontend(request, call_next):
 
 
 # --------------------------------------------------------------------------------------
-# Acceso: la sesión, y las dos puertas que tienen que quedar abiertas
+# Acceso: quién puede mirar, quién puede escribir
 # --------------------------------------------------------------------------------------
+#
+# El taller se puede mirar sin cuenta. La sesión dejó de ser la puerta de entrada y pasó a ser lo
+# que habilita ESCRIBIR: ejecutar el pipeline, borrar o renombrar ramas, contestar la encuesta y
+# comentar en la revisión experta.
+#
+# Es una reversión deliberada de media decisión del ADR A16. Ese ADR daba dos motivos para pedir
+# sesión: proteger los datos y atribuir el juicio. El segundo sigue entero —cada clasificación
+# sigue firmada por su revisor—; el primero se cambió a propósito para que un tutor, un tribunal o
+# un compañero puedan ver el trabajo sin que haya que darles de alta. Si esto se publica en
+# internet, la telemetría y los resultados son públicos: es la consecuencia buscada, no un olvido.
+#
+# LA REGLA, y por qué está escrita así:
+#
+#   Se decide por MÉTODO, no por una lista de rutas. Todo lo que no sea GET/HEAD pide sesión, con
+#   dos excepciones nombradas. Eso significa que un endpoint de escritura que alguien agregue
+#   mañana nace protegido sin acordarse de tocar esto — que es exactamente el modo de falla que una
+#   lista blanca de rutas tiene garantizado.
+#
+#   El precio es el simétrico y hay que decirlo: un GET nuevo nace PÚBLICO. Si algún día se agrega
+#   una lectura que no deba serlo, va en `_LECTURAS_PRIVADAS`.
 
-#: Rutas exactas que no piden sesión. Son las mínimas para poder iniciarla, más `/api/salud`.
-_ABIERTAS = frozenset({"/login", "/api/sesion", "/api/acceso", "/api/salud", "/favicon.ico"})
+#: Lecturas que siguen pidiendo sesión pese a ser GET, cada una por su motivo.
+#:
+#:   `/api/yo`, `/api/usuarios`, `/usuarios`  · son las cuentas.
+#:   `/revision`, `/api/revision`             · el editor del experto: abrirlo entrega la ficha del
+#:                                              documento, que es permiso de escritura disfrazado
+#:                                              de lectura. Las dos rutas del Document Server se
+#:                                              resuelven aparte, en `_es_del_document_server`.
+#:   `.../clasificacion`                      · es «lo que respondí YO». Sin sesión no hay un yo,
+#:                                              y devolverla vacía sería mentir menos que devolver
+#:                                              la de otro, pero mentir igual.
+_LECTURAS_PRIVADAS = ("/api/yo", "/api/usuarios", "/usuarios", "/api/revision", "/revision")
 
-#: Prefijos abiertos. `/estatico` es el CSS y el JS: código, no datos, y la pantalla de ingreso lo
-#: necesita para poder dibujarse.
-_ABIERTAS_PREFIJO = ("/estatico/",)
+#: Los dos POST que no pueden pedir sesión: el que la crea y el que la cierra.
+_ESCRITURAS_ABIERTAS = frozenset({"/api/sesion", "/api/sesion/salir"})
+
+
+def _necesita_sesion(metodo: str, ruta: str) -> bool:
+    """¿Esta petición exige haber iniciado sesión?
+
+    Ver el bloque de arriba: manda el método, y las excepciones son pocas y nombradas.
+    """
+    if _es_del_document_server(metodo, ruta):
+        return False
+    if metodo not in ("GET", "HEAD"):
+        return ruta not in _ESCRITURAS_ABIERTAS
+    if ruta.endswith("/clasificacion"):
+        return True
+    return any(ruta == r or ruta.startswith(r + "/") for r in _LECTURAS_PRIVADAS)
 
 
 def _es_del_document_server(metodo: str, ruta: str) -> bool:
@@ -1166,10 +1208,14 @@ def _es_del_document_server(metodo: str, ruta: str) -> bool:
 
 @app.middleware("http")
 async def exigir_sesion(request: Request, call_next):
-    """Deja pasar solo a quien tenga sesión, y le cuelga el usuario a la petición.
+    """Cuelga el usuario a la petición, y frena lo que sin sesión no se puede hacer.
 
     Va registrado DESPUÉS de `revalidar_el_frontend`, así que queda por fuera: se decide si la
     petición entra antes de gastar nada en ella.
+
+    Quien no inició sesión pasa igual, con `request.state.usuario = None`: el taller se mira sin
+    cuenta. Lo que se frena acá es escribir, y las lecturas que son de alguien en particular
+    (`_necesita_sesion`).
 
     Dos respuestas distintas según quién pregunte, porque son dos consumidores distintos: a la API
     se le contesta `401` en JSON —el frontend lo detecta y manda a la pantalla de ingreso sin perder
@@ -1178,11 +1224,7 @@ async def exigir_sesion(request: Request, call_next):
     ruta = request.url.path
     request.state.usuario = cuentas.usuario_de(request.cookies.get(cuentas.COOKIE))
 
-    abierta = (ruta in _ABIERTAS
-               or ruta.startswith(_ABIERTAS_PREFIJO)
-               or _es_del_document_server(request.method, ruta))
-
-    if request.state.usuario is None and not abierta:
+    if request.state.usuario is None and _necesita_sesion(request.method, ruta):
         if ruta.startswith("/api/"):
             return JSONResponse({"detail": "Hace falta iniciar sesión"}, status_code=401)
         # La redirección va RELATIVA, y el destino también. El taller puede estar publicado bajo un

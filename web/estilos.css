@@ -449,7 +449,15 @@ p { margin: 0 0 1em; text-wrap: pretty; }
 /* `latido` sigue vivo para `.chip.corriendo`, que es lo único que lo necesita: ahí
    el movimiento SÍ dice algo, que es que el paso está corriendo ahora. */
 @keyframes latido { 50% { opacity: .72 } }
-.barra nav { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+/* Las pestañas van pegadas a la marca, y la cuenta se va sola al otro extremo.
+   ANTES el `nav` entero se empujaba a la derecha con `margin-left: auto`, y como la cuenta vive
+   adentro del `nav`, la posición de las pestañas terminaba siendo «el borde derecho menos el ancho
+   de lo que venga después». Y lo que viene después cambia todo el tiempo: en la pantalla de
+   ingreso no hay nada, mirando sin cuenta dice «Modo lectura · Ingresar», como revisor dice el
+   nombre y «Salir», y como administrador suma «Usuarios». Cuatro anchos distintos, cuatro
+   posiciones para las mismas dos pestañas: al cambiar de pantalla saltaban de lugar.
+   Ancladas a la izquierda dependen solo del ancho de la marca, que es el mismo en todas. */
+.barra nav { flex: 1; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 /* Las DOS pestañas llevan recuadro, y lo único que las distingue es el relleno.
    Antes solo la activa tenía caja, así que la inactiva no se leía como algo
    clickeable: parecía una etiqueta al lado de un botón. Con las dos enmarcadas se
@@ -473,17 +481,37 @@ p { margin: 0 0 1em; text-wrap: pretty; }
 /* --- La cuenta, al final de la barra ---
    Va separada de las pestañas por un filete y no por más aire: son dos cosas distintas —a dónde ir
    y quién sos— y el filete lo dice sin sumar una tercera caja. El nombre NO es un botón: no lleva
-   recuadro, porque no se puede hacer clic en él y darle marco lo haría parecer una pestaña más. */
-.barra .cuenta { display: flex; align-items: center; gap: 10px;
-  margin-left: 10px; padding-left: 14px; border-left: 1px solid var(--borde); }
+   recuadro, porque no se puede hacer clic en él y darle marco lo haría parecer una pestaña más.
+
+   Y «Salir» tampoco. El recuadro en esta barra significa DESTINO —las pestañas—, así que un botón
+   enmarcado acá se leía como una tercera pestaña que no lleva a ninguna parte. Además es el
+   control que menos se usa de toda la pantalla y era el más pesado de su zona, que es al revés de
+   como debería ser. Ahora pesa igual que el nombre que tiene al lado: son los dos lados de la
+   misma frase, «sos admin» y «dejá de serlo». */
+.barra .cuenta { display: flex; align-items: center; gap: 12px;
+  margin-left: auto; padding-left: 14px; border-left: 1px solid var(--borde); }
+.barra .cuenta.sola { padding-left: 0; border-left: none; }
 .barra .cuenta .quien { font-size: .86rem; color: var(--texto-2); }
 .barra .cuenta .salir {
-  font: inherit; font-size: .86rem; padding: 7px 12px; border-radius: var(--radio-2);
-  border: 1px solid var(--borde); background: none; color: var(--texto-2); cursor: pointer;
-  transition: color .18s ease;
+  font: inherit; font-size: .86rem; padding: 0; border: none; background: none;
+  color: var(--texto-2); cursor: pointer; text-decoration: underline;
+  text-decoration-color: var(--borde-fuerte); text-underline-offset: 3px;
+  transition: color .18s ease, text-decoration-color .18s ease;
 }
-.barra .cuenta .salir:hover { color: var(--texto); }
+.barra .cuenta .salir:hover { color: var(--texto); text-decoration-color: currentColor; }
 .barra .cuenta .salir:disabled { opacity: .5; cursor: progress; }
+
+/* En pantalla angosta la barra pasa a dos renglones enteros en vez de acomodar los pedazos donde
+   entren. Sin esto el `nav` sigue ocupando lo que sobra al lado de la marca y sus hijos envuelven
+   ahí adentro: las pestañas quedan indentadas contra el borde derecho y la cuenta cae debajo,
+   también indentada, cada una arrancando en un lugar distinto. Ocupando el ancho completo las dos
+   arrancan del margen izquierdo, que es de donde se lee. El filete separador se va con ellas: en
+   renglones distintos ya no separa nada, solo cuelga. */
+@media (max-width: 640px) {
+  .barra { flex-wrap: wrap; gap: 10px 16px; }
+  .barra nav { flex-basis: 100%; }
+  .barra .cuenta { margin-left: 0; padding-left: 0; border-left: none; }
+}
 /* La pestaña activa se marca con su propio relleno y no con un subrayado colgando
    de la barra. El subrayado obligaba a calcular un `bottom` negativo contra el alto
    de la barra, y se desalineaba en cuanto cambiaba el padding; el relleno viaja con

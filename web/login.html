@@ -6,42 +6,45 @@
 <title>Ingresar — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
 <style>
-  /* La pantalla de ingreso no lleva navegación: no hay a dónde ir hasta entrar. Solo la marca,
-     para que se vea de qué sitio es y no parezca una pantalla de un tercero. */
-  .ingreso { max-width: 380px; margin: 12vh auto 0; padding: 0 20px 60px; }
-  .ingreso .marca { display: flex; align-items: center; gap: 11px; font-weight: 500;
-                    margin-bottom: 26px; }
-  .ingreso .marca span.punto {
-    width: 22px; height: 22px; flex: none; border-radius: 50%;
-    border: 1.5px solid var(--acento); position: relative;
-  }
-  .ingreso .marca span.punto::after {
-    content: ''; position: absolute; top: -2px; left: 50%;
-    width: 5px; height: 5px; border-radius: 50%; background: var(--acento);
-    transform: translateX(-50%);
-  }
-  .ingreso h1 { font-size: 1.24rem; margin: 0 0 4px; }
-  .ingreso .pista { margin: 0 0 22px; }
+  /* La pantalla lleva la MISMA barra que el resto del sitio, con sus dos pestañas.
+     Antes no llevaba ninguna —no había a dónde ir sin entrar—, pero ahora sí: el taller se mira
+     sin cuenta, así que dejar a alguien acá sin salida sería encerrarlo en la única pantalla que
+     no necesita ver. Las pestañas son la salida, y de paso la pantalla deja de parecer de otro
+     sitio: misma barra, misma tarjeta, mismo cielo. */
+  .ingreso { max-width: 404px; margin: 9vh auto 0; padding: 0 20px 70px; }
+  .ingreso h1 { font-size: 1.3rem; margin: 0 0 5px; letter-spacing: -.015em; }
+  .ingreso .pista { margin: 0 0 20px; }
   .ingreso .campo { margin-bottom: 14px; }
   .ingreso .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
   .ingreso .campo input { width: 100%; padding: 9px 12px; border-radius: var(--radio-2);
     border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
     font: inherit; font-size: .95rem; }
   .ingreso .campo input:focus { outline: none; border-color: var(--acento); }
-  .ingreso .boton { width: 100%; justify-content: center; margin-top: 6px; }
+  .ingreso .boton { width: 100%; justify-content: center; margin-top: 8px; }
   .ingreso .aviso { margin-top: 18px; font-size: .84rem; }
+
+  /* El pie repite la salida en palabras. El que llegó acá redirigido desde `/taller` ve la
+     pestaña arriba, pero el que llegó desde el botón «Ingresar» quizá no la esté mirando. */
+  .ingreso .volver { margin: 16px 0 0; font-size: .84rem; color: var(--texto-2); text-align: center; }
 </style>
 </head>
 <body>
 <div class="estrellas"></div>
 
-<div class="ingreso">
+<header class="barra">
   <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <nav>
+    <a href=".">El proyecto</a>
+    <a href="taller">Taller</a>
+  </nav>
+</header>
 
+<div class="ingreso">
   <h1>Ingresar al taller</h1>
-  <p class="pista">Los datos de telemetría y los resultados de las corridas no son públicos.</p>
+  <p class="pista">Todo se puede mirar sin cuenta. Ingresá solo para ejecutar el pipeline, tocar
+     las ramas o clasificar eventos.</p>
 
-  <form id="form">
+  <form id="form" class="tarjeta">
     <div class="campo">
       <label for="usuario">Usuario</label>
       <input id="usuario" name="usuario" autocomplete="username" autofocus required>
@@ -54,6 +57,8 @@
   </form>
 
   <div id="mensaje"></div>
+
+  <p class="volver">o <a href=".">volver al proyecto</a> y seguir mirando en modo lectura</p>
 </div>
 
 <script>

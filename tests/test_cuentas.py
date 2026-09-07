@@ -73,18 +73,33 @@ def test_el_admin_del_entorno_se_siembra(taller):
 
 # ---------------------------------------------------------------- la reja
 
-def test_la_api_sin_sesion_contesta_401(taller):
+def test_la_api_de_escritura_sin_sesion_contesta_401(taller):
+    """Lo que se lee está abierto; lo que escribe, no.
+
+    Antes bastaba con pedir `/api/arbol` para comprobar la reja. Ya no: el taller se puede mirar
+    sin cuenta y ese endpoint contesta 200 a propósito. Lo que hay que afirmar ahora es lo otro.
+    """
     cliente, _ = taller
-    assert cliente.get("/api/arbol").status_code == 401
+    assert cliente.get("/api/arbol").status_code == 200
+    assert cliente.post("/api/ejecutar", json={}).status_code == 401
+    assert cliente.delete("/api/nodo/loquesea").status_code == 401
+    assert cliente.put("/api/nodo/x/evento/1/clasificacion", json={}).status_code == 401
 
 
 def test_una_navegacion_sin_sesion_redirige_al_ingreso(taller):
+    """Las pantallas de cuentas y de revisión siguen mandando al ingreso.
+
+    `/taller` no: se mira sin sesión. Se comprueba de las dos formas para que quede escrito cuál
+    es cuál — si algún día `/taller` vuelve a redirigir, este test lo dice.
+    """
     cliente, _ = taller
-    r = cliente.get("/taller", follow_redirects=False)
+    assert cliente.get("/taller", follow_redirects=False).status_code == 200
+
+    r = cliente.get("/usuarios", follow_redirects=False)
     assert r.status_code == 303
     assert r.headers["location"].startswith("login")
     # El destino viaja pegado para volver a donde se iba después de entrar.
-    assert "destino=taller" in r.headers["location"]
+    assert "destino=usuarios" in r.headers["location"]
 
 
 def test_la_redireccion_al_ingreso_no_arranca_en_la_raiz(taller):
@@ -98,7 +113,7 @@ def test_la_redireccion_al_ingreso_no_arranca_en_la_raiz(taller):
     El síntoma no se parece a la causa: la página carga bien y el 404 aparece recién al redirigir.
     """
     cliente, _ = taller
-    for ruta in ("/", "/taller", "/usuarios", "/revision?doc=abc"):
+    for ruta in ("/usuarios", "/revision?doc=abc"):
         location = cliente.get(ruta, follow_redirects=False).headers["location"]
         assert not location.startswith("/"), f"{ruta} redirige a la raíz: {location}"
         assert "destino=%2F" not in location, f"{ruta} manda un destino absoluto: {location}"
@@ -138,10 +153,11 @@ def test_ingreso_y_salida(taller):
     r = cliente.post("/api/sesion", json={"usuario": "jefa", "contrasena": "contrasena-larga"})
     assert r.status_code == 200
     assert r.json()["usuario"]["rol"] == "admin"
-    assert cliente.get("/api/arbol").status_code == 200
+    # `/api/yo` como sonda de sesión: `/api/arbol` ya no sirve para esto, contesta 200 siempre.
+    assert cliente.get("/api/yo").status_code == 200
 
     cliente.post("/api/sesion/salir")
-    assert cliente.get("/api/arbol").status_code == 401
+    assert cliente.get("/api/yo").status_code == 401
 
 
 def test_la_cookie_de_sesion_es_httponly(taller):
@@ -165,9 +181,9 @@ def test_en_la_base_no_queda_el_testigo_sino_su_hash(taller):
 def test_cambiar_la_contrasena_cierra_las_sesiones(taller):
     cliente, cuentas = taller
     cliente.post("/api/sesion", json={"usuario": "jefa", "contrasena": "contrasena-larga"})
-    assert cliente.get("/api/arbol").status_code == 200
+    assert cliente.get("/api/yo").status_code == 200
     cuentas.cambiar_clave("jefa", "otra-contrasena")
-    assert cliente.get("/api/arbol").status_code == 401
+    assert cliente.get("/api/yo").status_code == 401
 
 
 # ---------------------------------------------------------------- alta y roles

@@ -61,16 +61,28 @@ En la práctica:
 
 ## Cuentas
 
-El taller pide usuario y contraseña. Se define **una** cuenta en el `.env`, la del administrador, y
-el resto las crea él desde la pantalla **Usuarios**:
+**El taller se mira sin cuenta.** Quien llegue ve el proyecto, el mapa de ramas, los resultados, los
+gráficos, el análisis y los tres entregables — y puede descargarlos. Es a propósito: un tutor o un
+tribunal tienen que poder ver el trabajo sin que haya que darles de alta.
+
+La sesión es lo que habilita **escribir**: ejecutar el pipeline, crear, borrar o renombrar ramas,
+clasificar eventos y comentar en la revisión experta. Sin sesión esos controles ni se dibujan, y el
+backend los rechaza aunque alguien los llame a mano.
+
+> Si publicás esto en internet, la telemetría y los resultados son públicos. Es la consecuencia
+> buscada, no un descuido — pero conviene decidirlo, no descubrirlo. Ver el ADR A18.
+
+Se define **una** cuenta en el `.env`, la del administrador, y el resto las crea él desde la
+pantalla **Usuarios**:
 
 ```ini
 ADMIN_USUARIO=admin
 ADMIN_CONTRASENA=poneleUnaDeVerdad
 ```
 
-**Sin `ADMIN_CONTRASENA` nadie puede entrar.** El taller arranca igual y la pantalla de ingreso lo
-explica, en vez de rechazar cada intento sin decir por qué.
+**Sin `ADMIN_CONTRASENA` nadie puede escribir.** El taller arranca igual y se puede mirar entero,
+pero no hay con qué iniciar sesión. La pantalla de ingreso lo explica, en vez de rechazar cada
+intento sin decir por qué.
 
 Se siembra en **cada arranque**, no solo la primera vez. Eso la vuelve una llave de repuesto: si
 alguien queda afuera o se pierde la base de cuentas, se cambia acá y se reinicia. Las contraseñas se

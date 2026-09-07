@@ -543,3 +543,54 @@ de «no contestó».
 planilla no encajona al experto porque la taxonomía de la Etapa 2 es lo que él tiene que producir; la
 encuesta hace la pregunta previa —¿esto es una anomalía?— que sí tiene respuesta cerrada y que hace
 falta poder contar, comparar entre revisores y llevar a un reporte.
+
+---
+
+## A18 — El taller se mira sin cuenta; la sesión habilita escribir
+
+**Decisión.** Cualquiera puede ver el proyecto, el mapa de ramas, los resultados, los gráficos, el
+análisis y los tres entregables —incluida su descarga— sin iniciar sesión. La sesión pasa a ser lo
+que habilita **escribir**: ejecutar el pipeline, crear, borrar o renombrar ramas, contestar la
+encuesta y comentar en la revisión experta.
+
+**Esto revierte media decisión del A16, a propósito.** Aquel ADR daba dos motivos para pedir sesión:
+proteger los datos y atribuir el juicio. El segundo queda intacto —cada clasificación sigue firmada
+por su revisor, y sigue siendo invisible para los demás—. El primero se cambia: un tutor, un
+tribunal o un compañero tienen que poder ver el trabajo sin que haya que darles de alta, y darles
+una cuenta para que solo miren es fricción sin contrapartida.
+
+**Lo que esto significa, dicho sin eufemismos.** Si el taller se publica en internet, la telemetría
+de BIRDS-4/TSURU y los resultados de las corridas son públicos. Es la consecuencia buscada. Quien
+no la quiera tiene dos salidas que no cuestan código: no publicarlo fuera de la red local, o poner
+autenticación por delante (nginx, un túnel) — que ahí sí sirve, porque el problema vuelve a ser
+proteger y no identificar.
+
+**La regla es por método, no por lista de rutas.** `_necesita_sesion` pide sesión para todo lo que
+no sea `GET`/`HEAD`, con dos excepciones nombradas (crear y cerrar la sesión) y las dos rutas del
+Document Server, que se resuelven antes. La razón es el sentido en que falla:
+
+| Forma de escribirla | Cómo falla cuando alguien agrega un endpoint |
+|---|---|
+| Lista blanca de rutas abiertas | un endpoint de escritura nuevo queda **abierto** si nadie se acuerda de la lista |
+| **Por método** (la elegida) | un endpoint de escritura nuevo nace **cerrado**; el olvido es dejar una lectura privada de más |
+
+Las dos se pueden olvidar. La diferencia es qué pasa cuando se olvidan, y un olvido que cierra de
+más se descubre solo —alguien reporta que no puede ver algo—, mientras que uno que abre de más no
+se descubre nunca.
+
+El precio es explícito y hay que sostenerlo: **un `GET` nuevo nace público.** Las lecturas que no
+deban serlo van en `_LECTURAS_PRIVADAS`. Hoy son las cuentas, el editor del experto —abrirlo entrega
+la ficha del documento, que es permiso de escritura disfrazado de lectura— y todo lo que termina en
+`/clasificacion`, que responde «lo que dije yo» y sin un yo no tiene respuesta honesta.
+
+**El frontend no dibuja lo que no se puede hacer.** Sin sesión no existen los botones de ejecutar,
+borrar ni renombrar, ni la columna «mi juicio», ni el doble clic que abre la encuesta. Un botón que
+falla al tocarlo es la peor forma de comunicar un permiso: parece que anda hasta que no anda. La
+barra ofrece «Ingresar» en lugar de decir que falta autenticarse, porque no falta nada — el sitio
+se está viendo entero.
+
+**Un detalle que costó encontrar.** El interceptor de `api()` mandaba al ingreso ante cualquier
+`401`, que era correcto cuando todo pedía sesión: significaba que había vencido. En modo lectura un
+`401` es la respuesta normal a algo que necesita sesión, y redirigir expulsaba del taller a un
+visitante por una petición que ni siquiera hizo a propósito. Ahora la distinción es explícita: se
+redirige solo si *había* un usuario. «Se venció» y «nunca hubo» son cosas distintas.

@@ -14,6 +14,7 @@
 const S = {
   defs: [], cadena: [], nodos: [],
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
+  usuario: null,      // quién mira, o null en modo lectura: gobierna qué controles existen
   form: null,         // {etapa, padre, modo} cuando el formulario está abierto
   sondeo: null,
   vista: 'paso',      // 'paso' | 'analisis' | 'comparar' — qué se está mirando de la fase
@@ -38,8 +39,15 @@ const api = async (ruta, op) => {
      dibujada con datos viejos y ninguna acción funciona, que es de los peores para diagnosticar.
      El destino viaja pegado para volver al mismo nodo después de entrar. */
   if (r.status === 401) {
-    location.href = 'login?destino=' + encodeURIComponent(location.pathname + location.search);
-    throw new Error('Sesión vencida');
+    /* …salvo en modo lectura, donde un 401 no es un vencimiento sino la respuesta esperada: se
+       pidió algo que necesita sesión y nunca hubo una. Redirigir ahí echaría del taller a un
+       visitante que sí puede verlo, por una petición que ni siquiera hizo a propósito. La
+       diferencia entre «se venció» y «nunca hubo» es exactamente `S.usuario`. */
+    if (S.usuario) {
+      location.href = 'login?destino=' + encodeURIComponent(location.pathname + location.search);
+      throw new Error('Sesión vencida');
+    }
+    throw new Error('Hace falta iniciar sesión');
   }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
   return r.json();
@@ -68,6 +76,11 @@ async function iniciar() {
   S.defs = def.etapas; S.cadena = def.cadena;
 
   const est = await api('api/estado');
+  /* Quién está mirando, o `null` si nadie inició sesión. El taller se puede ver sin cuenta, pero
+     no escribir: sin esto el front dibujaría botones que el backend va a rechazar con 401, que es
+     la peor forma de comunicar un permiso —parece que anda hasta que hacés clic—. */
+  S.usuario = est.usuario || null;
+  S.usuario ? habilitarEscritura() : modoLectura();
   S.oficial = est.config_tesis || {};
   S.muestreo = est.muestreo_segundos || 10.6;
   $('#sello').textContent = `tesis @ ${est.commit_tesis}`;
@@ -348,7 +361,7 @@ function pintarFase() {
     ['#fase-flujo', '#fase-params', '#fase-resumen', '#fase-visual'].forEach((s) => $(s).innerHTML = '');
     $('#btn-borrar').style.display = 'none';
     $('#btn-nombrar').style.display = 'none';
-    $('#fase-acciones').innerHTML = S.nodos.length ? '' :
+    $('#fase-acciones').innerHTML = (S.nodos.length || !S.usuario) ? '' :
       `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} Ejecutar tesis</button>
        <button class="boton" onclick="document.getElementById('btn-nueva').click()">Configurar el paso 1 a mano</button>`;
     return;
@@ -367,8 +380,9 @@ function pintarFase() {
     ? `paso ${i + 1} de 6 · ${n.duracion_s ?? 0}s` : n.estado;
   $('#fase-desc').innerHTML = escalonado(def.resumen || def.descripcion, def.descripcion);
   activarEscalonados($('#fase-desc'));
-  $('#btn-borrar').style.display = 'inline-flex';
-  $('#btn-nombrar').style.display = 'inline-flex';
+  const escribe = S.usuario ? 'inline-flex' : 'none';
+  $('#btn-borrar').style.display = escribe;
+  $('#btn-nombrar').style.display = escribe;
   $('#btn-nombrar').textContent = n.etiqueta ? 'Cambiar el nombre' : 'Ponerle nombre';
 
   if (n.estado === 'listo') {
@@ -423,6 +437,40 @@ function pintarFase() {
     S.eligiendo = !S.eligiendo; S.comp = null; pintar();
   });
   pintarPestanas(analizable);
+}
+
+/** Saca de la pantalla todo lo que sin sesión no se puede hacer.
+ *
+ *  Se ocultan y no se deshabilitan. Un botón gris invita a preguntarse qué falta; acá la respuesta
+ *  siempre sería la misma —«ingresá»— y para eso está el enlace de la barra, que `cuenta.js` pinta.
+ *  El aviso va una sola vez y arriba, no repetido al lado de cada control ausente.
+ */
+/** Enciende los controles de escritura, que en el HTML nacen apagados.
+ *
+ *  El sentido importa. Antes venían visibles y se apagaban al descubrir que no había sesión, así
+ *  que un visitante sin cuenta veía «Empezar de cero» y «Ejecutar tesis» un instante y después
+ *  desaparecían — controles que no puede usar, ofrecidos y retirados. Naciendo apagados, lo que
+ *  puede pasar es que aparezcan tarde, que es lo correcto: nada se ofrece hasta saber que se
+ *  puede usar.
+ */
+function habilitarEscritura() {
+  ['#btn-nueva', '#btn-oficial'].forEach((s) => { const b = $(s); if (b) b.style.display = ''; });
+}
+
+function modoLectura() {
+  document.documentElement.classList.add('sin-sesion');
+
+  const tarjeta = $('#mapa-caja')?.closest('.tarjeta');
+  if (tarjeta && !$('#aviso-lectura')) {
+    const p = document.createElement('div');
+    p.id = 'aviso-lectura';
+    p.className = 'aviso info';
+    p.style.cssText = 'margin:0 0 14px';
+    p.innerHTML = '<strong>Modo lectura.</strong> Los resultados, los gráficos y los entregables '
+                + 'están todos acá. Para ejecutar el pipeline, tocar las ramas o clasificar '
+                + 'eventos hace falta <a href="login">ingresar</a>.';
+    tarjeta.parentElement.insertBefore(p, tarjeta);
+  }
 }
 
 /** Le pone nombre a un paso. No entra en el hash: renombrar no crea una rama ni invalida el caché. */
@@ -1086,6 +1134,8 @@ const atributoTono = (id) => {
 };
 
 async function cargarClasificacion(clave) {
+  // «Lo que respondí yo» no existe sin un yo: en modo lectura ni se pide.
+  if (!S.usuario) { C.pregunta = ''; C.escala = []; C.mias = {}; return; }
   try {
     const d = await api(`api/nodo/${clave}/clasificacion`);
     C.pregunta = d.pregunta; C.escala = d.escala; C.mias = d.mias || {};
@@ -1135,17 +1185,20 @@ function verEventos(d) {
     <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="avance-clas"></span>
-      <span class="tenue" style="font-size:.78rem">clic = ver señales · doble clic = clasificar</span></div>
+      <span class="tenue" style="font-size:.78rem">${S.usuario
+        ? 'clic = ver señales · doble clic = clasificar'
+        : 'clic = ver señales'}</span></div>
     <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
-      `<th>${rot[c] || c}</th>`).join('')}<th>mi juicio</th></tr></thead>
+      `<th>${rot[c] || c}</th>`).join('')}${S.usuario ? '<th>mi juicio</th>' : ''}</tr></thead>
     <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer"${
       atributoTono(f.event_id)}>${cols.map((c) => {
       const v = f[c];
       if (c === 'n_detectores') return `<td class="num"><strong style="color:${v >= 4 ? 'var(--acento-2)' : 'var(--texto-2)'}">${v}/5</strong></td>`;
       if (c === 'features_top') return `<td class="mono" style="font-size:.71rem;color:var(--texto-2)">${(v || '').slice(0, 60)}</td>`;
       return typeof v === 'number' ? `<td class="num">${v}</td>` : `<td>${v}</td>`;
-    }).join('')}<td class="celda-clas">${marcaClasificacion(f.event_id)}</td></tr>`).join('')}</tbody></table></div>
+    }).join('')}${S.usuario
+      ? `<td class="celda-clas">${marcaClasificacion(f.event_id)}</td>` : ''}</tr>`).join('')}</tbody></table></div>
     <div id="detalle-evento" style="margin-top:16px"></div>`;
   _tablaEventos = { d, filas };
   lineaDeEventos($('#caja-linea'), d, filas);
@@ -1154,7 +1207,9 @@ function verEventos(d) {
      al cerrar el diálogo, el detalle de ese mismo evento ya quedó abierto detrás. */
   document.querySelectorAll('#fase-visual tr[data-ev]').forEach((tr) => {
     tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev)));
-    tr.addEventListener('dblclick', () => abrirDialogoEvento(Number(tr.dataset.ev)));
+    // Sin sesión no hay a quién atribuir un juicio, así que el doble clic no engancha nada: la
+    // encuesta no existe en modo lectura en vez de abrirse y fallar al guardar.
+    if (S.usuario) tr.addEventListener('dblclick', () => abrirDialogoEvento(Number(tr.dataset.ev)));
   });
   pintarAvanceClasificacion(filas.length);
   bloqueDeRevision(S.sel);
@@ -1218,6 +1273,9 @@ const TIPOS_REVISION = [
 async function bloqueDeRevision(clave) {
   const caja = document.getElementById('caja-revision');
   if (!caja) return;
+  // La revisión experta es escritura: abrir un documento entrega su ficha. Sin sesión ni se
+  // pregunta, para no gastar dos peticiones que el backend va a contestar 401.
+  if (!S.usuario) return;
 
   let cfg;
   try {
