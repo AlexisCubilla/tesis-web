@@ -759,11 +759,15 @@ p { margin: 0 0 1em; text-wrap: pretty; }
    control que menos se usa de toda la pantalla y era el más pesado de su zona, que es al revés de
    como debería ser. Ahora pesa igual que el nombre que tiene al lado: son los dos lados de la
    misma frase, «sos admin» y «dejá de serlo». */
-/* --- La esquina derecha: avatar, menú y tema ---
-   CON SESIÓN VA UN SOLO CONTROL. Antes había tres cosas sueltas —el nombre, el interruptor de tema
-   y «Salir»— para acciones que se tocan una vez por sesión, ocupando el mismo peso visual que las
-   pestañas, que se tocan todo el tiempo. Ahora van detrás del avatar. Sin sesión no hay avatar que
-   apretar, así que el tema y «Ingresar» quedan a la vista.
+/* --- La esquina derecha: tema, avatar y menú ---
+   LO DE LA CUENTA VA DETRÁS DEL AVATAR; EL TEMA, NO. Antes el nombre y «Salir» estaban sueltos acá,
+   con el mismo peso visual que las pestañas, para acciones que se tocan una vez por sesión: eso se
+   plegó detrás del avatar. El tema volvió a salir, y es a propósito. No es una acción de la cuenta
+   —quien mira sin entrar también lo usa— y es lo único de esta esquina que se prueba mirando: dos
+   clics para eso, uno de ellos para abrir un menú que habla de otra cosa, es un clic de más.
+
+   Suelto queda además en el MISMO LUGAR con sesión y sin ella, contra el filete: navegar entre
+   pantallas no lo mueve, que era la falla que lo trajo hasta acá.
 
    El filete que separa esta zona de las pestañas se queda: son dos preguntas distintas —a dónde ir
    y quién sos— y el filete lo dice sin sumar una caja. */
@@ -771,8 +775,8 @@ p { margin: 0 0 1em; text-wrap: pretty; }
   margin-left: auto; order: 3; padding-left: 14px; border-left: 1px solid var(--borde); }
 .barra .cuenta.sola { padding-left: 0; border-left: none; }
 
-/* El botón de tema suelto, para cuando no hay sesión. Peso de pestaña inactiva: es una preferencia,
-   no un destino, y con el recuadro competiría con ellas. */
+/* El botón de tema. Peso de pestaña inactiva: es una preferencia, no un destino, y con el recuadro
+   competiría con ellas. Sin marco tampoco compite con el avatar, que sí lo lleva. */
 .barra .btn-tema {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; padding: 0;

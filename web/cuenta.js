@@ -8,10 +8,11 @@
  * sin conocerse; el resultado fue un interruptor que quedaba en medio de las pestañas y se movía al
  * navegar. Ahora `tema.js` ofrece la API (`window.Tema`) y acá se decide qué se dibuja.
  *
- * CON SESIÓN, UN SOLO CONTROL. El nombre, el tema y «Salir» eran tres cosas sueltas en la barra
- * para algo que se toca una vez por sesión. Van dentro de un menú detrás del avatar, que es donde
- * la gente ya las busca. Sin sesión no hay avatar que apretar, así que quedan a la vista el tema y
- * «Ingresar» — que es la acción de esa pantalla y esconderla un clic no la ayuda.
+ * EL TEMA VA SUELTO; LA SESIÓN, ADENTRO. Son dos cosas distintas: el tema es una preferencia de
+ * quien mira —la usa también quien entra sin cuenta— y la sesión es quién sos. Meter el tema en el
+ * menú de la cuenta lo ataba a tener una, y lo dejaba a dos clics de algo que se prueba mirando.
+ * Queda a la izquierda del avatar, así el control está en el mismo lugar haya sesión o no. Detrás
+ * del avatar queda lo que sí es de la cuenta: el nombre, el rol y «Salir».
  *
  * No pinta marcado nuevo en el HTML de cada página: busca la `.barra` y se cuelga ahí. Agregar el
  * widget a una pantalla nueva es agregar una etiqueta `<script>` y nada más.
@@ -32,7 +33,12 @@
     .then((usuario) => (usuario ? pintarMenu(usuario) : pintarSuelto()))
     .catch(() => {});   // sin red no hay nada útil que decir en la barra
 
-  /** Un botón de tema, para los casos en que no hay menú donde meterlo. */
+  /** El botón de tema. Va en la barra en los dos casos, con o sin sesión.
+   *
+   *  No hace falta mantenerle el ícono al día: `tema.js` recorre todos los `.btn-tema` cada vez que
+   *  aplica un tema —incluido el cambio desde otra pestaña—, y este ya está en el documento para
+   *  entonces. Acá solo se pone el estado inicial, porque este botón nace después de que `tema.js`
+   *  corrió. */
   function botonTema() {
     const b = document.createElement('button');
     b.type = 'button';
@@ -93,20 +99,6 @@
       usuario.rol === 'admin' ? 'Administrador' : 'Revisor'}</span>`;
     menu.appendChild(quien);
 
-    const tema = document.createElement('button');
-    tema.type = 'button';
-    tema.className = 'op';
-    tema.setAttribute('role', 'menuitem');
-    const rotularTema = () => {
-      const va = window.Tema && window.Tema.actual() === 'oscuro' ? 'claro' : 'oscuro';
-      const ico = window.Tema
-        ? (va === 'claro' ? window.Tema.ICONO_SOL : window.Tema.ICONO_LUNA) : '';
-      tema.innerHTML = `${ico}<span>Tema ${va}</span>`;
-    };
-    rotularTema();
-    tema.addEventListener('click', () => { window.Tema && window.Tema.alternar(); rotularTema(); });
-    menu.appendChild(tema);
-
     const salir = document.createElement('button');
     salir.type = 'button';
     salir.className = 'op';
@@ -122,6 +114,7 @@
     });
     menu.appendChild(salir);
 
+    caja.appendChild(botonTema());
     caja.appendChild(disparador);
     caja.appendChild(menu);
     barra.appendChild(caja);
@@ -134,10 +127,7 @@
       if (si) menu.querySelector('.op').focus();
     };
     disparador.addEventListener('click', (e) => { e.stopPropagation(); abrir(menu.hidden); });
-    menu.addEventListener('click', (e) => {
-      // Cambiar el tema NO cierra: se puede querer probar los dos. Salir cierra solo, navegando.
-      if (e.target.closest('.op') === salir) abrir(false);
-    });
+    menu.addEventListener('click', (e) => { if (e.target.closest('.op')) abrir(false); });
     addEventListener('click', (e) => { if (!caja.contains(e.target)) abrir(false); });
     addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || menu.hidden) return;
