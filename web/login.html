@@ -6,36 +6,231 @@
 <title>Ingresar — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
 <style>
-  /* La pantalla lleva la MISMA barra que el resto del sitio, con sus dos pestañas.
-     Antes no llevaba ninguna —no había a dónde ir sin entrar—, pero ahora sí: el taller se mira
-     sin cuenta, así que dejar a alguien acá sin salida sería encerrarlo en la única pantalla que
-     no necesita ver. Las pestañas son la salida — y son la única: hubo un pie que repetía «volver
-     al proyecto» en palabras, y decir dos veces lo mismo en una pantalla de cuatro elementos era
-     justamente lo que la hacía sentir cargada. De paso deja de parecer de otro sitio: misma barra,
-     misma tarjeta, mismo cielo. */
-  .ingreso { max-width: 404px; margin: 9vh auto 0; padding: 0 20px 70px; }
-  /* Título y nota van CENTRADOS, y es la excepción deliberada a que todo se alinee a la
-     izquierda: esta pantalla es una columna angosta y simétrica, con la tarjeta al medio, así que
-     el conjunto se lee como un bloque y no como texto suelto que quedó descolgado. Adentro de la
-     tarjeta se vuelve a la izquierda —cada rótulo sobre su campo—, que es lo único que se puede
-     leer rápido en un formulario. */
-  .ingreso h1 { font-size: 1.3rem; margin: 0 0 18px; letter-spacing: -.015em; text-align: center; }
-  /* La nota va DESPUÉS del formulario y en chico. Es una aclaración, no una instrucción: nadie
-     necesita leerla para entrar, y arriba del formulario se leía como si hiciera falta. */
-  .ingreso .nota { margin: 18px 0 0; font-size: .8rem; color: var(--texto-2);
-    text-align: center; text-wrap: pretty; }
-  .ingreso .campo { margin-bottom: 14px; }
-  .ingreso .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
-  .ingreso .campo input { width: 100%; padding: 9px 12px; border-radius: var(--radio-2);
-    border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
-    font: inherit; font-size: .95rem; }
-  .ingreso .campo input:focus { outline: none; border-color: var(--acento); }
-  .ingreso .boton { width: 100%; justify-content: center; margin-top: 8px; }
-  .ingreso .aviso { margin-top: 18px; font-size: .84rem; }
+  /* LA PANTALLA DE INGRESO TIENE SU PROPIO REGISTRO, y es una excepción consciente al resto del
+     sitio: acá el fondo es el tema. Órbitas concéntricas, un satélite dándoles la vuelta y una
+     grilla de seguimiento.
+
+     HUBO UN BARRIDO DE RADAR y se quitó. Medido, no cambiaba en nada el brillo de la tarjeta —es
+     opaca y está por encima—, así que no estorbaba la lectura. Lo que sí hacía era dar una vuelta
+     cada 8 segundos contra los 34 del satélite: era lo más rápido de la pantalla, y en visión
+     periférica se leía como un pulso que pedía atención sin decir nada. Además BIRDS-4 no hace
+     radar: sus datos son paquetes de telemetría bajados a una estación terrena, así que la órbita
+     describe el proyecto y el barrido era un préstamo de otro género.
+
+     Por qué acá sí y en el taller no. La regla del sitio es que las superficies donde se lee un
+     dato van planas, porque «una textura detrás de cinco curvas compite con el dato justo donde hay
+     que leerlo» (ver el encabezado de `estilos.css`). En esta pantalla no hay ningún dato: hay dos
+     campos y un botón. El fondo no le compite a nada, y en cambio dice de qué proyecto es esto
+     antes de que la persona entre.
+
+     Todo el color sale de tokens `--ing-*` definidos en `estilos.css`, no de hexadecimales acá.
+     Los tonos llevan el tinte azulado que los neutros del taller deliberadamente no tienen, y está
+     acotado a esta pantalla por el mismo motivo: si se filtrara a las tarjetas del taller, todo
+     sería un poco azul y por eso nada sería azul.
+
+     El campo de estrellas global (`.estrellas`) se apaga acá: esta pantalla arma el suyo, más denso
+     y con titileo, y los dos juntos daban el doble de estrellas. */
+  .estrellas { display: none; }
+
+  body { min-height: 100vh; margin: 0; overflow-x: hidden; }
+
+  /* ---------- el fondo ---------- */
+  .cielo {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 120% 80% at 20% -10%, var(--ing-cielo-1) 0%, transparent 60%),
+      radial-gradient(ellipse 100% 70% at 85% 110%, var(--ing-cielo-2) 0%, transparent 55%),
+      linear-gradient(180deg, var(--fondo) 0%, var(--ing-fondo-1) 100%);
+  }
+
+  /* Grilla de seguimiento, difuminada hacia los bordes con una máscara: sin ella el patrón llega
+     al filo de la pantalla y se lee como un fondo de planilla en vez de como un instrumento. */
+  .grilla {
+    position: fixed; inset: 0; z-index: 0; opacity: .25;
+    background-image:
+      linear-gradient(var(--ing-grilla) 1px, transparent 1px),
+      linear-gradient(90deg, var(--ing-grilla) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, #000 0%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, #000 0%, transparent 75%);
+  }
+
+  /* ---------- las órbitas ---------- */
+  .orbita {
+    position: fixed; top: 50%; left: 50%; z-index: 0;
+    border: 1px solid var(--ing-orbita); border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .orbita.o1 { width: 640px; height: 640px; animation: girar 34s linear infinite; }
+  .orbita.o2 { width: 920px; height: 920px; opacity: .64; animation: girar 54s linear infinite reverse; }
+  .orbita.o3 { width: 1220px; height: 1220px; opacity: .43; }
+  @keyframes girar { to { transform: translate(-50%, -50%) rotate(360deg) } }
+
+  /* El satélite va montado en la órbita interna y contragira para no dar vueltas sobre sí mismo,
+     que es lo que no hace un satélite estabilizado en tres ejes. */
+  .caja-sat { position: absolute; top: -15px; left: 50%; width: 30px; height: 30px; margin-left: -15px; }
+  .sat { width: 100%; height: 100%; display: block;
+    filter: drop-shadow(0 0 6px rgba(200, 208, 220, .35));
+    animation: contragirar 34s linear infinite; }
+  .sat .baliza { animation: latir 2.4s ease-in-out infinite; }
+  @keyframes contragirar { from { transform: rotate(0) } to { transform: rotate(-360deg) } }
+  @keyframes latir { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
+
+  /* ---------- estrellas y telemetría de fondo ---------- */
+  .estrella { position: fixed; border-radius: 50%; background: var(--texto); z-index: 0; }
+  .estrella.titila { animation: titilar 3.6s ease-in-out infinite; }
+  @keyframes titilar {
+    0%, 100% { opacity: var(--op, .6) }
+    50%      { opacity: .15 }
+  }
+  .dato { position: fixed; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--ing-dato); z-index: 0; }
+
+  /* Nada se mueve para quien pidió que no se mueva. */
+  @media (prefers-reduced-motion: reduce) {
+    .orbita, .sat, .sat .baliza, .estrella { animation: none !important }
+  }
+
+  /* ---------- la barra ---------- */
+  /* El punto de la marca lleva halo solo acá: en el taller la marca convive con datos y un
+     resplandor sería una luz que no significa nada. */
+  .barra { position: relative; z-index: 2; background: var(--barra-fondo); }
+  .barra .marca span.punto { border-color: var(--acento);
+    box-shadow: 0 0 8px 1px var(--ing-orbita); }
+  .barra .marca span.punto::after { background: var(--acento); }
+
+  /* ---------- el ingreso ---------- */
+  /* La página es una columna: la barra arriba y el ingreso ocupando lo que sobre. Así el centrado
+     vertical NO depende de saber cuánto mide la barra — escribirlo como `calc(100vh - 58px)`
+     desbordaba 7 px a cualquier altura, porque la barra mide 65 y el 58 era una estimación. */
+  body { display: flex; flex-direction: column; }
+  .ingreso { position: relative; z-index: 2; flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px 20px; }
+
+  .ingreso h1 { font-size: 1.62rem; font-weight: 500; margin: 0 0 28px;
+    letter-spacing: .2px; text-align: center; }
+
+  .ingreso form {
+    width: 360px; max-width: 90vw;
+    background: linear-gradient(180deg, var(--ing-panel-1), var(--ing-panel-2));
+    border: 1px solid var(--ing-borde); border-radius: 10px;
+    padding: 28px 26px 24px;
+    /* Tres sombras y no una: el filete de luz interior es lo que hace que la tarjeta parezca tener
+       espesor en vez de ser un rectángulo pegado al fondo. */
+    box-shadow:
+      0 0 0 1px rgba(111, 137, 184, .03),
+      0 30px 60px -20px rgba(0, 0, 0, .6),
+      inset 0 1px 0 rgba(255, 255, 255, .03);
+  }
+
+  .campo { margin-bottom: 18px; }
+  .campo:last-of-type { margin-bottom: 24px; }
+  /* Igual que en los campos: el 1,65 del cuerpo es para párrafos, y en un rótulo de una línea
+     sumaba 5 px por cada uno. Con dos rótulos y dos campos, la tarjeta crecía 17 px sobre la
+     maqueta sin que nada lo justificara. */
+  .campo label { display: block; font-size: .78rem; font-weight: 600; color: var(--texto);
+    line-height: 1.2; margin-bottom: 7px; letter-spacing: .2px; }
+  .campo input {
+    width: 100%; padding: 11px 12px;
+    background: var(--ing-campo); border: 1px solid var(--ing-borde); border-radius: 6px;
+    color: var(--texto); font: inherit; font-size: .9rem; outline: none;
+    /* `line-height: 1.2` y no el del sitio: el cuerpo va en 1.6, que es lo correcto para leer
+       párrafos y de más para un campo de una línea — sumaba 7 px de alto a cada input y a la
+       tarjeta 36. Un campo no es un párrafo. */
+    line-height: 1.2;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .campo input::placeholder { color: var(--ing-marcador); }
+  .campo input:focus { border-color: var(--acento);
+    box-shadow: 0 0 0 3px var(--ing-orbita); }
+
+  /* EL BOTÓN ES EL PRIMARIO DEL SISTEMA, con una sola diferencia buscada.
+     Primero lo escribí con el CSS de la maqueta y quedó divergiendo en diez propiedades: radio de
+     6 px contra los 9 del sitio, peso 700 contra 500, sin filete, otro tamaño de letra, otro hover,
+     otro `:disabled`. Nueve de esas diez no eran decisiones: eran restos de portar una hoja de
+     estilos ajena. Un botón que hace lo mismo que otros nueve del sitio tiene que verse como ellos,
+     o deja de leerse como el mismo tipo de cosa.
+
+     Lo que SÍ es una decisión es el degradado, que se pidió para esta pantalla. Va como
+     `background-image` sobre el relleno del sistema, no en su lugar: el color plano sigue siendo
+     `--acento-hondo` y el degradado es una capa encima que cierra en ese mismo tono. Se repite en
+     `:hover` porque el `background` del sistema es una propiedad abreviada y al aplicarse borraría
+     la imagen — el `brightness` del hover sigue siendo el del sitio.
+
+     Ancho completo y texto centrado: eso no es estilo, es lo que corresponde al botón de envío de
+     un formulario de una columna. */
+  .ingreso .boton.primario.entrar,
+  .ingreso .boton.primario.entrar:hover {
+    background-image: linear-gradient(180deg, var(--ing-boton-1), var(--acento-hondo));
+  }
+  .ingreso .entrar { width: 100%; justify-content: center; }
+  /* `progress` y no el `not-allowed` del sistema: acá deshabilitado significa «estoy entrando»,
+     no «no podés». Es el mismo criterio que el botón «Salir» de la barra. */
+  .ingreso .entrar:disabled { cursor: progress; }
+
+  .ingreso .nota { margin: 22px 0 0; max-width: 380px; text-align: center;
+    font-size: .78rem; line-height: 1.6; color: var(--texto-2); text-wrap: pretty; }
+  /* La maqueta destaca la segunda oración un tono por encima de la primera: la primera dice qué NO
+     hace falta y la segunda qué habilita entrar, que es la que importa si estás en esta pantalla. */
+  .ingreso .nota strong { color: var(--texto); font-weight: 600; }
+  .ingreso .aviso { margin-top: 18px; font-size: .84rem; max-width: 380px; }
+
+  @media (max-width: 480px) {
+    .barra nav { display: none }
+    .ingreso h1 { font-size: 1.37rem }
+  }
 </style>
 </head>
 <body>
-<div class="estrellas"></div>
+
+<div class="cielo"></div>
+<div class="grilla"></div>
+
+<!-- Las tres órbitas y el satélite. Decorativo, así que `aria-hidden`: no hay nada acá que un
+     lector de pantalla necesite anunciar. -->
+<div aria-hidden="true">
+  <div class="orbita o1">
+    <div class="caja-sat">
+      <!-- El CubeSat, dibujado. Es una ILUSTRACIÓN y no un ícono del sistema: sus tonos internos
+           son sombreado del objeto —panel, brazo, cuerpo, antena—, no fichas de la paleta, igual
+           que la textura de la Tierra en la portada trae los suyos. -->
+      <svg class="sat" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#8b929c" stroke-width="0.6">
+          <rect x="1" y="14" width="12" height="12" fill="#1a2030" stroke="#4a5568"/>
+          <line x1="1" y1="17.3" x2="13" y2="17.3"/>
+          <line x1="1" y1="20.6" x2="13" y2="20.6"/>
+          <line x1="1" y1="23.9" x2="13" y2="23.9"/>
+          <line x1="4.3" y1="14" x2="4.3" y2="26"/>
+          <line x1="7.6" y1="14" x2="7.6" y2="26"/>
+          <line x1="10.9" y1="14" x2="10.9" y2="26"/>
+        </g>
+        <g stroke="#8b929c" stroke-width="0.6">
+          <rect x="27" y="14" width="12" height="12" fill="#1a2030" stroke="#4a5568"/>
+          <line x1="27" y1="17.3" x2="39" y2="17.3"/>
+          <line x1="27" y1="20.6" x2="39" y2="20.6"/>
+          <line x1="27" y1="23.9" x2="39" y2="23.9"/>
+          <line x1="29.3" y1="14" x2="29.3" y2="26"/>
+          <line x1="32.6" y1="14" x2="32.6" y2="26"/>
+          <line x1="35.9" y1="14" x2="35.9" y2="26"/>
+        </g>
+        <rect x="13" y="19" width="4" height="2" fill="#6f7887"/>
+        <rect x="23" y="19" width="4" height="2" fill="#6f7887"/>
+        <rect x="16" y="15" width="8" height="10" rx="1" fill="#c9cdd6"/>
+        <rect x="16" y="15" width="8" height="4" rx="1" fill="#eef0f3"/>
+        <line x1="20" y1="15" x2="20" y2="9" stroke="#9aa1ac" stroke-width="0.8"/>
+        <circle cx="20" cy="8.2" r="1.1" fill="#eef0f3"/>
+        <path d="M24 22 q5 -1 6 3" stroke="#9aa1ac" stroke-width="0.7" fill="none"/>
+        <ellipse cx="30.3" cy="25.4" rx="2.1" ry="1.3" fill="#dfe2e7" stroke="#9aa1ac"
+                 stroke-width="0.4" transform="rotate(20 30 25)"/>
+        <circle class="baliza" cx="20" cy="26.3" r="0.9" fill="#ffffff"/>
+      </svg>
+    </div>
+  </div>
+  <div class="orbita o2"></div>
+  <div class="orbita o3"></div>
+  <div id="fondo-puntos"></div>
+</div>
 
 <header class="barra">
   <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
@@ -48,22 +243,59 @@
 <div class="ingreso">
   <h1>Ingresar</h1>
 
-  <form id="form" class="tarjeta">
+  <form id="form">
     <div class="campo">
       <label for="usuario">Usuario</label>
-      <input id="usuario" name="usuario" autocomplete="username" autofocus required>
+      <input id="usuario" name="usuario" autocomplete="username" placeholder="usuario"
+             autofocus required>
     </div>
     <div class="campo">
       <label for="contrasena">Contraseña</label>
-      <input id="contrasena" name="contrasena" type="password" autocomplete="current-password" required>
+      <input id="contrasena" name="contrasena" type="password" placeholder="••••••••"
+             autocomplete="current-password" required>
     </div>
-    <button class="boton primario" type="submit" id="entrar">Entrar</button>
+    <button class="boton primario entrar" type="submit" id="entrar">Iniciar sesión</button>
   </form>
 
   <div id="mensaje"></div>
 
-  <p class="nota">Mirar no necesita cuenta: la sesión habilita ejecutar y clasificar.</p>
+  <p class="nota">El modo de solo lectura no requiere autenticación.
+     <strong>Iniciar sesión otorga permisos de ejecución y clasificación.</strong></p>
 </div>
+
+<script>
+/* El campo de estrellas y los puntos de telemetría, sembrados al azar.
+ *
+ * Se generan en el navegador y no como patrón CSS porque la gracia es que no se repitan: un
+ * `background-image` con siete radiales se nota como baldosa en cuanto la pantalla es ancha.
+ *
+ * Van en `position: fixed` y con las medidas de la ventana al cargar. No se re-siembran al
+ * redimensionar a propósito: mover doscientas estrellas mientras alguien arrastra el borde de la
+ * ventana es más llamativo que un rincón sin estrellas.
+ */
+(function () {
+  const caja = document.getElementById('fondo-puntos');
+  if (!caja) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  const trozos = [];
+
+  for (let i = 0; i < 160; i++) {
+    const x = Math.random() * W, y = Math.random() * H;
+    const tam = (Math.random() * 1.6 + 0.6).toFixed(2);
+    const op = (Math.random() * 0.5 + 0.35).toFixed(2);
+    const titila = Math.random() < 0.35;
+    trozos.push(`<div class="estrella${titila ? ' titila' : ''}" style="left:${x}px;top:${y}px;`
+      + `width:${tam}px;height:${tam}px;opacity:${op};--op:${op};`
+      + `animation-duration:${(2.4 + Math.random() * 3).toFixed(1)}s;`
+      + `animation-delay:${(Math.random() * 4).toFixed(1)}s"></div>`);
+  }
+  for (let i = 0; i < 50; i++) {
+    trozos.push(`<div class="dato" style="left:${Math.random() * W}px;top:${Math.random() * H}px;`
+      + `opacity:${(0.15 + Math.random() * 0.35).toFixed(2)}"></div>`);
+  }
+  caja.innerHTML = trozos.join('');
+})();
+</script>
 
 <script>
 'use strict';
@@ -132,7 +364,7 @@ $('#form').addEventListener('submit', async (e) => {
     $('#contrasena').value = '';
     $('#contrasena').focus();
     boton.disabled = false;
-    boton.textContent = 'Entrar';
+    boton.textContent = 'Iniciar sesión';
   }
 });
 </script>

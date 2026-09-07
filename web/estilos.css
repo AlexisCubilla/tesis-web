@@ -128,6 +128,45 @@
   --boton-hover: rgba(255, 255, 255, .09);
   --fila-hover: rgba(127, 168, 214, .07);
   --opcion-activa: rgba(21, 68, 115, .30);
+  /* --- La pantalla de ingreso ---
+     Esta pantalla tiene su propio registro visual —órbitas, grilla de seguimiento— y es una
+     excepción CONSCIENTE: acá el fondo es el tema, porque no hay ningún dato con el que competir.
+     En el taller sería ruido encima de las curvas; en una pantalla con dos campos, es la identidad
+     del proyecto.
+
+     PERO LA PALETA ES LA DEL SITIO. La maqueta traía tonos propios, más claros y con bastante azul
+     (`#131b2d` en la tarjeta, `#0a1120` en los campos, `#4a679a` en el botón). Se bajaron a los
+     neutros de arriba: la tarjeta arranca en `--panel-2` y cierra en `--panel`, los campos van casi
+     en `--fondo-2`, y todo lo que tiene equivalente en la paleta lo usa por referencia en vez de
+     repetir un valor parecido. Lo que quedó de esos tonos es la ESTRUCTURA —degradado, filete de
+     luz, volumen en el botón—, no el color.
+
+     Los cuatro azules que quedan salen del acento con `color-mix`, así que si el acento cambia,
+     esta pantalla lo sigue. Escribirlos a mano habría dejado cuatro valores que se desincronizan en
+     silencio, que es justo lo que el encabezado de este archivo pide evitar. */
+  --ing-cielo-1: #0d0f14;      /* las dos manchas del fondo, apenas levantadas de `--fondo` */
+  --ing-cielo-2: #0b0d11;
+  --ing-fondo-1: #090a0e;      /* cierre del degradado vertical */
+  --ing-grilla: #15171c;       /* la grilla de seguimiento; encima lleva opacidad .25 */
+  --ing-borde: #1e2127;        /* filete de la tarjeta y de los campos */
+  --ing-panel-1: rgba(23, 26, 31, .92);  /* la tarjeta: de `--panel-2` a `--panel` */
+  --ing-panel-2: rgba(16, 18, 22, .92);
+  --ing-campo: #0a0c10;
+  /* El texto de ejemplo dentro de los campos, a 3,04:1 sobre `--ing-campo`. Al oscurecer la
+     pantalla había quedado en 1,87 —por debajo incluso del umbral decorativo de 3:1— y a esa
+     altura no se lee discreto, se lee roto. La maqueta lo tenía en 2,67 sobre un campo más claro;
+     este es el valor equivalente sobre el campo oscuro. No dice nada que el rótulo de arriba no
+     diga, así que subordinado está bien; invisible, no. */
+  --ing-marcador: #565f70;
+
+  /* Derivados del acento: siguen a la paleta sin repetirla. */
+  --ing-orbita: color-mix(in srgb, var(--acento) 11%, transparent);
+  --ing-dato:   color-mix(in srgb, var(--acento) 30%, transparent);
+  /* El primario conserva el volumen de la maqueta, pero en el marino del sitio: cierra exactamente
+     en `--acento-hondo`, que es el relleno de todos los botones primarios del taller. */
+  --ing-boton-1: color-mix(in oklab, var(--acento-hondo) 72%, var(--acento));
+  --ing-boton-2: var(--acento-hondo);
+
   /* El tramo que marcaron los detectores, sombreado sobre la señal cuando se dibuja con contexto
      alrededor. NEUTRO y no rojo: quien mira ese gráfico está decidiendo si eso es una anomalía, y
      un color de estado le daría la respuesta antes de la pregunta. Dice «esto es lo que marcaron
