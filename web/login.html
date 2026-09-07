@@ -9,11 +9,21 @@
   /* La pantalla lleva la MISMA barra que el resto del sitio, con sus dos pestañas.
      Antes no llevaba ninguna —no había a dónde ir sin entrar—, pero ahora sí: el taller se mira
      sin cuenta, así que dejar a alguien acá sin salida sería encerrarlo en la única pantalla que
-     no necesita ver. Las pestañas son la salida, y de paso la pantalla deja de parecer de otro
-     sitio: misma barra, misma tarjeta, mismo cielo. */
+     no necesita ver. Las pestañas son la salida — y son la única: hubo un pie que repetía «volver
+     al proyecto» en palabras, y decir dos veces lo mismo en una pantalla de cuatro elementos era
+     justamente lo que la hacía sentir cargada. De paso deja de parecer de otro sitio: misma barra,
+     misma tarjeta, mismo cielo. */
   .ingreso { max-width: 404px; margin: 9vh auto 0; padding: 0 20px 70px; }
-  .ingreso h1 { font-size: 1.3rem; margin: 0 0 5px; letter-spacing: -.015em; }
-  .ingreso .pista { margin: 0 0 20px; }
+  /* Título y nota van CENTRADOS, y es la excepción deliberada a que todo se alinee a la
+     izquierda: esta pantalla es una columna angosta y simétrica, con la tarjeta al medio, así que
+     el conjunto se lee como un bloque y no como texto suelto que quedó descolgado. Adentro de la
+     tarjeta se vuelve a la izquierda —cada rótulo sobre su campo—, que es lo único que se puede
+     leer rápido en un formulario. */
+  .ingreso h1 { font-size: 1.3rem; margin: 0 0 18px; letter-spacing: -.015em; text-align: center; }
+  /* La nota va DESPUÉS del formulario y en chico. Es una aclaración, no una instrucción: nadie
+     necesita leerla para entrar, y arriba del formulario se leía como si hiciera falta. */
+  .ingreso .nota { margin: 18px 0 0; font-size: .8rem; color: var(--texto-2);
+    text-align: center; text-wrap: pretty; }
   .ingreso .campo { margin-bottom: 14px; }
   .ingreso .campo label { display: block; font-size: .83rem; margin-bottom: 5px; font-weight: 600; }
   .ingreso .campo input { width: 100%; padding: 9px 12px; border-radius: var(--radio-2);
@@ -22,10 +32,6 @@
   .ingreso .campo input:focus { outline: none; border-color: var(--acento); }
   .ingreso .boton { width: 100%; justify-content: center; margin-top: 8px; }
   .ingreso .aviso { margin-top: 18px; font-size: .84rem; }
-
-  /* El pie repite la salida en palabras. El que llegó acá redirigido desde `/taller` ve la
-     pestaña arriba, pero el que llegó desde el botón «Ingresar» quizá no la esté mirando. */
-  .ingreso .volver { margin: 16px 0 0; font-size: .84rem; color: var(--texto-2); text-align: center; }
 </style>
 </head>
 <body>
@@ -40,9 +46,7 @@
 </header>
 
 <div class="ingreso">
-  <h1>Ingresar al taller</h1>
-  <p class="pista">Todo se puede mirar sin cuenta. Ingresá solo para ejecutar el pipeline, tocar
-     las ramas o clasificar eventos.</p>
+  <h1>Ingresar</h1>
 
   <form id="form" class="tarjeta">
     <div class="campo">
@@ -58,7 +62,7 @@
 
   <div id="mensaje"></div>
 
-  <p class="volver">o <a href=".">volver al proyecto</a> y seguir mirando en modo lectura</p>
+  <p class="nota">Mirar no necesita cuenta: la sesión habilita ejecutar y clasificar.</p>
 </div>
 
 <script>
