@@ -35,6 +35,15 @@ def taller(tmp_path, monkeypatch):
     monkeypatch.setenv("ADMIN_CONTRASENA", "contrasena-larga")
     monkeypatch.setenv("OO_URL_INTERNA", "")
     monkeypatch.setenv("OO_URL_DEL_TALLER", "")
+    # La cookie SIN `Secure`, aunque el servidor donde corran los tests la tenga encendida.
+    # `TestClient` habla http contra `http://testserver`, y una cookie `Secure` no viaja por http:
+    # el ingreso devolvía 200 y la petición siguiente llegaba sin sesión — exactamente el modo de
+    # falla que `.env.example` advierte para el navegador, reproducido en la suite.
+    #
+    # Sin fijarlo, los tests dependen del `.env` de la máquina donde corren: pasaban en la de
+    # desarrollo (COOKIE_SEGURA=0) y fallaban en el servidor (=1). Un test que cambia de resultado
+    # según la configuración del ambiente no afirma nada sobre el código.
+    monkeypatch.setenv("COOKIE_SEGURA", "0")
 
     olvidar_backend()
     ajustes = importlib.import_module("backend.ajustes")
