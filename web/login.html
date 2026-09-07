@@ -64,17 +64,24 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   }
 
   /* ---------- las órbitas ---------- */
-  .orbita {
+  .aro {
     position: fixed; top: 50%; left: 50%; z-index: 0;
     border: 1px solid var(--ing-orbita); border-radius: 50%;
     transform: translate(-50%, -50%);
   }
-  .orbita.o1 { width: 640px; height: 640px; animation: girar 34s linear infinite; }
-  .orbita.o2 { width: 920px; height: 920px; opacity: .64; animation: girar 54s linear infinite reverse; }
-  .orbita.o3 { width: 1220px; height: 1220px; opacity: .43; }
+  .aro.o1 { width: 640px; height: 640px; animation: girar 34s linear infinite; }
+  .aro.o2 { width: 920px; height: 920px; opacity: .64; animation: girar 54s linear infinite reverse; }
+  .aro.o3 { width: 1220px; height: 1220px; opacity: .43; }
   @keyframes girar { to { transform: translate(-50%, -50%) rotate(360deg) } }
 
-  /* El satélite va montado en la órbita interna y contragira para no dar vueltas sobre sí mismo,
+  /* LOS ANILLOS SE LLAMAN `.aro` Y NO `.orbita`, POR LA MISMA RAZÓN QUE LAS ESTRELLAS SE LLAMAN
+     `.chispa`: `orbita` ya existía, y allá es el bloque del globo de la portada en `index.html`
+     —dibujo más pie—. Una regla de tema escrita para estos anillos escondió aquel globo entero.
+     Segunda vez que pasa en esta pantalla: el nombre genérico y bonito es la trampa, porque es
+     justo el que a otro le va a parecer bueno. El token de color sí se llama `--ing-orbita`, y ahí
+     no hay riesgo: el prefijo `--ing-` ya dice de quién es.
+
+     El satélite va montado en el anillo interno y contragira para no dar vueltas sobre sí mismo,
      que es lo que no hace un satélite estabilizado en tres ejes. */
   .caja-sat { position: absolute; top: -15px; left: 50%; width: 30px; height: 30px; margin-left: -15px; }
   .sat { width: 100%; height: 100%; display: block;
@@ -96,7 +103,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 
   /* Nada se mueve para quien pidió que no se mueva. */
   @media (prefers-reduced-motion: reduce) {
-    .orbita, .sat, .sat .baliza, .chispa { animation: none !important }
+    .aro, .sat, .sat .baliza, .chispa { animation: none !important }
   }
 
   /* ---------- la barra ---------- */
@@ -198,7 +205,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 <!-- Las tres órbitas y el satélite. Decorativo, así que `aria-hidden`: no hay nada acá que un
      lector de pantalla necesite anunciar. -->
 <div aria-hidden="true">
-  <div class="orbita o1">
+  <div class="aro o1">
     <div class="caja-sat">
       <!-- El CubeSat, dibujado. Es una ILUSTRACIÓN y no un ícono del sistema: sus tonos internos
            son sombreado del objeto —panel, brazo, cuerpo, antena—, no fichas de la paleta, igual
@@ -235,8 +242,8 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
       </svg>
     </div>
   </div>
-  <div class="orbita o2"></div>
-  <div class="orbita o3"></div>
+  <div class="aro o2"></div>
+  <div class="aro o3"></div>
   <div id="fondo-puntos"></div>
 </div>
 

@@ -560,14 +560,24 @@ html[data-tema="claro"] {
    Pero seguía siendo un satélite sin espacio: el problema no era el contraste. Por eso se va, y no
    se tokeniza.
 
-   SE LLAMAN `.chispa` Y NO `.estrella` POR ALGO. Esta regla se escribió primero con `.estrella`, y
-   esa clase ya existía: es la ★ de la configuración de la tesis en el mapa de ramas. La regla la
-   escondía también, así que en claro desaparecía la marca de cuál es la rama de la tesis — un dato,
-   no un adorno. Dos cosas distintas con el mismo nombre de clase es una colisión que solo se nota
-   cuando alguien escribe una regla para una de las dos. */
+   LOS NOMBRES DE ESTAS CLASES YA COSTARON DOS VECES, y las dos fueron esta misma regla.
+
+   `.chispa` se llamó primero `.estrella`, y esa clase ya existía: es la ★ de la configuración de la
+   tesis en el mapa de ramas. La regla la escondía también, así que en claro desaparecía la marca de
+   cuál es la rama de la tesis — un dato, no un adorno.
+
+   `.aro` se llamó primero `.orbita`, y esa TAMBIÉN existía: en `index.html` es el bloque del globo
+   de la portada, dibujo más pie. Al sumar `.orbita` a esta lista desapareció el globo entero del
+   inicio en modo claro, que es la ilustración principal del sitio.
+
+   El patrón es el mismo y conviene nombrarlo: el nombre genérico y bonito —`estrella`, `orbita`—
+   es justo el que a otra pantalla también le va a parecer bueno, y una hoja de estilos compartida
+   no tiene alcance por archivo. Las clases de una escena decorativa van con un nombre que nadie más
+   vaya a querer. Los TOKENS no tienen el problema porque llevan prefijo: `--ing-orbita` convive sin
+   ruido con la clase `.orbita` de la portada. */
 html[data-tema="claro"] .chispa,
 html[data-tema="claro"] .dato,
-html[data-tema="claro"] .orbita { display: none; }
+html[data-tema="claro"] .aro { display: none; }
 
 * { box-sizing: border-box; }
 
