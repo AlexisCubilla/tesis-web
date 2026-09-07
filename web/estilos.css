@@ -537,17 +537,28 @@ html[data-tema="claro"] {
   --ing-dato: color-mix(in srgb, var(--acento) 26%, transparent);
 }
 
-/* El satélite del ingreso está dibujado con grises claros, para verse sobre el cielo nocturno.
-   Sobre blanco desaparecería, así que en claro se oscurece con un filtro en vez de mantener un
-   segundo SVG: es una ilustración, no una ficha de la paleta, y duplicarla sería dos dibujos que
-   se desincronizan. */
-html[data-tema="claro"] .sat { filter: brightness(.42) contrast(1.15); }
+/* DE DÍA NO HAY CIELO EN EL INGRESO, y eso se lleva la escena entera: estrellas, puntos de datos,
+   órbitas y satélite. Queda la grilla de seguimiento sobre el papel, y nada más.
 
-/* De día tampoco hay estrellas en el ingreso. Esa pantalla se siembra las suyas en el navegador con
-   `background: var(--texto)`, así que en claro se volvían puntos OSCUROS sobre un lienzo claro: no
-   un cielo, suciedad. `--estrellas-op` apaga el campo global pero no éstas, que son elementos
-   aparte; se apagan acá. Lo que queda es la geometría —los anillos y la grilla—, que sí funciona
-   como trazo gris y sigue siendo la marca del sitio a escala.
+   Empezó por las estrellas, que era un defecto claro: esa pantalla se siembra las suyas en el
+   navegador con `background: var(--texto)`, así que en claro se volvían puntos OSCUROS sobre un
+   lienzo claro —no un cielo, suciedad—. `--estrellas-op` apaga el campo global pero no éstas, que
+   son elementos aparte.
+
+   Los anillos y el satélite se quedaban, con el argumento de que la geometría funciona como trazo
+   gris a cualquier escala. El argumento era cierto pieza por pieza y falso en conjunto: quitadas
+   las estrellas, lo que sobrevive es un satélite dando vueltas sobre papel, sin nada que diga que
+   eso es el espacio. Un CubeSat solo se lee como un CubeSat contra un cielo; sobre blanco es un
+   objeto sin lugar, y el ojo lo lee como una mancha antes que como un dibujo.
+
+   HUBO UN INTENTO DE SALVARLO y conviene dejar por qué no alcanzaba. El satélite se oscurecía con
+   `filter: brightness(.42)`, pero un filtro oscurece todo por igual y por lo tanto PRESERVA el
+   orden de luminosidad cuando sobre papel hay que invertirlo: el panel solar —la pieza pensada para
+   hundirse en el fondo, 1,23:1 contra el cielo— terminaba en #000004 y pasaba a ser lo más marcado
+   de la pantalla con 18,2:1, mientras la baliza caía a 4,85:1, la que menos. Se puede arreglar
+   reflejando la escala en vez de oscurecerla —nueve tokens, uno por pieza— y el dibujo se lee bien.
+   Pero seguía siendo un satélite sin espacio: el problema no era el contraste. Por eso se va, y no
+   se tokeniza.
 
    SE LLAMAN `.chispa` Y NO `.estrella` POR ALGO. Esta regla se escribió primero con `.estrella`, y
    esa clase ya existía: es la ★ de la configuración de la tesis en el mapa de ramas. La regla la
@@ -555,7 +566,8 @@ html[data-tema="claro"] .sat { filter: brightness(.42) contrast(1.15); }
    no un adorno. Dos cosas distintas con el mismo nombre de clase es una colisión que solo se nota
    cuando alguien escribe una regla para una de las dos. */
 html[data-tema="claro"] .chispa,
-html[data-tema="claro"] .dato { display: none; }
+html[data-tema="claro"] .dato,
+html[data-tema="claro"] .orbita { display: none; }
 
 * { box-sizing: border-box; }
 
