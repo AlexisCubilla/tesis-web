@@ -797,18 +797,53 @@ def _mismo_valor(a, b) -> bool:
     return a == b
 
 
+#: El valor por omisión de cada parámetro, por etapa. Ver `_esperado_en_la_tesis`.
+_DEFECTOS: dict[str, dict] = {
+    nombre: {p.nombre: p.defecto for p in etapa.parametros}
+    for nombre, etapa in etapas.REGISTRO.items()
+}
+
+
+def _esperado_en_la_tesis(etapa: str, k: str):
+    """Qué valor tendría este parámetro en la corrida de la tesis.
+
+    `CONFIG_TESIS` sale de `tesis.config.CONFIG` y solo nombra los parámetros que el pipeline de la
+    tesis tiene. El taller agrega perillas propias que allá no existen —hoy `filtrado.descartar`,
+    que apaga el filtrado entero— y para esas el valor esperado es el `defecto` que declara la
+    etapa. Es la misma función que `esperadoOficial` en `app.js`, con el mismo motivo escrito ahí.
+    """
+    ref = ajustes.CONFIG_TESIS.get(etapa, {})
+    if k in ref:
+        return ref[k]
+    return _DEFECTOS.get(etapa, {}).get(k)
+
+
 def _diferencias_con_la_tesis(cadena: list[dict]) -> list[tuple[str, str, object, object]]:
     """Qué parámetros de la rama se apartan de la configuración de referencia.
 
     Es lo mismo que muestra la pantalla de análisis, calculado acá porque el Excel se genera en el
     servidor y tiene que poder decir de dónde salió sin depender del navegador.
+
+    SE RECORRE LA UNIÓN de las claves —las de la referencia y las que el nodo trae— y no solo las
+    primeras. Mirar la intersección deja pasar cualquier parámetro que la tesis no nombre, y eso no
+    es teórico: una rama con `filtrado.descartar=False` apaga el filtrado entero, un paso que la
+    tesis necesita, y esta función respondía «cero diferencias». La hoja de Procedencia del Excel
+    escribía entonces «SÍ — coincide en todos los parámetros» sobre una corrida que salteaba un
+    paso, que es justo el archivo indistinguible del oficial que el ADR A7 quiere evitar.
+
+    `app.js` ya lo hacía bien —`esOficial`, con su comentario— y esta copia del backend se había
+    quedado con la versión vieja. Apareció al calcular la ★ del catálogo: dos ramas salían marcadas
+    como la tesis y el mapa del taller marcaba una.
     """
     dif = []
     for nodo in cadena:
-        ref = ajustes.CONFIG_TESIS.get(nodo["etapa"], {})
-        for k, v in (nodo["parametros"] or {}).items():
-            if k in ref and not _mismo_valor(v, ref[k]):
-                dif.append((nodo["etapa"], k, v, ref[k]))
+        etapa = nodo["etapa"]
+        params = nodo["parametros"] or {}
+        claves = set(ajustes.CONFIG_TESIS.get(etapa, {})) | set(params)
+        for k in sorted(claves):
+            esperado = _esperado_en_la_tesis(etapa, k)
+            if not _mismo_valor(params.get(k), esperado):
+                dif.append((etapa, k, params.get(k), esperado))
     return dif
 
 

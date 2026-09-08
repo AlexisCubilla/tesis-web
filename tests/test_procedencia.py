@@ -64,6 +64,45 @@ def test_detecta_cambios_en_varias_etapas():
     assert {(e, k) for e, k, _v, _r in dif} == {("datos", "limpiar"), ("eventos", "fraccion_candidatos")}
 
 
+def test_una_perilla_que_la_tesis_no_nombra_tambien_cuenta():
+    """El bug que esto fija, y por qué importa.
+
+    `CONFIG_TESIS` sale de `tesis.config.CONFIG` y solo nombra los parámetros que el pipeline de la
+    tesis tiene. El taller agrega perillas propias —hoy `filtrado.descartar`, que apaga el filtrado
+    ENTERO— y la comparación recorría solo las claves de la referencia, así que una rama que saltea
+    un paso que la tesis necesita respondía «cero diferencias».
+
+    Eso no era cosmético: la hoja de Procedencia del Excel escribe «SÍ — coincide en todos los
+    parámetros» a partir de esta cuenta, o sea que producía un archivo indistinguible del oficial
+    sobre una corrida que no lo era, que es exactamente lo que el ADR A7 existe para evitar.
+
+    `app.js` ya lo hacía bien (ver `esOficial`); la copia del backend se había quedado atrás.
+    """
+    dif = _diferencias_con_la_tesis(_cadena(filtrado={"descartar": False}))
+    assert [(e, k) for e, k, _v, _r in dif] == [("filtrado", "descartar")]
+    etapa, k, valor, esperado = dif[0]
+    assert (valor, esperado) == (False, True), "el esperado es el `defecto` que declara la etapa"
+
+
+def test_una_perilla_del_taller_en_su_valor_por_omision_no_es_una_diferencia():
+    """El otro lado: `descartar=True` es lo que la tesis hace, aunque no lo nombre."""
+    assert _diferencias_con_la_tesis(_cadena(filtrado={"descartar": True})) == []
+
+
+def test_un_parametro_que_falta_en_el_nodo_cuenta_como_diferencia():
+    """Recorrer la unión también cubre el caso inverso: la referencia lo nombra y el nodo no.
+
+    Antes se recorrían los parámetros DEL NODO, así que un parámetro ausente simplemente no se
+    miraba. Una rama a la que le falta un ajuste de la tesis no es la rama de la tesis.
+    """
+    cadena = _cadena()
+    for nodo in cadena:
+        if nodo["etapa"] == "ventaneo":
+            nodo["parametros"].pop("tamano_ventana", None)
+    dif = _diferencias_con_la_tesis(cadena)
+    assert ("ventaneo", "tamano_ventana") in [(e, k) for e, k, _v, _r in dif]
+
+
 # ---------------------------------------------------------------- la fecha de cada hoja
 
 def test_la_fecha_de_una_hoja_sale_de_su_nombre():
