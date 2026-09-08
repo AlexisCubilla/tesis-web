@@ -520,9 +520,10 @@ async function borrarSeleccion() {
      ningún documento anunciaba «0 documento(s) …» y prometía que los documentos no se borraban —de
      documentos que no existían—, sin mencionar lo único que estaba realmente en juego.
 
-     Y corren distinta suerte, así que se dice cuál es cuál: el documento queda y se sigue bajando;
-     la clasificación se va con la rama. Un aviso que promete lo mismo para las dos es peor que no
-     avisar, porque quien lo lee decide con una idea equivocada de lo que va a pasar. */
+     Y AHORA LAS DOS SE BORRAN, así que el aviso dice eso y no otra cosa. Durante un tiempo el
+     documento se conservaba huérfano y esta frase lo prometía; era verdad a medias, porque ninguna
+     pantalla listaba documentos sin filtrar por rama y a ese archivo no se podía volver. Prometer
+     una conservación que no se puede usar es peor que avisar que se borra. */
   if (r.bloqueado) {
     const docs = r.detalle.documentos || [];
     const clas = r.detalle.clasificaciones || 0;
@@ -531,19 +532,17 @@ async function borrarSeleccion() {
       partes.push(
         `${docs.length} documento(s) con comentarios del experto:\n` +
         docs.map((d) => `  · ${d.nombre} (v${d.version}, por ${d.ultimo_autor || 'el experto'})`)
-          .join('\n') +
-        `\n\nEsos NO se borran: quedan guardados y se siguen bajando desde su propia pantalla.`);
+          .join('\n'));
     }
     if (clas) {
-      partes.push(
-        `${clas} clasificación(es) de eventos.\n\n` +
-        `Esas SÍ SE BORRAN, junto con la rama: un juicio pertenece a la corrida donde se emitió, ` +
-        `así que sin la rama no hay a qué evento referirlo.` +
+      partes.push(`${clas} clasificación(es) de eventos.` +
         (S.usuario && S.usuario.rol === 'admin'
-          ? `\n\nSi querés verlas antes de decidir, están en el Catálogo.` : ''));
+          ? `\n  Si querés verlas antes de decidir, están en el Catálogo.` : ''));
     }
     const seguir = confirm(
-      `Esta rama tiene trabajo que no se puede recalcular:\n\n${partes.join('\n\n')}\n\n` +
+      `Esta rama tiene trabajo que NO SE PUEDE RECALCULAR ni recuperar después:\n\n` +
+      `${partes.join('\n\n')}\n\n` +
+      `Todo eso se borra junto con la rama. Los pasos se pueden volver a correr; esto no.\n\n` +
       `¿Borrar igual?`);
     if (!seguir) return;
     r = await borrar(S.sel, true);
@@ -553,11 +552,12 @@ async function borrarSeleccion() {
   S.sel = n.padre;
   await recargar();
   if (S.sel) cargarVisual();
-  // Y al terminar, las dos cifras: lo que se conservó y lo que se fue. La segunda también faltaba.
+  // Y al terminar, qué se llevó de trabajo humano. Se dice aunque sea cero: lo que se acaba de
+  // perder no debería quedar solo en el diálogo que ya se cerró.
   const extra = [
-    r.documentos_huerfanos ? `${r.documentos_huerfanos} documento(s) del experto conservados` : '',
-    r.clasificaciones_borradas ? `${r.clasificaciones_borradas} clasificación(es) borradas` : '',
-  ].filter(Boolean).map((t) => ` · ${t}`).join('');
+    r.documentos_borrados ? `${r.documentos_borrados} documento(s) del experto` : '',
+    r.clasificaciones_borradas ? `${r.clasificaciones_borradas} clasificación(es)` : '',
+  ].filter(Boolean).map((t) => ` · ${t} borradas`).join('');
   $('#estado-ejecucion').textContent =
     `Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados${extra}`;
 }

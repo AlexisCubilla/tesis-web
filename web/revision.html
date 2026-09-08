@@ -354,11 +354,6 @@ async function arrancar() {
   pintarComentarios();
   pintarSolapas(doc);
 
-  if (doc.rama_borrada) {
-    aviso('info', '<strong>La rama de este documento se borró.</strong> El archivo se conserva y se '
-      + 'puede seguir descargando; la hoja de Procedencia de adentro dice de dónde salió.');
-  }
-
   let cfg;
   try {
     cfg = await pedir(`api/revision/${encodeURIComponent(DOC)}/editor?autor=Experto`);

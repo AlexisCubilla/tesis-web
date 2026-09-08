@@ -526,23 +526,30 @@ evento**: tiene otro rango, otras ventanas y otra prioridad. Heredarle la respue
 juicio que nadie emitió. El costo asumido es que explorar ramas obliga a reclasificar, y se prefirió
 ese costo antes que un dato que parece un juicio sin serlo.
 
-**Borrar la rama borra sus clasificaciones**, y lo que protege el trabajo es el aviso previo: el
-borrado en cascada se planta con un 409 que dice cuántos documentos del experto y cuántas
-clasificaciones hay en juego, y exige confirmar. Las dos clases corren distinta suerte y el aviso lo
-dice: el documento queda huérfano y se sigue bajando, la clasificación se va.
+**Borrar la rama borra sus clasificaciones**, y también sus documentos del experto: lo de la rama se
+va con la rama, una sola regla. Lo que protege el trabajo es el aviso previo — el borrado en cascada
+se planta con un 409 que dice cuántos documentos editados y cuántas clasificaciones hay en juego, y
+exige confirmar.
 
-*Esta parte del ADR decía lo contrario, y se revirtió.* La fila sobrevivía a su rama, y seis columnas
-copiaban hoja, segmento, rango, tramos y prioridad para que la respuesta siguiera siendo legible sin
-ella. La analogía con `revision.py` no se sostuvo: ahí conservar funciona porque `GET /api/revision`
-lista los documentos sin pasar por el árbol, y acá no existía la puerta equivalente. La única llave
-para volver a una fila era su `nodo` —un hash de 16 caracteres que desaparece del árbol justo al
-borrarlo— y no había listado de huérfanas ni pantalla que las mostrara. El dato se conservaba y era
-inalcanzable salvo abriendo el SQLite a mano; las seis columnas se escribían en cada alta y no las
-leía nadie.
+*Las dos mitades de este ADR decían lo contrario, y las dos se revirtieron por el mismo motivo:
+conservar sirve si después se puede LLEGAR al dato, y no se podía.* Las clasificaciones sobrevivían
+a su rama con seis columnas que copiaban hoja, segmento, rango, tramos y prioridad; los documentos
+sobrevivían marcados con `rama_borrada`. En los dos casos faltaba la puerta: ninguna pantalla lista
+documentos ni clasificaciones sin filtrar por rama, así que a un huérfano solo se llegaba con una URL
+guardada de antes o abriendo el SQLite a mano. Las seis columnas, además, se escribían en cada alta y
+no las leía nadie.
 
-Entre construir la mitad que faltaba o borrar de verdad, se eligió borrar, por coherencia con «por
-rama» de más arriba: si el juicio pertenece a la corrida donde se emitió, sin esa corrida no hay
-juicio que recuperar, hay una opinión sobre un identificador que ya no resuelve a nada. Las seis
+*Y en el documento había un estado a medio camino.* La clave de un nodo es un hash de sus
+parámetros, así que recrear la misma rama daba el mismo `doc_id`: el documento se reconectaba solo
+—eso funcionaba, y el trabajo del experto no se sobrescribía porque `post_revision` no regenera sobre
+una versión editada— pero quedaba con `rama_borrada=1` para siempre, ya que nada devolvía esa columna
+a cero. La pantalla anunciaba «la rama de este documento se borró» sobre una rama viva.
+
+Entre construir las mitades que faltaban o borrar de verdad, se eligió borrar, por coherencia con
+«por rama» de más arriba: si el juicio pertenece a la corrida donde se emitió, sin esa corrida no hay
+juicio que recuperar, hay una opinión sobre un identificador que ya no resuelve a nada. El precio,
+dicho sin vueltas: el trabajo del experto se pierde y es irrepetible; por eso el aviso lo nombra
+pieza por pieza antes de dejar seguir. Las seis
 columnas se quitaron con una migración que corre al arrancar (`clasificacion._migrar`).
 
 **Un revisor puede retirar su propia respuesta.** El evento vuelve a estar sin clasificar, como si

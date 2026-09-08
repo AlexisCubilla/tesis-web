@@ -169,18 +169,21 @@ def delete_nodo(clave: str, forzar: bool = False):
     persona sobre telemetría que nadie etiquetó, no. Y el botón de borrar está en la misma pantalla
     donde se clasifica, así que un clic en el nodo equivocado se llevaría trabajo irrepetible.
 
-    CON `forzar=1` LAS DOS CLASES CORREN DISTINTA SUERTE, y la diferencia no es cuánto valen sino si
-    se las puede volver a encontrar:
+    CON `forzar=1` SE VA TODO: los pasos, sus resultados en disco, las clasificaciones
+    (`clasificacion.borrar_de`) y los documentos del experto (`revision.borrar_de`). Una sola regla
+    —lo de la rama se va con la rama— y el 409 es lo que protege el trabajo.
 
-    - Los **documentos** quedan huérfanos y se siguen bajando (`revision.desvincular`). Funciona
-      porque `GET /api/revision` los lista sin pasar por el árbol: hay una puerta.
-    - Las **clasificaciones se borran** (`clasificacion.borrar_de`). Antes se conservaban, y era una
-      promesa a medias: la única llave para volver a una fila era su `nodo`, un hash que desaparecía
-      del árbol justo al borrarlo, y no había listado de huérfanas. El dato quedaba y era
-      inalcanzable salvo abriendo el SQLite a mano.
+    HUBO UNA ÉPOCA EN QUE LAS DOS CLASES SE CONSERVABAN, y conviene dejar por qué no alcanzaba:
+    conservar sirve si después se puede LLEGAR al dato, y no se podía. Ninguna pantalla lista
+    documentos ni clasificaciones sin filtrar por rama, así que a lo huérfano solo se llegaba con una
+    URL guardada de antes o abriendo el SQLite a mano. Encima la clave del nodo es un hash de sus
+    parámetros: recrear la misma rama daba el mismo `doc_id` y el documento se reconectaba solo, pero
+    con `rama_borrada=1` para siempre —nada devolvía esa columna a cero— así que la pantalla
+    anunciaba «la rama de este documento se borró» sobre una rama viva.
 
-    Por eso lo que protege el trabajo acá es el 409, no la conservación — y el aviso dice cuántas
-    clasificaciones se van, que es lo que antes no decía.
+    Entre construir las dos mitades que faltaban o borrar de verdad, se eligió borrar. El precio,
+    dicho sin vueltas: el trabajo del experto se pierde, y es irrepetible. Por eso el aviso dice
+    cuántos documentos editados y cuántas clasificaciones hay antes de dejar seguir.
     """
     if almacen.obtener(_con, clave) is None:
         raise HTTPException(404, "Nodo inexistente")
@@ -208,10 +211,10 @@ def delete_nodo(clave: str, forzar: bool = False):
             ],
         })
 
-    huerfanos = revision.desvincular(claves) if comentados else 0
+    docs_borrados = revision.borrar_de(claves)
     borradas = clasificacion.borrar_de(claves)
     resultado = almacen.borrar(_con, clave)
-    resultado["documentos_huerfanos"] = huerfanos
+    resultado["documentos_borrados"] = docs_borrados
     resultado["clasificaciones_borradas"] = borradas
     return resultado
 

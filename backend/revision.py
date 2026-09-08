@@ -65,8 +65,7 @@ CREATE TABLE IF NOT EXISTS documentos (
     creado_en     TEXT NOT NULL,
     guardado_en   TEXT,
     ultimo_autor  TEXT,
-    commit_tesis  TEXT,
-    rama_borrada  INTEGER NOT NULL DEFAULT 0
+    commit_tesis  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_documentos_nodo ON documentos(nodo);
 
@@ -104,7 +103,29 @@ def preparar() -> sqlite3.Connection:
         _con.execute("UPDATE documentos SET ficha=? WHERE id=?", (nueva_ficha(), doc_id))
     if faltantes:
         _con.commit()
+    _migrar(_con)
     return _con
+
+
+def _migrar(con: sqlite3.Connection) -> bool:
+    """Quita `rama_borrada` si la base viene de antes. Devuelve si hubo algo que quitar.
+
+    La columna marcaba los documentos cuya rama se había borrado, cuando eso los dejaba huérfanos en
+    vez de borrarlos. Ahora se van con la rama (`borrar_de`), así que nadie la escribe: nace en 0 y
+    se queda en 0, que es la peor clase de columna —parece decir algo y no dice nada—.
+
+    Corre en cada arranque y es idempotente, igual que su gemela en `clasificacion`. `DROP COLUMN`
+    necesita SQLite 3.35 (2021); si la base es más vieja, la columna se queda ahí sin molestar.
+    """
+    hay = {f["name"] for f in con.execute("PRAGMA table_info(documentos)")}
+    if "rama_borrada" not in hay:
+        return False
+    try:
+        con.execute("ALTER TABLE documentos DROP COLUMN rama_borrada")
+        con.commit()
+        return True
+    except sqlite3.OperationalError:
+        return False
 
 
 def nueva_ficha() -> str:
@@ -265,6 +286,46 @@ def olvidar(doc_id: str) -> None:
         con.commit()
 
 
+def borrar_de(claves: list[str]) -> int:
+    """Borra los documentos de esas ramas —archivos, versiones y filas—. Devuelve cuántos se fueron.
+
+    LA DIFERENCIA CON `olvidar` ES QUIÉN DECIDE. `olvidar` se niega a tocar un documento editado y
+    está bien que lo haga: la llama `post_revision` al regenerar un entregable, donde nadie pidió
+    perder nada. Acá la rama entera se va por decisión de una persona, con el 409 de `delete_nodo`
+    de por medio, así que se lleva también lo editado.
+
+    SE BORRABA A MEDIAS Y ESO ERA PEOR. Antes estos documentos sobrevivían marcados con
+    `rama_borrada`, y en el papel era la opción generosa; en los hechos no había pantalla que
+    listara documentos sin filtrar por rama, así que a un huérfano solo se llegaba con su URL
+    guardada de antes. Se conservaba un archivo al que nadie podía volver.
+
+    Y con la clave del nodo siendo un hash de sus parámetros, recrear la misma rama daba el mismo
+    `doc_id`: el documento se reconectaba solo —eso funcionaba— pero quedaba con `rama_borrada=1`
+    para siempre, porque nada devolvía esa columna a cero. La pantalla anunciaba «la rama de este
+    documento se borró» sobre una rama viva.
+
+    Entre arreglar esas dos mitades o borrar de verdad, se eligió borrar, por lo mismo que las
+    clasificaciones: una sola regla —lo de la rama se va con la rama— en vez de dos con excepciones.
+    Lo que protege el trabajo es el aviso previo, que dice cuántos documentos editados hay.
+    """
+    if not claves:
+        return 0
+    marcas = ",".join("?" * len(claves))
+    con = conexion()
+    ids = [f["id"] for f in con.execute(
+        f"SELECT id FROM documentos WHERE nodo IN ({marcas})", claves)]
+    if not ids:
+        return 0
+    with _lock:
+        for doc_id in ids:
+            shutil.rmtree(_carpeta(doc_id), ignore_errors=True)
+        huecos = ",".join("?" * len(ids))
+        con.execute(f"DELETE FROM versiones WHERE documento IN ({huecos})", ids)
+        con.execute(f"DELETE FROM documentos WHERE id IN ({huecos})", ids)
+        con.commit()
+    return len(ids)
+
+
 def versiones(doc_id: str) -> list[dict]:
     filas = conexion().execute(
         "SELECT version, autor, guardado_en, bytes FROM versiones WHERE documento=? "
@@ -305,25 +366,6 @@ def con_trabajo_del_experto(claves: list[str]) -> list[dict]:
         claves,
     ).fetchall()
     return [dict(f) for f in filas]
-
-
-def desvincular(claves: list[str]) -> int:
-    """Marca los documentos de esas ramas como huérfanos, en vez de borrarlos con la rama.
-
-    Se usa cuando alguien borra igual una rama comentada: la rama se va, el archivo del experto se
-    queda. Un documento huérfano ya no se puede abrir contra su rama —no hay contra qué compararlo—
-    pero se sigue pudiendo descargar, y la hoja de Procedencia de adentro dice de dónde salió.
-    """
-    if not claves:
-        return 0
-    marcas = ",".join("?" * len(claves))
-    con = conexion()
-    with _lock:
-        cur = con.execute(
-            f"UPDATE documentos SET rama_borrada=1 WHERE nodo IN ({marcas})", claves
-        )
-        con.commit()
-    return cur.rowcount
 
 
 # --------------------------------------------------------------------------------------
