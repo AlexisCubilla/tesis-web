@@ -1150,14 +1150,6 @@ th.ordenable.num button { justify-content: flex-end; }
 .encuesta textarea:focus { outline: none; border-color: var(--borde-fuerte); }
 .encuesta .pie { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 
-/* «Retirar» va a la derecha, con los botones de guardar y cerrar al otro lado del espaciador: es la
-   acción menos frecuente del diálogo y la única que quita algo, así que no comparte vecindario con
-   la que se toca cuarenta veces seguidas. Peso de `.boton.plano`, sin recuadro, por lo mismo.
-
-   EL AIRE EXTRA NO ES ESTÉTICO. Al lado queda el «Respondido el …», que es texto tenue del mismo
-   tono y del mismo cuerpo que este botón; con el `gap` de 10 px los dos se leían como una sola
-   frase gris y el botón dejaba de parecer apretable. */
-.encuesta .pie #retirar-clas { margin-right: 8px; }
 
 /* Marca de «ya lo clasifiqué» en la tabla de eventos. La ETIQUETA es texto y no un ícono de color:
    la respuesta tiene cinco valores y un semáforo de cinco tonos obligaría a recordar qué significa

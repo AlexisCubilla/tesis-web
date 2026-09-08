@@ -1800,16 +1800,39 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
     dlg.remove();
     _dlgEvento = null;
   };
-  const cerrar = () => { guardarBorrador(); dlg.close(); limpiar(); };
+  /* SALIR ES EL ÚLTIMO MOMENTO PARA GUARDAR, y hay cuatro formas de salir: la ✕, un clic en el
+     fondo, Escape y el `close` del propio diálogo. Sin botón de guardar, cualquiera de las cuatro
+     puede llevarse una frase escrita hace medio segundo, así que las cuatro pasan por acá.
+
+     `asegurar` va sin `await`: los valores del formulario se leen sincrónicamente al entrar a
+     `guardar`, antes de su primer `await`, así que la petición sale con lo que había en pantalla
+     aunque el diálogo se cierre en el mismo cuadro. Y `guardarBorrador` queda como red: si la
+     petición falla, el texto sigue en memoria y reaparece con «Sin guardar».
+
+     Escape merece la mención aparte: dispara `cancel` y NO pasaba por `cerrar`, así que antes de
+     esto era la única salida que no guardaba ni el borrador. */
+  let asegurado = false;
+  const asegurar = () => {
+    if (asegurado) return;
+    asegurado = true;
+    if (guardarAlSalir) guardarAlSalir({ silencioso: true });
+    guardarBorrador();
+  };
+  const cerrar = () => { asegurar(); dlg.close(); limpiar(); };
   dlg.addEventListener('click', (e) => { if (e.target === dlg) cerrar(); });
-  dlg.addEventListener('close', limpiar);
-  dlg.addEventListener('cancel', limpiar);   // Escape
+  dlg.addEventListener('close', () => { asegurar(); limpiar(); });
+  dlg.addEventListener('cancel', () => { asegurar(); limpiar(); });   // Escape
   dlg.showModal();
 
   /* El diálogo se abre UNA vez y después solo se repinta por dentro. Cerrarlo y volver a abrirlo en
      cada «siguiente» perdería el foco, haría parpadear el fondo y volvería a animar la apertura
      cuarenta veces en una sesión de revisión. */
   let actual = id;
+
+  /* `pintar()` crea el formulario de cada evento y con él su propia función de guardar; esto la
+     deja al alcance de `irA` y `cerrar`, que viven afuera y tienen que poder asegurar lo escrito
+     antes de irse. Sin botón de guardar, salir del evento ES el momento de guardar. */
+  let guardarAlSalir = null;
 
   /** Guarda en memoria lo que haya en el formulario, si difiere de lo ya registrado. */
   function guardarBorrador() {
@@ -1827,7 +1850,9 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
 
   async function irA(otro) {
     if (otro == null || otro === actual) return;
+    if (guardarAlSalir) await guardarAlSalir({ silencioso: true });
     guardarBorrador();
+    asegurado = false;   // el evento siguiente tiene su propia salida que asegurar
     Grafico.limpiar(dlg);
     dlg.querySelector('.cuerpo').innerHTML =
       '<p class="tenue" style="font-size:.85rem">Cargando…</p>';
@@ -1900,13 +1925,14 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
             ${puesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
         <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
           maxlength="4000">${esc(comentario)}</textarea>
+        <!-- SIN BOTONES. Guardar, cerrar y seguir ya estaban en otra parte: la respuesta se
+             guarda al elegirla, la ✕ del encabezado cierra —y Escape—, y para moverse hay dos
+             flechas ahí arriba más las del teclado. Tres botones que repiten lo que la pantalla
+             ya sabe hacer solo suman lugares donde mirar.
+
+             Lo que queda es el estado, y ahora es la ÚNICA señal de que algo se guardó, así que
+             dice qué pasó y cuándo. -->
         <div class="pie">
-          <button class="boton primario" type="submit" id="guardar-clas">${
-            siguiente !== null ? 'Guardar y seguir' : (mia ? 'Actualizar respuesta' : 'Guardar respuesta')}</button>
-          <button class="boton" type="button" id="cancelar-clas">Cerrar</button>
-          <span class="esp"></span>
-          ${mia ? `<button class="boton plano" type="button" id="retirar-clas"
-            title="Deja el evento sin clasificar, como si nunca lo hubieras respondido">Retirar</button>` : ''}
           <span class="tenue" style="font-size:.78rem" id="estado-clas">${
             borrador ? 'Sin guardar'
             : mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
@@ -1915,37 +1941,81 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       </form>`;
 
     dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
-    dlg.querySelector('#cancelar-clas').addEventListener('click', cerrar);
 
-    /* RETIRAR. Solo aparece si hay una respuesta guardada: sobre un evento sin clasificar el botón
-       no tendría nada que hacer, y uno gris invitaría a preguntarse qué falta.
+    /* UN CLIC EN LA OPCIÓN YA MARCADA RETIRA LA RESPUESTA. Un `radio` no se desmarca solo: una
+       vez elegido, la única forma de cambiarlo es elegir otro, y no hay ninguna de volver a «no
+       contesté». Eso está bien donde algo hay que responder, y acá justamente no: la escala no
+       tiene opción premarcada para poder distinguir «dijo neutral» de «no contestó» (ADR A17), así
+       que la interfaz tiene que dejar volver a ese segundo estado.
 
-       No pide confirmación. Es reversible en un clic —la escala queda ahí, volver a elegir y
-       guardar—, y un diálogo encima de otro diálogo para deshacer algo deshacible cuesta más de lo
-       que protege. Lo que sí hace es DESMARCAR la escala, para que la pantalla no siga mostrando
-       una respuesta que ya no está en la base. */
-    const bRetirar = dlg.querySelector('#retirar-clas');
-    if (bRetirar) bRetirar.addEventListener('click', async () => {
-      const estado = dlg.querySelector('#estado-clas');
-      bRetirar.disabled = true;
-      estado.textContent = 'Retirando…';
-      try {
-        await api(`api/nodo/${clave}/evento/${id}/clasificacion`, { method: 'DELETE' });
-        delete C.mias[String(id)];
+       Y DESMARCAR RETIRA DE UNA, sin pasar por otro botón. Hubo una versión con un «Retirar» en el
+       pie, y desmarcar solo limpiaba la pantalla: eran dos gestos para una intención, y encima
+       dejaban un estado que había que explicar con una frase —«sin marcar acá, pero guardado
+       allá»—. «Sin marcar» y «sin clasificar» son lo mismo, así que la interfaz los trata igual.
+
+       No pide confirmación porque es reversible en un clic: la escala sigue ahí, se vuelve a
+       elegir y se guarda.
+
+       `marcado` recuerda qué estaba elegido ANTES de este clic, porque cuando el manejador corre el
+       navegador ya puso `checked = true`: sin esa memoria no hay forma de saber si el clic fue para
+       elegir algo nuevo o para insistir sobre lo mismo.
+
+       SE ESCUCHA EN CADA INPUT y no delegado en `.escala`: un clic en el texto de un `<label>`
+       genera además un clic sintético en su input, así que un manejador en el contenedor recibiría
+       los dos y el toggle se cancelaría solo. */
+    let marcado = (dlg.querySelector('input[name="respuesta"]:checked') || {}).value || null;
+    let retirando = false;
+    for (const radio of dlg.querySelectorAll('input[name="respuesta"]')) {
+      radio.addEventListener('click', async (e) => {
+        const estado = dlg.querySelector('#estado-clas');
+        if (radio.value !== marcado) {
+          marcado = radio.value;
+          /* ELEGIR CON EL RATÓN SUELTA EL FOCO, y no es un detalle. Con el foco dentro del grupo de
+             radios, las flechas del teclado cambian la opción —es el comportamiento nativo, y el
+             manejador de navegación las ignora ahí justamente para no pisarlo—. Eso era inocuo
+             mientras nada se guardaba hasta apretar un botón; con guardado automático, alguien que
+             acaba de marcar con el ratón y toca la flecha para pasar al evento siguiente
+             sobrescribe su respuesta sin querer, y la petición sale antes de que se dé cuenta.
+
+             `e.detail > 0` distingue el clic del ratón del que sintetiza el teclado: quien llegó
+             acá con Tab y flechas conserva el foco, que es lo que necesita para seguir usándolas. */
+          if (e.detail > 0) radio.blur();
+          await guardar();     // elegir ES guardar: no hay botón que lo confirme después
+          return;
+        }
+
+        radio.checked = false;
+        marcado = null;
         BORRADORES.delete(id);
-        refrescarMarca(id);
-        pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
-        for (const r of dlg.querySelectorAll('input[name="respuesta"]')) r.checked = false;
-        dlg.querySelector('#comentario').value = '';
-        bRetirar.remove();
-        dlg.querySelector('#guardar-clas').textContent =
-          siguiente !== null ? 'Guardar y seguir' : 'Guardar respuesta';
-        estado.textContent = 'Retirada: el evento quedó sin clasificar.';
-      } catch (err) {
-        estado.textContent = `No se pudo retirar: ${err.message}`;
-        bRetirar.disabled = false;
-      }
-    });
+
+        // Sin nada guardado no hay a qué mandar un DELETE: el evento nunca se contestó y el clic
+        // solo deshizo una marca que todavía no había salido del navegador.
+        if (!miRespuesta(id)) {
+          if (estado) estado.textContent = 'Sin marcar.';
+          return;
+        }
+        if (retirando) return;
+        retirando = true;
+        if (estado) estado.textContent = 'Retirando…';
+        try {
+          await api(`api/nodo/${clave}/evento/${id}/clasificacion`, { method: 'DELETE' });
+          delete C.mias[String(id)];
+          refrescarMarca(id);
+          pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
+          dlg.querySelector('#comentario').value = '';
+          if (estado) estado.textContent = 'Retirada: el evento quedó sin clasificar.';
+        } catch (err) {
+          // Se vuelve a marcar: la pantalla no puede quedar diciendo que no hay respuesta cuando en
+          // la base sigue habiendo una.
+          radio.checked = true;
+          marcado = radio.value;
+          if (estado) estado.textContent = `No se pudo retirar: ${err.message}`;
+        } finally {
+          retirando = false;
+        }
+      });
+    }
+
     const bAnt = dlg.querySelector('#ev-anterior');
     const bSig = dlg.querySelector('#ev-siguiente');
     if (bAnt) bAnt.addEventListener('click', () => irA(anterior));
@@ -1966,35 +2036,70 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
        gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
        gráfico cubre cualquier cambio posterior. */
 
-    dlg.querySelector('#form-clas').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    /* Guardar es una función y no el submit de un botón, porque ahora la dispara cualquiera de
+       tres cosas: elegir una opción, dejar de escribir el comentario, o irse del evento. Devuelve
+       si quedó todo guardado, para que quien se va sepa si perdió algo. */
+    async function guardar({ silencioso = false } = {}) {
       const elegida = dlg.querySelector('input[name="respuesta"]:checked');
+      const caja = dlg.querySelector('#comentario');
       const estado = dlg.querySelector('#estado-clas');
-      if (!elegida) { estado.textContent = 'Elegí una de las cinco opciones.'; return; }
-      const boton = dlg.querySelector('#guardar-clas');
-      boton.disabled = true;
-      estado.textContent = 'Guardando…';
+      if (!elegida || !caja) return true;
+
+      const ya = miRespuesta(id);
+      const texto = caja.value;
+      if (ya && ya.respuesta === elegida.value && (ya.comentario || '') === texto) {
+        return true;    // nada cambió: no se molesta al servidor ni se parpadea el estado
+      }
+      if (!silencioso && estado) estado.textContent = 'Guardando…';
       try {
         const guardada = await api(`api/nodo/${clave}/evento/${id}/clasificacion`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            respuesta: elegida.value,
-            comentario: dlg.querySelector('#comentario').value,
-          }),
+          body: JSON.stringify({ respuesta: elegida.value, comentario: texto }),
         });
         C.mias[String(id)] = guardada;
         BORRADORES.delete(id);
         refrescarMarca(id);
         pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
-        // Guardar el último evento cierra, como antes. En cualquier otro, seguir de largo: es lo
-        // que uno va a querer cuarenta veces seguidas, y volver es una flecha.
-        if (siguiente !== null) irA(siguiente); else cerrar();
+        if (!silencioso && estado) {
+          estado.textContent = `Guardado ${new Date(guardada.actualizado_en)
+            .toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`;
+        }
+        return true;
       } catch (err) {
-        estado.textContent = `No se pudo guardar: ${err.message}`;
-        boton.disabled = false;
+        /* Falló: el texto se queda en BORRADORES —lo puso `guardarBorrador`— así que al volver al
+           evento reaparece con «Sin guardar». Es la red que hace tolerable que no haya botón. */
+        guardarBorrador();
+        if (estado) estado.textContent = `No se pudo guardar: ${err.message}`;
+        return false;
       }
-    });
+    }
+    guardarAlSalir = guardar;
+
+    /* EL COMENTARIO SE GUARDA SOLO, un segundo después de la última tecla. Con un botón esto no
+       hacía falta; sin él, cada palabra escrita es trabajo que hay que asegurar sin pedir un gesto.
+       El segundo es a propósito: más corto manda una petición por palabra, más largo hace que
+       cerrar rápido pierda la última frase. Y además se guarda al salir del campo y al irse del
+       evento, que son los dos momentos en que la espera ya no importa.
+
+       SOLO SI HAY UNA OPCIÓN ELEGIDA. La API pide respuesta y comentario juntos, así que un texto
+       sin respuesta no tiene dónde ir: queda en el borrador en memoria, y el estado lo dice. */
+    const caja = dlg.querySelector('#comentario');
+    if (caja) {
+      let reloj = null;
+      caja.addEventListener('input', () => {
+        const estado = dlg.querySelector('#estado-clas');
+        clearTimeout(reloj);
+        if (!dlg.querySelector('input[name="respuesta"]:checked')) {
+          guardarBorrador();
+          if (estado) estado.textContent = 'Elegí una opción para guardar el comentario.';
+          return;
+        }
+        if (estado) estado.textContent = 'Sin guardar…';
+        reloj = setTimeout(guardar, 1000);
+      });
+      caja.addEventListener('blur', () => { clearTimeout(reloj); guardar(); });
+    }
   }
 }
 
