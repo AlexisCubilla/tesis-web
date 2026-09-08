@@ -58,6 +58,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   .est.acuerdo { background: var(--chip-ok-b); color: var(--chip-ok-t); }
   .est.desacuerdo { background: var(--chip-err-b); color: var(--chip-err-t); }
   .est.solo { color: var(--texto-3); padding-left: 0; }
+  .est.nota { color: var(--texto-3); padding-left: 0; font-style: italic; }
 
   .voto { display: inline-block; margin-right: 9px; white-space: nowrap; }
   .voto b { font-weight: 600; }
@@ -65,6 +66,8 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   .voto.pos b { color: var(--ok); }
   .voto.neg b { color: var(--peligro); }
   .voto.cero b { color: var(--texto-2); }
+  /* Una nota sin decisión: en cursiva y apagada, porque no es una respuesta a la pregunta. */
+  .voto.nota b { color: var(--texto-3); font-style: italic; font-weight: 400; }
   .com { display: block; color: var(--texto-2); font-size: .78rem; margin-top: 3px;
     padding-left: 2px; border-left: 2px solid var(--borde); padding-left: 7px; }
 
@@ -128,8 +131,9 @@ let ESCALA = [];
 const etiqueta = (cod) => (ESCALA.find((o) => o.codigo === cod) || {}).etiqueta || cod;
 
 /** El signo de una respuesta, para colorear el voto. Ver `_acuerdo` en el backend: lo que importa
- *  es de qué lado cae, no con cuánta convicción. */
+ *  es de qué lado cae, no con cuánta convicción. `null` es una nota sin decisión: no tiene lado. */
 function signo(valor) {
+  if (valor == null) return 'nota';
   return valor > 0 ? 'pos' : valor < 0 ? 'neg' : 'cero';
 }
 
@@ -143,9 +147,10 @@ function pintarCifras(g) {
     : `${Math.round(g.coincidencia * 100)}%`;
   return `<div class="cifras">
     ${cifra(g.juicios, `decisi${g.juicios === 1 ? 'ón' : 'ones'} cargada${g.juicios === 1 ? '' : 's'}`,
-            g.eventos_totales
+            (g.eventos_totales
               ? `sobre ${g.eventos} de los ${g.eventos_totales} eventos que hay`
-              : `sobre ${g.eventos} evento${g.eventos === 1 ? '' : 's'}`)}
+              : `sobre ${g.eventos} evento${g.eventos === 1 ? '' : 's'}`)
+            + (g.notas ? ` · y ${g.notas} nota${g.notas === 1 ? '' : 's'} sin decidir` : ''))}
     ${cifra(coincidencia, 'coincidencia', g.comparables
               ? `en ${g.comparables === 1 ? 'el único evento' : `los ${g.comparables} eventos`} que miró más de uno`
               : 'ningún evento lo miró más de una persona')}
@@ -172,7 +177,8 @@ function pintarRevisores(porRevisor) {
         .filter(([, v]) => v > 0);
       return `<div class="cifra">
         <div class="n" style="font-size:1.05rem">${esc(n)}</div>
-        <div class="r">${d.n} decisi${d.n === 1 ? 'ón' : 'ones'}</div>
+        <div class="r">${d.n} decisi${d.n === 1 ? 'ón' : 'ones'}${
+          d.notas ? ` · ${d.notas} nota${d.notas === 1 ? '' : 's'}` : ''}</div>
         <div class="barrita">${partes.map(([cod, v]) =>
           `<span style="flex:${v};background:${tono[cod] || 'var(--texto-3)'}"
                  title="${esc(etiqueta(cod))}: ${v}"></span>`).join('')}</div>
@@ -203,6 +209,7 @@ function pintarRama(r) {
   if (r.cuenta.acuerdo) partes.push(`${r.cuenta.acuerdo} en acuerdo`);
   if (r.cuenta.desacuerdo) partes.push(`${r.cuenta.desacuerdo} en desacuerdo`);
   if (r.cuenta.un_solo_juicio) partes.push(`${r.cuenta.un_solo_juicio} con una sola decisión`);
+  if (r.cuenta.solo_notas) partes.push(`${r.cuenta.solo_notas} con nota sin decidir`);
 
   /* UNA RAMA SIN NINGÚN JUICIO SE MUESTRA IGUAL, y es la mitad del sentido de esta pantalla: decir
      dónde falta trabajo. Va sin flecha de desplegar —no hay nada adentro que ver— y con el aire
@@ -240,10 +247,13 @@ function pintarRama(r) {
           <td class="num">${e.sin_contexto ? '—' : e.n_ventanas}</td>
           <td>${e.estado
             ? `<span class="est ${e.estado}">${e.estado}</span>`
-            : '<span class="est solo">una sola decisión</span>'}</td>
+            : (e.respuestas.some((v) => v.respuesta)
+              ? '<span class="est solo">una sola decisión</span>'
+              : '<span class="est nota">solo notas</span>')}</td>
           <td>${e.respuestas.map((v) => `
             <span class="voto ${signo(v.valor)}">
-              <span class="q">${esc(v.usuario)}:</span> <b>${esc(etiqueta(v.respuesta))}</b>
+              <span class="q">${esc(v.usuario)}:</span> <b>${
+                v.respuesta ? esc(etiqueta(v.respuesta)) : 'sin decidir'}</b>
             </span>${v.comentario ? `<span class="com">${esc(v.comentario)}</span>` : ''}`).join('')}
           </td>
         </tr>`).join('')}

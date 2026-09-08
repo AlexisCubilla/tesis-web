@@ -1167,7 +1167,8 @@ const etiquetaEscala = (codigo) => (C.escala.find((o) => o.codigo === codigo) ||
  */
 function tonoDeRespuesta(id) {
   const mia = miRespuesta(id);
-  if (!mia) return null;
+  // Una nota sin decisión no tiñe la fila: el tinte dice qué se respondió, y ahí no se respondió.
+  if (!mia || !mia.respuesta) return null;
   const valor = (C.escala.find((o) => o.codigo === mia.respuesta) || {}).valor;
   return valor > 0 ? 'si' : valor < 0 ? 'no' : 'neutral';
 }
@@ -1251,7 +1252,9 @@ const COLUMNAS_ORDENABLES = {
 
 function valorDeJuicio(id) {
   const mia = miRespuesta(id);
-  if (!mia) return null;
+  // `null` también para una nota sin decisión: al ordenar va junto a lo sin contestar, que es lo
+  // que es. Un cero la pondría entre los «neutral», que sí son una respuesta.
+  if (!mia || !mia.respuesta) return null;
   const o = (C.escala || []).find((x) => x.codigo === mia.respuesta);
   return o ? o.valor : 0;
 }
@@ -1384,19 +1387,37 @@ function verEventos(d) {
 }
 
 /** La celda «mi juicio» de una fila: la respuesta si la hay, o un guion si falta. */
+/** La celda «mi decisión»: la respuesta, o «sin clasificar» con un ✎ si hay una nota.
+ *
+ *  TRES ESTADOS Y NO DOS. Un evento puede estar decidido, sin tocar, o con una nota y sin decisión
+ *  —alguien lo miró, escribió algo y no se pronunció—. El tercero se lee como los sin clasificar
+ *  porque eso es lo que le falta, pero el ✎ dice que hay trabajo empezado; sin esa marca, la única
+ *  forma de encontrar la nota sería abrir los cuarenta eventos de a uno.
+ */
 function marcaClasificacion(id) {
   const mia = miRespuesta(id);
-  return mia
-    ? `<span class="marca-clas si" title="${mia.comentario ? 'Con comentario' : 'Sin comentario'}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>`
-    : '<span class="marca-clas pendiente">sin clasificar</span>';
+  if (mia && mia.respuesta) {
+    return `<span class="marca-clas si" title="${mia.comentario ? 'Con comentario' : 'Sin comentario'}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>`;
+  }
+  if (mia && mia.comentario) {
+    return '<span class="marca-clas pendiente" title="Con una nota, sin decisión">sin clasificar ✎</span>';
+  }
+  return '<span class="marca-clas pendiente">sin clasificar</span>';
 }
 
 /** «12 de 40 clasificados» arriba de la tabla: lo primero que hace falta al volver a una sesión. */
 function pintarAvanceClasificacion(total) {
   const caja = $('#avance-clas');
   if (!caja) return;
-  const hechos = Object.keys(C.mias).length;
-  caja.textContent = hechos ? `${hechos} de ${total} clasificados por vos ·` : '';
+  // Cuenta DECISIONES. Una nota sin decisión es trabajo empezado, no un evento clasificado, así
+  // que va aparte: sumarla haría que el avance dijera que hay más juzgado de lo que hay.
+  const mias = Object.values(C.mias);
+  const hechos = mias.filter((m) => m.respuesta).length;
+  const notas = mias.length - hechos;
+  const partes = [];
+  if (hechos) partes.push(`${hechos} de ${total} clasificados por vos`);
+  if (notas) partes.push(`${notas} con nota sin decidir`);
+  caja.textContent = partes.length ? `${partes.join(' · ')} ·` : '';
 }
 
 /** Repinta una fila después de guardar —su celda y su tinte—, sin rehacer la tabla entera. */
@@ -1944,7 +1965,10 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         <div class="pie">
           <span class="tenue" style="font-size:.78rem" id="estado-clas">${
             borrador ? 'Sin guardar'
-            : mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
+            /* «Respondido» solo si hay respuesta. Una nota sin decisión no es una respuesta, y
+               decirle así haría creer que el evento ya quedó juzgado. */
+            : mia ? `${mia.respuesta ? 'Respondido' : 'Nota guardada'} el ${
+                      new Date(mia.actualizado_en).toLocaleString('es',
                       { dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
         </div>
       </form>`}`;
@@ -2011,8 +2035,15 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
           delete C.mias[String(id)];
           refrescarMarca(id);
           pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
-          dlg.querySelector('#comentario').value = '';
-          if (estado) estado.textContent = 'Retirada: el evento quedó sin clasificar.';
+          /* El comentario NO se borra: si había texto, queda como nota sin decisión. Retirar es
+             quitar el juicio, no tirar lo que la persona escribió; y ahora hay dónde guardarlo. */
+          const nota = dlg.querySelector('#comentario').value.trim();
+          if (estado) {
+            estado.textContent = nota
+              ? 'Decisión retirada. El comentario queda como nota.'
+              : 'Retirada: el evento quedó sin clasificar.';
+          }
+          if (nota) await guardar({ silencioso: true });
         } catch (err) {
           // Se vuelve a marcar: la pantalla no puede quedar diciendo que no hay respuesta cuando en
           // la base sigue habiendo una.
@@ -2059,11 +2090,17 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       const elegida = dlg.querySelector('input[name="respuesta"]:checked');
       const caja = dlg.querySelector('#comentario');
       const estado = dlg.querySelector('#estado-clas');
-      if (!elegida || !caja) return true;
+      if (!caja) return true;
+
+      const respuesta = elegida ? elegida.value : null;
+      const texto = caja.value;
+      /* SIN DECISIÓN Y SIN TEXTO no hay nada que registrar. El backend rechaza esa fila —no sería
+         el registro de nada— así que acá se sale antes en vez de provocar un error que la persona
+         no causó: pasa cada vez que se abre un evento nuevo y no se toca nada. */
+      if (!respuesta && !texto.trim()) return true;
 
       const ya = miRespuesta(id);
-      const texto = caja.value;
-      if (ya && ya.respuesta === elegida.value && (ya.comentario || '') === texto) {
+      if (ya && (ya.respuesta || null) === respuesta && (ya.comentario || '') === texto) {
         return true;    // nada cambió: no se molesta al servidor ni se parpadea el estado
       }
       if (!silencioso && estado) estado.textContent = 'Guardando…';
@@ -2071,7 +2108,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         const guardada = await api(`api/nodo/${clave}/evento/${id}/clasificacion`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ respuesta: elegida.value, comentario: texto }),
+          body: JSON.stringify({ respuesta, comentario: texto }),
         });
         C.mias[String(id)] = guardada;
         BORRADORES.delete(id);
@@ -2098,19 +2135,16 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
        cerrar rápido pierda la última frase. Y además se guarda al salir del campo y al irse del
        evento, que son los dos momentos en que la espera ya no importa.
 
-       SOLO SI HAY UNA OPCIÓN ELEGIDA. La API pide respuesta y comentario juntos, así que un texto
-       sin respuesta no tiene dónde ir: queda en el borrador en memoria, y el estado lo dice. */
+       TAMBIÉN SIN OPCIÓN ELEGIDA. Un comentario sin decisión es una nota —«esto conviene verlo con
+       alguien»— y se guarda como tal: la fila queda con `respuesta` en NULL. Antes la API pedía las
+       dos cosas juntas, así que ese texto vivía en un borrador en memoria y se perdía al recargar
+       la página, que es lo que se venía a arreglar. */
     const caja = dlg.querySelector('#comentario');
     if (caja) {
       let reloj = null;
       caja.addEventListener('input', () => {
         const estado = dlg.querySelector('#estado-clas');
         clearTimeout(reloj);
-        if (!dlg.querySelector('input[name="respuesta"]:checked')) {
-          guardarBorrador();
-          if (estado) estado.textContent = 'Elegí una opción para guardar el comentario.';
-          return;
-        }
         if (estado) estado.textContent = 'Sin guardar…';
         reloj = setTimeout(guardar, 1000);
       });

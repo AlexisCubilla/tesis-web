@@ -568,6 +568,27 @@ colateral que no debe llevárselo.
 defecto se convierte en la respuesta de quien duda, y el reporte no podría distinguir «dijo neutral»
 de «no contestó».
 
+**Y una nota puede existir sin decisión.** `respuesta` admite NULL: una fila con comentario y sin
+juicio es alguien que miró el evento, anotó «esto conviene verlo con Elias» y no se pronunció. Antes
+la API pedía las dos cosas juntas, así que ese texto vivía en un borrador del navegador y se perdía
+en la primera recarga — trabajo humano tirado por una restricción del formulario.
+
+*Una nota no es una decisión, y la separación se sostiene en cada cuenta.* `resumen_nodo` la deja
+fuera del reparto y la cuenta aparte; el avance de la tabla dice «3 de 40 clasificados · 1 con nota
+sin decidir»; `_acuerdo` la ignora, porque una fila que no dice si el evento es anómalo no puede
+coincidir ni discrepar con nadie —contarla como cero la volvería un «neutral» que su autor no
+eligió—. La única cuenta que sí las incluye es `cuantas_en`, la del aviso al borrar una rama: ahí la
+pregunta no es «cuánto se juzgó» sino «cuánto se pierde», y una nota es texto que se va.
+
+En la tabla hay entonces tres estados y no dos: decidido, sin tocar, y «sin clasificar ✎». El tercero
+se lee como los sin clasificar porque eso es lo que le falta, pero el ✎ dice que hay trabajo
+empezado; sin esa marca, encontrar la nota obligaría a abrir los cuarenta eventos de a uno.
+
+Retirar una decisión con el comentario escrito deja la nota en pie: retirar es quitar el juicio, no
+tirar lo que la persona escribió. Cambiar el esquema costó recrear la tabla —SQLite no sabe quitar un
+`NOT NULL` con `ALTER`— y esa migración corre al arrancar, dentro de una transacción y recreando los
+índices.
+
 **Por qué la encuesta no reemplaza a la planilla de `revision.py`.** Son dos preguntas distintas. La
 planilla no encajona al experto porque la taxonomía de la Etapa 2 es lo que él tiene que producir; la
 encuesta hace la pregunta previa —¿esto es una anomalía?— que sí tiene respuesta cerrada y que hace

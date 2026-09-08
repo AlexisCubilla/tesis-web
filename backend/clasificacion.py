@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS clasificaciones (
     nodo          TEXT NOT NULL,
     event_id      INTEGER NOT NULL,
     usuario       TEXT NOT NULL,
-    respuesta     TEXT NOT NULL,
+    respuesta     TEXT,
     comentario    TEXT NOT NULL DEFAULT '',
     creado_en     TEXT NOT NULL,
     actualizado_en TEXT NOT NULL,
@@ -126,6 +126,50 @@ def _migrar(con: sqlite3.Connection) -> list[str]:
     return quitadas
 
 
+def _migrar_respuesta_opcional(con: sqlite3.Connection) -> bool:
+    """Deja `respuesta` admitir NULL, si la base viene de cuando era obligatoria.
+
+    UNA NOTA SIN DECISIÓN es una fila con comentario y sin respuesta: «no sé qué decir todavía, pero
+    esto conviene mirarlo con alguien». Antes eso no tenía dónde ir —la API pedía las dos cosas
+    juntas— así que el texto quedaba en un borrador en memoria y se perdía al recargar la página.
+
+    SQLITE NO SABE QUITAR UN `NOT NULL`. `ALTER TABLE` puede agregar y borrar columnas, no cambiarles
+    las restricciones, así que la única forma es recrear la tabla y copiar las filas. Se hace dentro
+    de una transacción: si algo sale mal a mitad de camino, la base queda como estaba en vez de a
+    medio migrar. Y se recrean los índices, que se van con la tabla vieja.
+
+    Idempotente: pregunta por el `notnull` de la columna antes de tocar nada.
+    """
+    fila = next((f for f in con.execute("PRAGMA table_info(clasificaciones)")
+                 if f["name"] == "respuesta"), None)
+    if fila is None or not fila["notnull"]:
+        return False
+    with _lock:
+        con.executescript("""
+            BEGIN;
+            CREATE TABLE clasificaciones_nueva (
+                nodo          TEXT NOT NULL,
+                event_id      INTEGER NOT NULL,
+                usuario       TEXT NOT NULL,
+                respuesta     TEXT,
+                comentario    TEXT NOT NULL DEFAULT '',
+                creado_en     TEXT NOT NULL,
+                actualizado_en TEXT NOT NULL,
+                PRIMARY KEY (nodo, event_id, usuario)
+            );
+            INSERT INTO clasificaciones_nueva
+                (nodo, event_id, usuario, respuesta, comentario, creado_en, actualizado_en)
+              SELECT nodo, event_id, usuario, respuesta, comentario, creado_en, actualizado_en
+                FROM clasificaciones;
+            DROP TABLE clasificaciones;
+            ALTER TABLE clasificaciones_nueva RENAME TO clasificaciones;
+            CREATE INDEX IF NOT EXISTS idx_clas_nodo    ON clasificaciones(nodo);
+            CREATE INDEX IF NOT EXISTS idx_clas_usuario ON clasificaciones(usuario);
+            COMMIT;
+        """)
+    return True
+
+
 def _ahora() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -139,6 +183,7 @@ def preparar() -> sqlite3.Connection:
     _con.row_factory = sqlite3.Row
     _con.executescript(ESQUEMA)
     _migrar(_con)
+    _migrar_respuesta_opcional(_con)
     return _con
 
 
@@ -150,17 +195,27 @@ def guardar(
     nodo: str,
     event_id: int,
     usuario: str,
-    respuesta: str,
+    respuesta: str | None,
     comentario: str = "",
 ) -> dict:
-    """Registra (o corrige) la respuesta de una persona sobre un evento.
+    """Registra (o corrige) lo que una persona anotó sobre un evento.
 
     Cambiar de opinión pisa la respuesta anterior pero **conserva `creado_en`**: interesa cuándo se
     miró el evento por primera vez, no solo la última corrección.
+
+    `respuesta` PUEDE SER `None`: es una nota sin decisión, y hace falta que exista. Quien mira un
+    evento y no sabe todavía qué contestar igual quiere poder anotar «esto conviene verlo con
+    alguien»; antes ese texto no tenía dónde ir y se perdía al recargar la página. Lo que no se
+    acepta es una fila vacía —ni respuesta ni comentario—, que no sería un registro de nada.
+
+    Una nota NO es una decisión, y eso vale para las cuentas: `resumen_nodo` la deja afuera. Ver ahí
+    por qué, que es el mismo motivo por el que la escala no tiene opción premarcada.
     """
-    if respuesta not in CODIGOS:
+    if respuesta is not None and respuesta not in CODIGOS:
         raise ValueError(f"Respuesta desconocida: {respuesta!r}")
     comentario = (comentario or "").strip()[:MAX_COMENTARIO]
+    if respuesta is None and not comentario:
+        raise ValueError("Hace falta una respuesta o un comentario")
     ahora = _ahora()
     con = conexion()
     with _lock:
@@ -240,20 +295,30 @@ def de_evento(nodo: str, event_id: int) -> list[dict]:
 
 
 def resumen_nodo(nodo: str) -> dict:
-    """Cuántas respuestas hay en una rama y cómo se reparten. Para el encabezado de la tabla."""
+    """Cuántas DECISIONES hay en una rama y cómo se reparten. Para el encabezado de la tabla.
+
+    Las notas sin decisión (`respuesta IS NULL`) quedan afuera del reparto y del total, y se cuentan
+    aparte en `notas`. Mezclarlas sería el mismo error que premarcar «Neutral» en la escala: haría
+    indistinguible «no se pronunció» de «se pronunció así», que es justo lo que la Etapa 2 necesita
+    poder separar. `revisores` sí las cuenta: alguien que dejó una nota participó.
+    """
     filas = conexion().execute(
-        """SELECT respuesta, COUNT(*) AS n, COUNT(DISTINCT usuario) AS revisores
-           FROM clasificaciones WHERE nodo = ? GROUP BY respuesta""",
+        """SELECT respuesta, COUNT(*) AS n
+           FROM clasificaciones WHERE nodo = ? AND respuesta IS NOT NULL GROUP BY respuesta""",
         (nodo,),
     ).fetchall()
     reparto = {f["respuesta"]: int(f["n"]) for f in filas}
-    revisores = conexion().execute(
-        "SELECT COUNT(DISTINCT usuario) AS n FROM clasificaciones WHERE nodo = ?", (nodo,)
+    otros = conexion().execute(
+        """SELECT COUNT(DISTINCT usuario) AS revisores,
+                  SUM(CASE WHEN respuesta IS NULL THEN 1 ELSE 0 END) AS notas
+             FROM clasificaciones WHERE nodo = ?""",
+        (nodo,),
     ).fetchone()
     return {
         "total": sum(reparto.values()),
         "reparto": reparto,
-        "revisores": int(revisores["n"]),
+        "revisores": int(otros["revisores"]),
+        "notas": int(otros["notas"] or 0),
     }
 
 
@@ -321,10 +386,13 @@ def borrar_de(nodos: list[str]) -> int:
 
 
 def cuantas_en(nodos: list[str]) -> int:
-    """Cuántas clasificaciones cuelgan de un conjunto de ramas.
+    """Cuántas filas cuelgan de un conjunto de ramas: decisiones Y notas sin decisión.
 
     La usa el borrado en cascada para poder avisar antes de llevarse por delante trabajo humano,
-    igual que ya hace con los documentos de revisión.
+    igual que ya hace con los documentos de revisión. Por eso cuenta las notas: una nota es texto
+    que alguien escribió y que el borrado se va a llevar, así que tiene que estar en el aviso. Es
+    la diferencia con `resumen_nodo`, que mide juicios y las deja afuera — acá la pregunta no es
+    «cuánto se juzgó» sino «cuánto se pierde».
     """
     if not nodos:
         return 0

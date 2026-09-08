@@ -62,7 +62,8 @@ class PeticionContrasena(BaseModel):
 
 
 class PeticionClasificacion(BaseModel):
-    respuesta: str
+    #: `None` es una nota sin decisión: comentario escrito sobre un evento que todavía no se juzgó.
+    respuesta: str | None = None
     comentario: str = ""
 
 
@@ -1037,19 +1038,25 @@ def get_revision_config():
 #: --------------------------------------------------------------------------------------
 
 def _acuerdo(respuestas: list[dict]) -> str | None:
-    """Si dos o más revisores miraron un evento, ¿coincidieron?
+    """Si dos o más revisores DECIDIERON sobre un evento, ¿coincidieron?
 
     Coincidir es caer del MISMO LADO, no marcar la misma casilla: «sí» y «definitivamente sí» son
     la misma respuesta a la pregunta con distinta convicción, y contarlas como desacuerdo mediría la
     escala en lugar del juicio. Se compara el signo del valor, que es para lo que la escala lo trae.
 
-    Devuelve `None` con menos de dos respuestas: un evento que miró una sola persona no es un
+    LAS NOTAS SIN DECISIÓN NO PARTICIPAN. Una fila con comentario y sin respuesta no dice si el
+    evento es anómalo, así que no puede coincidir ni discrepar con nadie; contarla como un cero la
+    volvería un «neutral» que su autor no eligió.
+
+    Devuelve `None` con menos de dos decisiones: un evento que juzgó una sola persona no es un
     acuerdo ni un desacuerdo, y meterlo en cualquiera de los dos montones ensucia la cifra.
     """
-    if len(respuestas) < 2:
-        return None
     valores = {o["codigo"]: o["valor"] for o in clasificacion.ESCALA}
-    signos = {(v > 0) - (v < 0) for v in (valores.get(r["respuesta"], 0) for r in respuestas)}
+    signos = {(v > 0) - (v < 0)
+              for v in (valores[r["respuesta"]] for r in respuestas
+                        if r["respuesta"] in valores)}
+    if len(signos) == 0 or sum(1 for r in respuestas if r["respuesta"] in valores) < 2:
+        return None
     return "acuerdo" if len(signos) == 1 else "desacuerdo"
 
 
@@ -1064,8 +1071,9 @@ def get_catalogado(request: Request):
     por_nodo = clasificacion.catalogado()
     valores = {o["codigo"]: o["valor"] for o in clasificacion.ESCALA}
 
-    ramas, global_ = [], {"acuerdo": 0, "desacuerdo": 0, "un_solo_juicio": 0,
-                          "eventos": 0, "juicios": 0, "eventos_totales": 0, "ramas_sin_tocar": 0}
+    ramas, global_ = [], {"acuerdo": 0, "desacuerdo": 0, "un_solo_juicio": 0, "solo_notas": 0,
+                          "eventos": 0, "juicios": 0, "notas": 0,
+                          "eventos_totales": 0, "ramas_sin_tocar": 0}
     por_revisor: dict[str, dict] = {}
 
     # SE RECORRE EL ÁRBOL, NO LA TABLA DE CLASIFICACIONES. La primera versión iteraba lo votado, y
@@ -1100,12 +1108,23 @@ def get_catalogado(request: Request):
             except Exception:
                 pass    # el resultado se limpió: los juicios se muestran igual, sin rango
 
-        filas, cuenta = [], {"acuerdo": 0, "desacuerdo": 0, "un_solo_juicio": 0}
+        filas, cuenta = [], {"acuerdo": 0, "desacuerdo": 0, "un_solo_juicio": 0, "solo_notas": 0}
         for ev, respuestas in sorted(eventos.items()):
             estado = _acuerdo(respuestas)
-            cuenta[estado or "un_solo_juicio"] += 1
+            decisiones = [r for r in respuestas if r["respuesta"] is not None]
+            if estado:
+                cuenta[estado] += 1
+            elif decisiones:
+                cuenta["un_solo_juicio"] += 1
+            else:
+                # Nadie decidió: el evento tiene una nota y nada más. No es «un solo juicio»,
+                # que sugiere que hay uno; es trabajo empezado sin pronunciarse.
+                cuenta["solo_notas"] += 1
             for r in respuestas:
-                d = por_revisor.setdefault(r["usuario"], {"n": 0, "reparto": {}})
+                d = por_revisor.setdefault(r["usuario"], {"n": 0, "reparto": {}, "notas": 0})
+                if r["respuesta"] is None:
+                    d["notas"] += 1
+                    continue
                 d["n"] += 1
                 d["reparto"][r["respuesta"]] = d["reparto"].get(r["respuesta"], 0) + 1
             filas.append({
@@ -1115,7 +1134,7 @@ def get_catalogado(request: Request):
                 "estado": estado,
                 "respuestas": [
                     {"usuario": r["usuario"], "respuesta": r["respuesta"],
-                     "valor": valores.get(r["respuesta"], 0), "comentario": r["comentario"],
+                     "valor": valores.get(r["respuesta"]), "comentario": r["comentario"],
                      "actualizado_en": r["actualizado_en"]}
                     for r in respuestas
                 ],
@@ -1124,7 +1143,10 @@ def get_catalogado(request: Request):
         for k, v in cuenta.items():
             global_[k] += v
         global_["eventos"] += len(filas)
-        global_["juicios"] += sum(len(f["respuestas"]) for f in filas)
+        global_["juicios"] += sum(
+            1 for f in filas for r in f["respuestas"] if r["respuesta"] is not None)
+        global_["notas"] += sum(
+            1 for f in filas for r in f["respuestas"] if r["respuesta"] is None)
         global_["eventos_totales"] += total_eventos or 0
         if not filas:
             global_["ramas_sin_tocar"] += 1

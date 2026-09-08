@@ -315,3 +315,130 @@ def test_retirar_saca_al_revisor_del_catalogo(clasificacion):
     clasificacion.retirar("nodoA", 1, "beto")
     assert clasificacion.revisores() == ["ana"]
     assert [r["usuario"] for r in clasificacion.catalogado()["nodoA"][1]] == ["ana"]
+
+
+# --- notas sin decisión -----------------------------------------------------------------------
+#
+# Un comentario sobre un evento que todavía no se juzgó. Existe porque el texto que alguien escribe
+# es trabajo, y antes se perdía: la API pedía respuesta y comentario juntos, así que una nota vivía
+# en un borrador del navegador hasta la primera recarga.
+
+
+def test_una_nota_sin_decision_se_guarda(clasificacion):
+    clasificacion.guardar("nodoA", 1, "ana", None, "esto conviene verlo con Elias")
+    mia = clasificacion.mia("nodoA", 1, "ana")
+    assert mia["respuesta"] is None
+    assert mia["comentario"] == "esto conviene verlo con Elias"
+
+
+def test_una_fila_sin_decision_y_sin_texto_se_rechaza(clasificacion):
+    """No sería el registro de nada. Pasa cada vez que se abre un evento y no se toca."""
+    with pytest.raises(ValueError):
+        clasificacion.guardar("nodoA", 1, "ana", None, "")
+    with pytest.raises(ValueError):
+        clasificacion.guardar("nodoA", 1, "ana", None, "   ")
+    assert clasificacion.mia("nodoA", 1, "ana") is None
+
+
+def test_una_nota_se_puede_convertir_en_decision_conservando_cuando_se_miro(clasificacion):
+    clasificacion.guardar("nodoA", 1, "ana", None, "no sé todavía")
+    nota = clasificacion.mia("nodoA", 1, "ana")
+    clasificacion.guardar("nodoA", 1, "ana", "si", "ahora sí: es una rampa")
+    ya = clasificacion.mia("nodoA", 1, "ana")
+    assert ya["respuesta"] == "si"
+    assert ya["creado_en"] == nota["creado_en"], "la nota fue el primer contacto con el evento"
+
+
+def test_una_decision_puede_volver_a_ser_nota(clasificacion):
+    """Es lo que pasa al retirar un juicio dejando el comentario escrito."""
+    clasificacion.guardar("nodoA", 1, "ana", "si", "me parece anómalo")
+    clasificacion.guardar("nodoA", 1, "ana", None, "me parece anómalo")
+    assert clasificacion.mia("nodoA", 1, "ana")["respuesta"] is None
+
+
+def test_una_nota_no_cuenta_como_decision_en_el_resumen(clasificacion):
+    """La separación importa: mezclarlas haría indistinguible «no se pronunció» de «dijo neutral»,
+    que es exactamente lo que la Etapa 2 necesita poder separar."""
+    clasificacion.guardar("nodoA", 1, "ana", "si")
+    clasificacion.guardar("nodoA", 2, "ana", None, "una nota")
+    clasificacion.guardar("nodoA", 3, "beto", "no")
+    r = clasificacion.resumen_nodo("nodoA")
+    assert r["total"] == 2, "las decisiones"
+    assert r["reparto"] == {"si": 1, "no": 1}
+    assert r["notas"] == 1
+    assert r["revisores"] == 2, "quien dejó una nota participó"
+
+
+def test_una_nota_si_cuenta_en_lo_que_el_borrado_se_llevaria(clasificacion):
+    """`cuantas_en` mide «cuánto se pierde», no «cuánto se juzgó»: una nota es texto que se va."""
+    clasificacion.guardar("nodoA", 1, "ana", "si")
+    clasificacion.guardar("nodoA", 2, "ana", None, "una nota")
+    assert clasificacion.cuantas_en(["nodoA"]) == 2
+    assert clasificacion.resumen_nodo("nodoA")["total"] == 1
+
+
+def test_una_nota_aparece_en_el_catalogo(clasificacion):
+    clasificacion.guardar("nodoA", 1, "ana", None, "revisar con el experto")
+    (fila,) = clasificacion.catalogado()["nodoA"][1]
+    assert fila["respuesta"] is None
+    assert fila["comentario"] == "revisar con el experto"
+    assert clasificacion.revisores() == ["ana"]
+
+
+def test_retirar_se_lleva_tambien_la_nota(clasificacion):
+    """Retirar es quitar la fila entera. Dejar el comentario huérfano de decisión es otra cosa —se
+    hace guardando con `respuesta=None`— y la hace el frontend cuando queda texto escrito."""
+    clasificacion.guardar("nodoA", 1, "ana", None, "una nota")
+    assert clasificacion.retirar("nodoA", 1, "ana") is True
+    assert clasificacion.mia("nodoA", 1, "ana") is None
+
+
+def test_la_migracion_deja_respuesta_admitir_nulos(clasificacion, tmp_path):
+    """Una base creada cuando `respuesta` era obligatoria tiene que poder recibir notas.
+
+    SQLite no sabe quitar un `NOT NULL` con `ALTER TABLE`, así que la migración recrea la tabla y
+    copia las filas; lo que hay que verificar es que no se pierda ninguna en el camino.
+    """
+    import sqlite3
+
+    base = tmp_path / "revision" / "clasificacion.sqlite"
+    base.parent.mkdir(parents=True, exist_ok=True)
+    clasificacion.conexion().close()
+    clasificacion._con = None
+    base.unlink(missing_ok=True)
+
+    vieja = sqlite3.connect(base)
+    vieja.executescript("""
+        CREATE TABLE clasificaciones (
+            nodo TEXT NOT NULL, event_id INTEGER NOT NULL, usuario TEXT NOT NULL,
+            respuesta TEXT NOT NULL, comentario TEXT NOT NULL DEFAULT '',
+            creado_en TEXT NOT NULL, actualizado_en TEXT NOT NULL,
+            PRIMARY KEY (nodo, event_id, usuario));
+    """)
+    vieja.execute("INSERT INTO clasificaciones VALUES ('nodoV', 3, 'ana', 'si', 'ya estaba',"
+                  " '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')")
+    vieja.commit()
+    vieja.close()
+
+    con = clasificacion.preparar()
+    col = next(f for f in con.execute("PRAGMA table_info(clasificaciones)")
+               if f["name"] == "respuesta")
+    assert not col["notnull"], "sigue siendo obligatoria"
+
+    vieja_fila = clasificacion.mia("nodoV", 3, "ana")
+    assert vieja_fila["respuesta"] == "si"
+    assert vieja_fila["comentario"] == "ya estaba"
+    assert vieja_fila["creado_en"] == "2026-01-01T00:00:00+00:00"
+
+    clasificacion.guardar("nodoV", 4, "ana", None, "y ahora una nota")
+    assert clasificacion.mia("nodoV", 4, "ana")["respuesta"] is None
+
+    indices = {f["name"] for f in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='clasificaciones'")}
+    assert {"idx_clas_nodo", "idx_clas_usuario"} <= indices, "los índices se van con la tabla vieja"
+
+
+def test_la_migracion_de_nulos_no_se_queja_en_una_base_al_dia(clasificacion):
+    con = clasificacion.conexion()
+    assert clasificacion._migrar_respuesta_opcional(con) is False
+    assert clasificacion._migrar_respuesta_opcional(con) is False
