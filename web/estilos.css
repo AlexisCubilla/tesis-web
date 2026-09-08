@@ -789,6 +789,11 @@ p { margin: 0 0 1em; text-wrap: pretty; }
    como debería ser. Ahora pesa igual que el nombre que tiene al lado: son los dos lados de la
    misma frase, «sos admin» y «dejá de serlo». */
 /* --- La esquina derecha: tema, avatar y menú ---
+   LAS PESTAÑAS SON DESTINOS DEL TRABAJO, y solo eso: el proyecto, el taller, el catálogo. Lo demás
+   vive en esta esquina. «Usuarios» estuvo un rato como cuarta pestaña y se movió al menú del
+   avatar: administrar cuentas se toca una vez cada tanto y, puesta al lado de «Catálogo», le
+   disputaba la atención a la pantalla que sí se usa todos los días.
+
    LO DE LA CUENTA VA DETRÁS DEL AVATAR; EL TEMA, NO. Antes el nombre y «Salir» estaban sueltos acá,
    con el mismo peso visual que las pestañas, para acciones que se tocan una vez por sesión: eso se
    plegó detrás del avatar. El tema volvió a salir, y es a propósito. No es una acción de la cuenta
@@ -852,6 +857,7 @@ p { margin: 0 0 1em; text-wrap: pretty; }
   padding: 8px 10px; border: none; border-radius: 7px; background: none;
   color: var(--texto-2); font: inherit; font-size: .84rem; text-align: left; cursor: pointer;
   transition: color .16s ease, background .16s ease;
+  text-decoration: none;   /* «Usuarios» es un <a>; los demás, <button> */
 }
 .menu-cuenta .op svg { width: 15px; height: 15px; flex: none; }
 .menu-cuenta .op:hover { color: var(--texto); background: var(--boton-hover); }

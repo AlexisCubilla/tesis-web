@@ -28,6 +28,11 @@
       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`;
 
+  const ICONO_USUARIOS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 19 7a4 4 0 0 1-3 3.87"/></svg>`;
+
   fetch('api/yo')
     .then((r) => (r.ok ? r.json() : null))
     .then((usuario) => (usuario ? pintarMenu(usuario) : pintarSuelto()))
@@ -70,7 +75,7 @@
 
   /* --- Con sesión: un avatar, y el resto adentro. ----------------------------------------- */
   function pintarMenu(usuario) {
-    if (usuario.rol === 'admin') { agregarPestana('usuarios', 'Usuarios'); agregarPestana('catalogo', 'Catálogo'); }
+    if (usuario.rol === 'admin') agregarPestana('catalogo', 'Catálogo');
 
     const caja = document.createElement('div');
     caja.className = 'cuenta';
@@ -98,6 +103,19 @@
     quien.innerHTML = `<strong>${usuario.nombre}</strong><span>${
       usuario.rol === 'admin' ? 'Administrador' : 'Revisor'}</span>`;
     menu.appendChild(quien);
+
+    /* «Usuarios» va acá y no en las pestañas. Las tres pestañas son los destinos del TRABAJO —el
+       proyecto, el taller, el catálogo— y administrar cuentas no es uno: es del sistema, se toca
+       una vez cada tanto, y puesta al lado de «Catálogo» le disputaba la atención a la pantalla que
+       sí se usa. Detrás del avatar queda junto a lo otro que es de la cuenta y no del trabajo. */
+    if (usuario.rol === 'admin') {
+      const usuarios = document.createElement('a');
+      usuarios.className = 'op';
+      usuarios.setAttribute('role', 'menuitem');
+      usuarios.href = 'usuarios';
+      usuarios.innerHTML = `${ICONO_USUARIOS}<span>Usuarios</span>`;
+      menu.appendChild(usuarios);
+    }
 
     const salir = document.createElement('button');
     salir.type = 'button';
@@ -136,12 +154,15 @@
     });
   }
 
-  /** Una pestaña que solo ve el administrador —Usuarios, Catálogo—, junto a las otras.
+  /** Una pestaña que solo ve el administrador. Hoy es una sola: «Catálogo».
    *
-   *  Cada una de esas pantallas ya trae SU pestaña escrita y marcada como activa, así que la
-   *  comprobación de duplicado no es defensiva: es lo que evita que en `usuarios.html` aparezca
-   *  «Usuarios» dos veces. Y la escrita a mano llega con la página, en vez de aparecer recién
-   *  cuando responde `api/yo`, que es lo que hace que la barra no salte en la pantalla propia.
+   *  `catalogo.html` ya trae la suya escrita y marcada como activa, así que la comprobación de
+   *  duplicado no es defensiva: es lo que evita que ahí aparezca «Catálogo» dos veces. Y la escrita
+   *  a mano llega con la página, en vez de aparecer recién cuando responde `api/yo`, que es lo que
+   *  hace que la barra no salte en la pantalla propia.
+   *
+   *  «Usuarios» estuvo acá y se movió al menú del avatar: administrar cuentas no es un destino del
+   *  trabajo, y al lado de «Catálogo» le disputaba la atención.
    */
   function agregarPestana(href, texto) {
     if (!nav || nav.querySelector(`a[href="${href}"]`)) return;
