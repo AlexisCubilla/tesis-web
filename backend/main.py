@@ -169,10 +169,18 @@ def delete_nodo(clave: str, forzar: bool = False):
     persona sobre telemetría que nadie etiquetó, no. Y el botón de borrar está en la misma pantalla
     donde se clasifica, así que un clic en el nodo equivocado se llevaría trabajo irrepetible.
 
-    Con `forzar=1` se borra igual, pero **nada de ese trabajo se pierde**: el documento queda
-    huérfano y se puede seguir descargando (`revision.desvincular`), y las clasificaciones se
-    quedan en su base con la copia del evento que guardaron al crearse — por eso `clasificacion`
-    denormaliza hoja, rango y prioridad.
+    CON `forzar=1` LAS DOS CLASES CORREN DISTINTA SUERTE, y la diferencia no es cuánto valen sino si
+    se las puede volver a encontrar:
+
+    - Los **documentos** quedan huérfanos y se siguen bajando (`revision.desvincular`). Funciona
+      porque `GET /api/revision` los lista sin pasar por el árbol: hay una puerta.
+    - Las **clasificaciones se borran** (`clasificacion.borrar_de`). Antes se conservaban, y era una
+      promesa a medias: la única llave para volver a una fila era su `nodo`, un hash que desaparecía
+      del árbol justo al borrarlo, y no había listado de huérfanas. El dato quedaba y era
+      inalcanzable salvo abriendo el SQLite a mano.
+
+    Por eso lo que protege el trabajo acá es el 409, no la conservación — y el aviso dice cuántas
+    clasificaciones se van, que es lo que antes no decía.
     """
     if almacen.obtener(_con, clave) is None:
         raise HTTPException(404, "Nodo inexistente")
@@ -201,9 +209,10 @@ def delete_nodo(clave: str, forzar: bool = False):
         })
 
     huerfanos = revision.desvincular(claves) if comentados else 0
+    borradas = clasificacion.borrar_de(claves)
     resultado = almacen.borrar(_con, clave)
     resultado["documentos_huerfanos"] = huerfanos
-    resultado["clasificaciones_conservadas"] = clasificadas
+    resultado["clasificaciones_borradas"] = borradas
     return resultado
 
 
@@ -1531,16 +1540,20 @@ def delete_usuario(nombre: str, request: Request):
 # Clasificación de eventos: la encuesta por revisor
 # --------------------------------------------------------------------------------------
 
-def _fila_de_evento(clave: str, event_id: int) -> dict:
-    """La fila del entregable para un evento, como diccionario. 404 si no existe."""
+def _exigir_evento(clave: str, event_id: int) -> None:
+    """Se planta con 404 si esa rama no tiene ese evento. No devuelve nada: solo valida.
+
+    Antes devolvía la fila entera serializada, porque `clasificacion.guardar` copiaba hoja, rango y
+    prioridad dentro de la respuesta. Esa copia se quitó —ver el encabezado de `clasificacion`— y
+    con ella la serialización; los dos 404 se quedan, que son la parte que hacía falta: sin esto se
+    podría dejar una opinión sobre un `event_id` que la rama no tiene.
+    """
     nodo = almacen.obtener(_con, clave)
     if nodo is None or nodo["etapa"] != "eventos" or not nodo["tiene_resultado"]:
         raise HTTPException(404, "No hay eventos en ese nodo")
     tabla = almacen.cargar_resultado(clave)["eventos"]
-    fila = tabla[tabla["event_id"] == event_id]
-    if fila.empty:
+    if tabla[tabla["event_id"] == event_id].empty:
         raise HTTPException(404, "Evento inexistente")
-    return json.loads(fila.iloc[0].to_json())
 
 
 @app.get("/api/nodo/{clave}/clasificacion")
@@ -1571,13 +1584,34 @@ def get_clasificacion_evento(clave: str, event_id: int, request: Request):
 def put_clasificacion(clave: str, event_id: int, pet: PeticionClasificacion, request: Request):
     """Guarda mi respuesta. Volver a mandarla la corrige, sin perder cuándo se miró por primera vez."""
     usuario = _usuario(request)
-    evento = _fila_de_evento(clave, event_id)
+    _exigir_evento(clave, event_id)
     try:
         return clasificacion.guardar(
-            clave, event_id, usuario["nombre"], pet.respuesta, pet.comentario, evento=evento
+            clave, event_id, usuario["nombre"], pet.respuesta, pet.comentario
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.delete("/api/nodo/{clave}/evento/{event_id}/clasificacion")
+def delete_clasificacion(clave: str, event_id: int, request: Request):
+    """Retira mi respuesta: el evento vuelve a estar sin clasificar.
+
+    Solo la propia. La clave de la tabla incluye al usuario y acá se pasa el de la sesión, así que
+    no hay forma de nombrar la respuesta de otro ni por error ni a propósito — que es lo que hace
+    que esto no necesite ser privilegio de administrador.
+
+    404 SI NO HABÍA NADA, en vez de un 204 complaciente. Un `DELETE` idempotente sería más cómodo
+    de escribir, pero acá un retiro que no encontró qué retirar significa que la pantalla y la base
+    no están de acuerdo —otra pestaña, o un `event_id` que ya no existe— y eso conviene que se vea.
+
+    Devuelve JSON y no un 204 vacío porque todos los endpoints de esta API devuelven JSON, el otro
+    `DELETE` incluido: un 204 suelto obligaría al front a tratar esta llamada distinto de las demás.
+    """
+    usuario = _usuario(request)
+    if not clasificacion.retirar(clave, event_id, usuario["nombre"]):
+        raise HTTPException(404, "No hay una respuesta tuya para ese evento")
+    return {"retirada": True, "event_id": event_id}
 
 
 @app.get("/")

@@ -245,3 +245,26 @@ def test_cada_uno_cambia_su_propia_contrasena_y_no_la_ajena(taller):
                         json={"contrasena": "clave-nueva-1"}).status_code == 403
     assert cliente.post("/api/usuarios/ana/contrasena",
                         json={"contrasena": "clave-nueva-1"}).status_code == 200
+
+
+# ------------------------------------------------- retirar la propia clasificación, por la API
+
+def test_retirar_una_clasificacion_que_no_existe_da_404(taller):
+    """Con sesión y todo: no hay nada que retirar, y la API lo dice en vez de fingir un éxito.
+
+    Es la mitad del contrato que el front necesita para distinguir «se retiró» de «la pantalla
+    estaba mostrando algo que en la base ya no estaba» —otra pestaña, o una rama borrada—. Sin el
+    404, las dos situaciones se ven igual desde el navegador.
+    """
+    cliente, _ = taller
+    cliente.post("/api/sesion", json={"usuario": "jefa", "contrasena": "contrasena-larga"})
+    r = cliente.delete("/api/nodo/nodo-inexistente/evento/1/clasificacion")
+    assert r.status_code == 404
+
+
+def test_retirar_sin_sesion_no_llega_a_la_base(taller):
+    """La reja primero: sin sesión no hay un «yo» cuya respuesta retirar."""
+    cliente, _ = taller
+    r = cliente.delete("/api/nodo/loquesea/evento/1/clasificacion")
+    assert r.status_code == 401
+

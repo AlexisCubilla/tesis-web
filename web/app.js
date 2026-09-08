@@ -510,17 +510,41 @@ async function borrarSeleccion() {
 
   let r = await borrar(S.sel, false);
 
-  // El backend se planta si el experto comentó alguna de esas ramas. Es lo único del taller que no
-  // se puede volver a calcular, así que la segunda pregunta dice exactamente qué se estaría
-  // perdiendo, en vez de repetir «¿seguro?».
+  /* El backend se planta si hay trabajo humano colgando: documentos comentados por el experto,
+     clasificaciones de eventos, o las dos cosas. Es lo único del taller que no se puede volver a
+     calcular, así que la segunda pregunta dice exactamente qué se estaría perdiendo en vez de
+     repetir «¿seguro?».
+
+     LAS DOS CLASES SE NOMBRAN, y antes no. Este bloque leía solo `detalle.documentos` e ignoraba
+     `detalle.clasificaciones`, que el backend ya mandaba: borrar una rama con cuarenta juicios y
+     ningún documento anunciaba «0 documento(s) …» y prometía que los documentos no se borraban —de
+     documentos que no existían—, sin mencionar lo único que estaba realmente en juego.
+
+     Y corren distinta suerte, así que se dice cuál es cuál: el documento queda y se sigue bajando;
+     la clasificación se va con la rama. Un aviso que promete lo mismo para las dos es peor que no
+     avisar, porque quien lo lee decide con una idea equivocada de lo que va a pasar. */
   if (r.bloqueado) {
-    const lista = r.detalle.documentos
-      .map((d) => `  · ${d.nombre} (v${d.version}, por ${d.ultimo_autor || 'el experto'})`).join('\n');
+    const docs = r.detalle.documentos || [];
+    const clas = r.detalle.clasificaciones || 0;
+    const partes = [];
+    if (docs.length) {
+      partes.push(
+        `${docs.length} documento(s) con comentarios del experto:\n` +
+        docs.map((d) => `  · ${d.nombre} (v${d.version}, por ${d.ultimo_autor || 'el experto'})`)
+          .join('\n') +
+        `\n\nEsos NO se borran: quedan guardados y se siguen bajando desde su propia pantalla.`);
+    }
+    if (clas) {
+      partes.push(
+        `${clas} clasificación(es) de eventos.\n\n` +
+        `Esas SÍ SE BORRAN, junto con la rama: un juicio pertenece a la corrida donde se emitió, ` +
+        `así que sin la rama no hay a qué evento referirlo.` +
+        (S.usuario && S.usuario.rol === 'admin'
+          ? `\n\nSi querés verlas antes de decidir, están en el Catálogo.` : ''));
+    }
     const seguir = confirm(
-      `${r.detalle.documentos.length} documento(s) con comentarios del experto dependen de esto:\n\n` +
-      `${lista}\n\n` +
-      `Los pasos se borran, pero los documentos NO: quedan guardados y se pueden seguir bajando ` +
-      `desde su propia pantalla.\n\n¿Borrar igual?`);
+      `Esta rama tiene trabajo que no se puede recalcular:\n\n${partes.join('\n\n')}\n\n` +
+      `¿Borrar igual?`);
     if (!seguir) return;
     r = await borrar(S.sel, true);
     if (r.bloqueado) { alert('No se pudo borrar.'); return; }
@@ -529,10 +553,13 @@ async function borrarSeleccion() {
   S.sel = n.padre;
   await recargar();
   if (S.sel) cargarVisual();
-  const huerfanos = r.documentos_huerfanos
-    ? ` · ${r.documentos_huerfanos} documento(s) del experto conservados` : '';
+  // Y al terminar, las dos cifras: lo que se conservó y lo que se fue. La segunda también faltaba.
+  const extra = [
+    r.documentos_huerfanos ? `${r.documentos_huerfanos} documento(s) del experto conservados` : '',
+    r.clasificaciones_borradas ? `${r.clasificaciones_borradas} clasificación(es) borradas` : '',
+  ].filter(Boolean).map((t) => ` · ${t}`).join('');
   $('#estado-ejecucion').textContent =
-    `Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados${huerfanos}`;
+    `Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados${extra}`;
 }
 
 /** DELETE de un nodo, distinguiendo el 409 del guardia de cualquier otro error. */
@@ -540,7 +567,10 @@ async function borrar(clave, forzar) {
   const resp = await fetch(`api/nodo/${clave}${forzar ? '?forzar=true' : ''}`, { method: 'DELETE' });
   if (resp.status === 409) {
     const cuerpo = await resp.json().catch(() => ({}));
-    if (cuerpo.detail && cuerpo.detail.documentos) return { bloqueado: true, detalle: cuerpo.detail };
+    /* Se pregunta por el `mensaje` y no por `documentos`: el guardia se dispara por documentos, por
+       clasificaciones o por las dos, y mirar una sola de las listas hacía que el 409 se tomara por
+       un error genérico cuando lo que colgaba era la otra. `mensaje` está siempre. */
+    if (cuerpo.detail && cuerpo.detail.mensaje) return { bloqueado: true, detalle: cuerpo.detail };
   }
   if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`);
   return resp.json();
@@ -1871,6 +1901,8 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
             siguiente !== null ? 'Guardar y seguir' : (mia ? 'Actualizar respuesta' : 'Guardar respuesta')}</button>
           <button class="boton" type="button" id="cancelar-clas">Cerrar</button>
           <span class="esp"></span>
+          ${mia ? `<button class="boton plano" type="button" id="retirar-clas"
+            title="Deja el evento sin clasificar, como si nunca lo hubieras respondido">Retirar</button>` : ''}
           <span class="tenue" style="font-size:.78rem" id="estado-clas">${
             borrador ? 'Sin guardar'
             : mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
@@ -1880,6 +1912,36 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
 
     dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
     dlg.querySelector('#cancelar-clas').addEventListener('click', cerrar);
+
+    /* RETIRAR. Solo aparece si hay una respuesta guardada: sobre un evento sin clasificar el botón
+       no tendría nada que hacer, y uno gris invitaría a preguntarse qué falta.
+
+       No pide confirmación. Es reversible en un clic —la escala queda ahí, volver a elegir y
+       guardar—, y un diálogo encima de otro diálogo para deshacer algo deshacible cuesta más de lo
+       que protege. Lo que sí hace es DESMARCAR la escala, para que la pantalla no siga mostrando
+       una respuesta que ya no está en la base. */
+    const bRetirar = dlg.querySelector('#retirar-clas');
+    if (bRetirar) bRetirar.addEventListener('click', async () => {
+      const estado = dlg.querySelector('#estado-clas');
+      bRetirar.disabled = true;
+      estado.textContent = 'Retirando…';
+      try {
+        await api(`api/nodo/${clave}/evento/${id}/clasificacion`, { method: 'DELETE' });
+        delete C.mias[String(id)];
+        BORRADORES.delete(id);
+        refrescarMarca(id);
+        pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
+        for (const r of dlg.querySelectorAll('input[name="respuesta"]')) r.checked = false;
+        dlg.querySelector('#comentario').value = '';
+        bRetirar.remove();
+        dlg.querySelector('#guardar-clas').textContent =
+          siguiente !== null ? 'Guardar y seguir' : 'Guardar respuesta';
+        estado.textContent = 'Retirada: el evento quedó sin clasificar.';
+      } catch (err) {
+        estado.textContent = `No se pudo retirar: ${err.message}`;
+        bRetirar.disabled = false;
+      }
+    });
     const bAnt = dlg.querySelector('#ev-anterior');
     const bSig = dlg.querySelector('#ev-siguiente');
     if (bAnt) bAnt.addEventListener('click', () => irA(anterior));

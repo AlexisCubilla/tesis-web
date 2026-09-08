@@ -81,6 +81,7 @@ CERRADAS = [
     ("DELETE", "/api/nodo/loquesea"),
     ("PUT", "/api/nodo/loquesea/etiqueta"),
     ("PUT", "/api/nodo/loquesea/evento/1/clasificacion"),
+    ("DELETE", "/api/nodo/loquesea/evento/1/clasificacion"),
     ("GET", "/api/nodo/loquesea/clasificacion"),
     ("GET", "/api/nodo/loquesea/evento/1/clasificacion"),
     ("POST", "/api/nodo/loquesea/revision/experto"),

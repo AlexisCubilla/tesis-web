@@ -511,7 +511,7 @@ documento, que solo se entrega a quien ya entró— pero está, y conviene que e
 
 ---
 
-## A17 — La clasificación de eventos es por persona y por rama, y guarda una copia del evento
+## A17 — La clasificación de eventos es por persona y por rama, y se va con ella
 
 **Decisión.** Doble clic sobre un evento —en la línea de tiempo o en la tabla— abre un diálogo con
 las tres señales del tramo y una encuesta de cinco opciones más un comentario. La respuesta se guarda
@@ -526,14 +526,36 @@ evento**: tiene otro rango, otras ventanas y otra prioridad. Heredarle la respue
 juicio que nadie emitió. El costo asumido es que explorar ramas obliga a reclasificar, y se prefirió
 ese costo antes que un dato que parece un juicio sin serlo.
 
-**Con una copia del evento adentro.** Hoja, segmento, rango, tramos y prioridad se copian en la fila
-al darla de alta. Sin eso, borrar una rama dejaría opiniones colgando de un identificador que ya no
-resuelve a nada. Es la misma decisión que toma `revision.py` con los documentos huérfanos, y por eso
-el borrado en cascada ahora también avisa cuando hay clasificaciones en juego.
+**Borrar la rama borra sus clasificaciones**, y lo que protege el trabajo es el aviso previo: el
+borrado en cascada se planta con un 409 que dice cuántos documentos del experto y cuántas
+clasificaciones hay en juego, y exige confirmar. Las dos clases corren distinta suerte y el aviso lo
+dice: el documento queda huérfano y se sigue bajando, la clasificación se va.
 
-**Solo el alta escribe esa copia.** Una corrección posterior cambia la respuesta y el comentario,
-nunca el contexto: si no, una corrección hecha desde otra corrida podría reescribir el rango con el
-que se emitió el juicio original.
+*Esta parte del ADR decía lo contrario, y se revirtió.* La fila sobrevivía a su rama, y seis columnas
+copiaban hoja, segmento, rango, tramos y prioridad para que la respuesta siguiera siendo legible sin
+ella. La analogía con `revision.py` no se sostuvo: ahí conservar funciona porque `GET /api/revision`
+lista los documentos sin pasar por el árbol, y acá no existía la puerta equivalente. La única llave
+para volver a una fila era su `nodo` —un hash de 16 caracteres que desaparece del árbol justo al
+borrarlo— y no había listado de huérfanas ni pantalla que las mostrara. El dato se conservaba y era
+inalcanzable salvo abriendo el SQLite a mano; las seis columnas se escribían en cada alta y no las
+leía nadie.
+
+Entre construir la mitad que faltaba o borrar de verdad, se eligió borrar, por coherencia con «por
+rama» de más arriba: si el juicio pertenece a la corrida donde se emitió, sin esa corrida no hay
+juicio que recuperar, hay una opinión sobre un identificador que ya no resuelve a nada. Las seis
+columnas se quitaron con una migración que corre al arrancar (`clasificacion._migrar`).
+
+**Un revisor puede retirar su propia respuesta.** El evento vuelve a estar sin clasificar, como si
+nunca lo hubiera contestado. La clave incluye al usuario, así que nadie retira lo de otro, y por eso
+no hace falta que sea privilegio de administrador. Se borra la fila en vez de marcarla como retirada
+para que «sin clasificar» siga siendo **un solo estado**: con filas retiradas habría dos maneras de
+no tener respuesta y las consultas del módulo tendrían que distinguirlas para siempre; la primera que
+se olvidara contaría como respondido un evento que nadie respondió.
+
+**Lo que no borra nada es dar de baja una cuenta.** Ahí el juicio queda, porque nadie eligió
+deshacerse de él y sigue contando para la coincidencia entre revisores. La distinción entre los tres
+casos es **quién decide**: su autor retirándolo, la rama entera yéndose con aviso, o un borrado
+colateral que no debe llevárselo.
 
 **Sin opción premarcada.** Ninguna de las cinco viene elegida, ni siquiera «Neutral». Un valor por
 defecto se convierte en la respuesta de quien duda, y el reporte no podría distinguir «dijo neutral»

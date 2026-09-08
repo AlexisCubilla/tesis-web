@@ -20,10 +20,23 @@ hizo. Un evento con otro dedup o con otra fracción de candidatos **no es el mis
 otro rango, otras ventanas y otra prioridad—, así que heredarle la respuesta sería inventar un
 juicio que nadie emitió. El costo asumido es que explorar ramas obliga a reclasificar.
 
-**Guarda una copia de los datos del evento.** Hoja, segmento, rango, tramos y prioridad se copian
-en la fila. La respuesta tiene que seguir siendo legible aunque la rama se borre y el evento deje
-de poder consultarse: sin eso, borrar una rama dejaría opiniones sobre un identificador que ya no
-resuelve a nada. Es la misma decisión que toma `revision.py` con los documentos huérfanos.
+**Se va con su rama.** Borrar la rama borra sus clasificaciones (`borrar_de`), y lo que protege el
+trabajo es el aviso previo: `delete_nodo` se planta con un 409 que dice cuántas hay y exige
+`forzar`. Hubo un intento anterior de conservarlas —la fila sobrevivía a la rama, y seis columnas
+copiaban hoja, segmento y rango para que siguiera siendo legible— que se revirtió porque estaba a
+medio hacer: no había forma de LLEGAR a una fila huérfana. La única llave era el `nodo`, un hash de
+16 caracteres que desaparecía del árbol justo al borrarlo, y no existía listado ni pantalla que las
+mostrara. `revision.py` sí tiene las dos cosas para sus documentos, y por eso ahí conservar
+funciona; acá conservar era guardar un dato que nadie podía volver a ver.
+
+Que se vaya con la rama además es coherente con «es por rama», más arriba: si el juicio pertenece a
+la corrida donde se emitió, sin esa corrida no hay juicio que recuperar.
+
+**Los dos borrados que sí existen, y quién los decide.** `retirar()` es una persona sacando su
+propia respuesta —la clave incluye al usuario, así que nadie toca la de otro—. `borrar_de()` es la
+rama entera yéndose, con el 409 de por medio. Lo que NO borra nada es dar de baja una cuenta: ahí
+el juicio queda, porque nadie eligió deshacerse de él y sigue contando para la coincidencia entre
+revisores.
 """
 
 from __future__ import annotations
@@ -73,17 +86,44 @@ CREATE TABLE IF NOT EXISTS clasificaciones (
     comentario    TEXT NOT NULL DEFAULT '',
     creado_en     TEXT NOT NULL,
     actualizado_en TEXT NOT NULL,
-    hoja          TEXT,
-    segmento      TEXT,
-    desde         INTEGER,
-    hasta         INTEGER,
-    n_ventanas    INTEGER,
-    n_detectores  INTEGER,
     PRIMARY KEY (nodo, event_id, usuario)
 );
 CREATE INDEX IF NOT EXISTS idx_clas_nodo    ON clasificaciones(nodo);
 CREATE INDEX IF NOT EXISTS idx_clas_usuario ON clasificaciones(usuario);
 """
+
+#: Las seis columnas que copiaban el evento. Ver `_migrar` justo abajo.
+_COLUMNAS_MUERTAS = ("hoja", "segmento", "desde", "hasta", "n_ventanas", "n_detectores")
+
+
+def _migrar(con: sqlite3.Connection) -> list[str]:
+    """Quita las columnas que copiaban el evento, si la base viene de antes.
+
+    Estaban para que una clasificación siguiera siendo legible después de borrar su rama. Eso ya no
+    pasa —borrar la rama borra las clasificaciones, ver `borrar_de`— así que las seis columnas no
+    tienen para qué existir. Y en los hechos nunca lo tuvieron: se escribían en cada alta y no las
+    leía nadie, ni el backend ni el frontend.
+
+    Corre en cada arranque y es idempotente: pregunta qué columnas hay antes de tocar nada. Es el
+    mismo criterio que `cuentas._sembrar_admin`, y sirve para lo mismo: que actualizar el código sea
+    suficiente y no haya un paso manual que alguien tenga que recordar dentro de dos años.
+
+    `DROP COLUMN` necesita SQLite 3.35 (2021). Si la base es más vieja que eso, las columnas se
+    quedan ahí sin molestar: `guardar` nombra las suyas explícitamente y estas admiten NULL.
+    """
+    hay = {f["name"] for f in con.execute("PRAGMA table_info(clasificaciones)")}
+    quitadas = []
+    for col in _COLUMNAS_MUERTAS:
+        if col not in hay:
+            continue
+        try:
+            con.execute(f"ALTER TABLE clasificaciones DROP COLUMN {col}")
+            quitadas.append(col)
+        except sqlite3.OperationalError:
+            break     # SQLite viejo: se quedan, y no pasa nada
+    if quitadas:
+        con.commit()
+    return quitadas
 
 
 def _ahora() -> str:
@@ -98,6 +138,7 @@ def preparar() -> sqlite3.Connection:
     _con = sqlite3.connect(BASE, check_same_thread=False)
     _con.row_factory = sqlite3.Row
     _con.executescript(ESQUEMA)
+    _migrar(_con)
     return _con
 
 
@@ -111,38 +152,60 @@ def guardar(
     usuario: str,
     respuesta: str,
     comentario: str = "",
-    *,
-    evento: dict | None = None,
 ) -> dict:
     """Registra (o corrige) la respuesta de una persona sobre un evento.
 
     Cambiar de opinión pisa la respuesta anterior pero **conserva `creado_en`**: interesa cuándo se
-    miró el evento por primera vez, no solo la última corrección. `evento` es la copia de contexto
-    descrita en el encabezado del módulo; solo se escribe en el alta, para que una corrección no
-    pueda reescribir el rango con datos de otra corrida.
+    miró el evento por primera vez, no solo la última corrección.
     """
     if respuesta not in CODIGOS:
         raise ValueError(f"Respuesta desconocida: {respuesta!r}")
     comentario = (comentario or "").strip()[:MAX_COMENTARIO]
-    ev = evento or {}
     ahora = _ahora()
     con = conexion()
     with _lock:
         con.execute(
             """INSERT INTO clasificaciones
-                 (nodo, event_id, usuario, respuesta, comentario, creado_en, actualizado_en,
-                  hoja, segmento, desde, hasta, n_ventanas, n_detectores)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 (nodo, event_id, usuario, respuesta, comentario, creado_en, actualizado_en)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(nodo, event_id, usuario) DO UPDATE SET
                  respuesta = excluded.respuesta,
                  comentario = excluded.comentario,
                  actualizado_en = excluded.actualizado_en""",
-            (nodo, int(event_id), usuario, respuesta, comentario, ahora, ahora,
-             ev.get("SheetName"), ev.get("segment"), ev.get("start"), ev.get("end"),
-             ev.get("n_ventanas"), ev.get("n_detectores")),
+            (nodo, int(event_id), usuario, respuesta, comentario, ahora, ahora),
         )
         con.commit()
     return mia(nodo, int(event_id), usuario) or {}
+
+
+def retirar(nodo: str, event_id: int, usuario: str) -> bool:
+    """Quita mi respuesta sobre un evento. Devuelve si había algo que quitar.
+
+    BORRA LA FILA, y eso merece justificación porque el resto del módulo está construido sobre lo
+    contrario: borrar una rama conserva las clasificaciones, dar de baja una cuenta también. Esas
+    dos protegen contra un borrado COLATERAL —nadie eligió deshacerse de esos juicios—. Acá la
+    persona que emitió el juicio decide retirarlo, que es la única mano con derecho a hacerlo: la
+    clave primaria incluye al usuario, así que nadie puede retirar lo de otro.
+
+    Y borrar del todo, en vez de marcar la fila como retirada, para que «sin clasificar» siga
+    siendo UN SOLO estado. Con una fila retirada habría dos maneras de no tener respuesta, y las
+    seis consultas del módulo tendrían que acordarse de distinguirlas para siempre; la primera que
+    se olvidara contaría como respondido un evento que nadie respondió. Tampoco hay incoherencia
+    con lo que ya hacía `guardar`: corregir un voto pisa el anterior sin dejar rastro, así que el
+    módulo nunca prometió historial. Si algún día hace falta, el lugar es una bitácora aparte que
+    registre las tres acciones —alta, corrección y retiro—, no media promesa acá.
+
+    No es idempotente por accidente: devuelve `False` si no había fila, y con eso la API puede
+    responder 404 en vez de fingir que retiró algo.
+    """
+    con = conexion()
+    with _lock:
+        cur = con.execute(
+            "DELETE FROM clasificaciones WHERE nodo = ? AND event_id = ? AND usuario = ?",
+            (nodo, int(event_id), usuario),
+        )
+        con.commit()
+    return cur.rowcount > 0
 
 
 def mia(nodo: str, event_id: int, usuario: str) -> dict | None:
@@ -192,6 +255,33 @@ def resumen_nodo(nodo: str) -> dict:
         "reparto": reparto,
         "revisores": int(revisores["n"]),
     }
+
+def borrar_de(nodos: list[str]) -> int:
+    """Borra las clasificaciones de esas ramas. Devuelve cuántas se fueron.
+
+    LA PAREJA DE `cuantas_en`: esa cuenta lo que se perdería, esta lo pierde. Se usan juntas al
+    borrar una rama —primero para avisar, después para ejecutar— y por eso viven al lado.
+
+    ANTES ESTAS FILAS SOBREVIVÍAN A SU RAMA, y era una promesa a medias. La fila quedaba, pero la
+    única forma de volver a ella era su `nodo`, un hash de 16 caracteres que desaparecía del árbol
+    justo al borrarlo: no había listado de huérfanas ni pantalla que las mostrara —a diferencia de
+    `revision.py`, que sí tiene las dos cosas para sus documentos—. El dato se conservaba y era
+    inalcanzable salvo abriendo el SQLite a mano.
+
+    Entre construir esa mitad que faltaba o borrar de verdad, se eligió borrar: el juicio pertenece
+    a la corrida donde se emitió —ver «Es por rama» en el encabezado— así que sin la rama no es un
+    juicio recuperable, es una opinión sobre un identificador que ya no resuelve a nada. Lo que
+    protege el trabajo es el aviso ANTES: `delete_nodo` se planta con 409 y exige `forzar`, y ahora
+    el aviso dice cuántas clasificaciones se van, que es lo que antes no decía.
+    """
+    if not nodos:
+        return 0
+    marcas = ",".join("?" * len(nodos))
+    con = conexion()
+    with _lock:
+        cur = con.execute(f"DELETE FROM clasificaciones WHERE nodo IN ({marcas})", nodos)
+        con.commit()
+    return cur.rowcount
 
 
 def cuantas_en(nodos: list[str]) -> int:
