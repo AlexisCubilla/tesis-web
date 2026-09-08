@@ -156,3 +156,71 @@ def test_el_estado_dice_quien_mira(taller):
 
     cliente.post("/api/sesion", json={"usuario": "jefa", "contrasena": "contrasena-larga"})
     assert cliente.get("/api/estado").json()["usuario"]["nombre"] == "jefa"
+
+
+# --- el rol, además de la sesión --------------------------------------------------------------
+#
+# La reja decide dos cosas distintas: si hace falta sesión (`_necesita_sesion`) y si hace falta ser
+# administrador (`_necesita_admin`). Lo segundo se resuelve por prefijo de ruta y no endpoint por
+# endpoint, justamente para que una ruta nueva de esas familias nazca cerrada; el precio es que las
+# excepciones hay que fijarlas con tests, porque un prefijo no distingue «esto es del admin» de
+# «esto es tuyo».
+
+SOLO_ADMIN = [
+    ("GET", "/api/clasificacion"),
+    ("GET", "/catalogo"),
+    ("GET", "/api/usuarios"),
+    ("GET", "/usuarios"),
+    ("GET", "/api/revision"),
+    ("GET", "/api/revision/loquesea"),
+    ("GET", "/revision"),
+    ("POST", "/api/nodo/loquesea/revision/experto"),
+]
+
+#: Con sesión de revisor alcanza. Clasificar es su trabajo, y su contraseña es suya.
+DE_CUALQUIER_SESION = [
+    ("GET", "/api/yo"),
+    ("GET", "/api/nodo/loquesea/clasificacion"),
+    ("PUT", "/api/nodo/loquesea/evento/1/clasificacion"),
+    ("DELETE", "/api/nodo/loquesea/evento/1/clasificacion"),
+    ("POST", "/api/usuarios/quien-sea/contrasena"),
+]
+
+
+@pytest.mark.parametrize("metodo,ruta", SOLO_ADMIN)
+def test_lo_que_pide_rol_administrador(taller, metodo, ruta):
+    _, main = taller
+    assert main._necesita_admin(metodo, ruta), f"{metodo} {ruta} debería pedir admin"
+
+
+@pytest.mark.parametrize("metodo,ruta", DE_CUALQUIER_SESION)
+def test_lo_que_un_revisor_si_puede(taller, metodo, ruta):
+    _, main = taller
+    assert not main._necesita_admin(metodo, ruta), f"{metodo} {ruta} no debería pedir admin"
+
+
+def test_una_ruta_nueva_de_revision_nace_cerrada(taller):
+    """La propiedad que justifica resolverlo por prefijo en vez de endpoint por endpoint."""
+    _, main = taller
+    for ruta in ("/api/revision/algo/que/no/existe", "/api/clasificacion/resumen",
+                 "/catalogo/exportar"):
+        assert main._necesita_admin("GET", ruta), ruta
+
+
+def test_el_document_server_no_pide_rol(taller):
+    """No tiene con qué autenticarse; lo protege la ficha del documento, no la sesión ni el rol."""
+    _, main = taller
+    assert not main._necesita_admin("GET", "/api/revision/abc/archivo")
+    assert not main._necesita_admin("POST", "/api/revision/abc/callback")
+
+
+def test_clasificar_no_pide_rol_pero_el_catalogo_si(taller):
+    """El corte entre la Etapa 2 y la 2.5, en una línea.
+
+    Clasificar es de cualquier revisor; ver lo que clasificaron TODOS es del administrador. Las dos
+    rutas se parecen tanto —`/api/nodo/{clave}/clasificacion` y `/api/clasificacion`— que conviene
+    dejar fijado que no son lo mismo.
+    """
+    _, main = taller
+    assert not main._necesita_admin("GET", "/api/nodo/abc/clasificacion")
+    assert main._necesita_admin("GET", "/api/clasificacion")

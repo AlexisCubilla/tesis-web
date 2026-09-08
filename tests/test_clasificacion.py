@@ -271,3 +271,47 @@ def test_la_migracion_no_se_queja_en_una_base_ya_migrada(clasificacion):
     assert clasificacion._migrar(con) == []
     assert clasificacion._migrar(con) == []
 
+
+# --- el catálogo de la Etapa 2.5 --------------------------------------------------------------
+
+
+def test_catalogado_agrupa_por_rama_y_evento(clasificacion):
+    clasificacion.guardar("nodoA", 1, "ana", "si")
+    clasificacion.guardar("nodoA", 1, "beto", "no")
+    clasificacion.guardar("nodoA", 2, "ana", "neutral")
+    clasificacion.guardar("nodoB", 5, "beto", "si_definitivo")
+    cat = clasificacion.catalogado()
+    assert set(cat) == {"nodoA", "nodoB"}
+    assert set(cat["nodoA"]) == {1, 2}
+    assert [r["usuario"] for r in cat["nodoA"][1]] == ["ana", "beto"]
+    assert cat["nodoB"][5][0]["respuesta"] == "si_definitivo"
+
+
+def test_catalogado_trae_los_nombres(clasificacion):
+    """A diferencia de todo lo demás del módulo. Su único consumidor es un endpoint de admin: el
+    catálogo es la Etapa 2.5, y quien lo mira no es ninguno de los revisores cuya independencia
+    hay que preservar."""
+    clasificacion.guardar("nodoA", 1, "ana", "si", "se ve una rampa")
+    (fila,) = clasificacion.catalogado()["nodoA"][1]
+    assert fila["usuario"] == "ana"
+    assert fila["comentario"] == "se ve una rampa"
+
+
+def test_catalogado_vacio_es_un_dict_vacio(clasificacion):
+    assert clasificacion.catalogado() == {}
+
+
+def test_revisores_son_los_que_clasificaron_algo(clasificacion):
+    clasificacion.guardar("nodoA", 1, "beto", "si")
+    clasificacion.guardar("nodoA", 2, "ana", "no")
+    clasificacion.guardar("nodoB", 1, "ana", "si")
+    assert clasificacion.revisores() == ["ana", "beto"]
+
+
+def test_retirar_saca_al_revisor_del_catalogo(clasificacion):
+    """Si alguien retira su único juicio, deja de figurar: el catálogo no inventa participantes."""
+    clasificacion.guardar("nodoA", 1, "ana", "si")
+    clasificacion.guardar("nodoA", 1, "beto", "no")
+    clasificacion.retirar("nodoA", 1, "beto")
+    assert clasificacion.revisores() == ["ana"]
+    assert [r["usuario"] for r in clasificacion.catalogado()["nodoA"][1]] == ["ana"]

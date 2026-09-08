@@ -268,3 +268,88 @@ def test_retirar_sin_sesion_no_llega_a_la_base(taller):
     r = cliente.delete("/api/nodo/loquesea/evento/1/clasificacion")
     assert r.status_code == 401
 
+
+# ---------------------------------------------- el catálogo de la Etapa 2.5, por la API
+
+def test_el_catalogo_es_del_administrador(taller):
+    """Un revisor recibe 403, no 401: tiene sesión, lo que no tiene es el rol.
+
+    La diferencia importa para el frontend: con 401 mandaría a la pantalla de ingreso —y volvería a
+    entrar la misma persona, al mismo 401—; con 403 muestra la explicación de qué es el catálogo.
+    """
+    cliente, cuentas = taller
+    cuentas.crear("revisora", "contrasena-larga", rol="revisor", creado_por="test")
+
+    cliente.post("/api/sesion", json={"usuario": "revisora", "contrasena": "contrasena-larga"})
+    assert cliente.get("/api/clasificacion").status_code == 403
+    assert cliente.get("/catalogo").status_code == 200, "la pantalla se sirve; la API es la que corta"
+
+    cliente.post("/api/sesion/salir")
+    cliente.post("/api/sesion", json={"usuario": "jefa", "contrasena": "contrasena-larga"})
+    assert cliente.get("/api/clasificacion").status_code == 200
+
+
+def test_una_navegacion_sin_rol_no_se_corta(taller):
+    """`/catalogo` y `/revision` se sirven a cualquier sesión, y la API de adentro es la que corta.
+
+    Cortar el HTML dejaría al revisor frente a una página de error del servidor, fuera del taller.
+    Así llega a la pantalla y ella le explica qué es y dónde clasificar.
+    """
+    cliente, cuentas = taller
+    cuentas.crear("revisora2", "contrasena-larga", rol="revisor", creado_por="test")
+    cliente.post("/api/sesion", json={"usuario": "revisora2", "contrasena": "contrasena-larga"})
+    for ruta in ("/catalogo", "/revision"):
+        assert cliente.get(ruta, follow_redirects=False).status_code == 200, ruta
+
+
+def test_un_revisor_sigue_clasificando(taller):
+    """Lo que el rol NO le quita: la Etapa 2 es su trabajo.
+
+    Da 404 porque la rama no existe en este taller de prueba, y eso es exactamente lo que hay que
+    ver: llegó al endpoint. Un 403 significaría que la reja se pasó de largo.
+    """
+    cliente, cuentas = taller
+    cuentas.crear("revisora3", "contrasena-larga", rol="revisor", creado_por="test")
+    cliente.post("/api/sesion", json={"usuario": "revisora3", "contrasena": "contrasena-larga"})
+    r = cliente.put("/api/nodo/inexistente/evento/1/clasificacion",
+                    json={"respuesta": "si", "comentario": ""})
+    assert r.status_code == 404
+    assert cliente.get("/api/nodo/inexistente/clasificacion").status_code == 200
+
+
+def test_coincidir_es_caer_del_mismo_lado_no_marcar_la_misma_casilla(taller):
+    """La regla del acuerdo, que es la métrica del catálogo.
+
+    «Sí» y «Definitivamente sí» son la misma respuesta a la pregunta con distinta convicción.
+    Contarlas como desacuerdo mediría cuánto se parecen las CASILLAS que eligieron dos personas, no
+    si coinciden en el juicio — y lo que la Etapa 2 quiere saber es lo segundo.
+
+    «Neutral» vale 0, así que no cae de ningún lado: contra un «sí» son signos distintos y eso es un
+    desacuerdo. Es deliberado — quien dijo neutral no acompañó al que dijo sí.
+    """
+    _, _ = taller
+    from backend.main import _acuerdo
+    r = lambda *cods: [{"respuesta": c} for c in cods]
+
+    assert _acuerdo(r("si", "si_definitivo")) == "acuerdo"
+    assert _acuerdo(r("no", "no_definitivo")) == "acuerdo"
+    assert _acuerdo(r("si", "no")) == "desacuerdo"
+    assert _acuerdo(r("si_definitivo", "no_definitivo")) == "desacuerdo"
+    assert _acuerdo(r("neutral", "si")) == "desacuerdo"
+    assert _acuerdo(r("neutral", "neutral")) == "acuerdo"
+    assert _acuerdo(r("si", "si", "si_definitivo")) == "acuerdo", "tres revisores también"
+    assert _acuerdo(r("si", "si", "no")) == "desacuerdo", "uno que discrepa alcanza"
+
+
+def test_un_solo_juicio_no_es_acuerdo_ni_desacuerdo(taller):
+    """`None`, y no «acuerdo» por defecto.
+
+    Un evento que miró una sola persona no dice nada sobre la coincidencia entre revisores. Contarlo
+    en cualquiera de los dos montones ensuciaría la única cifra que la Etapa 2 quiere medir: con
+    cuarenta eventos vistos por uno solo y dos por dos, sumarlos daría un 95 % de coincidencia que
+    no describe nada.
+    """
+    _, _ = taller
+    from backend.main import _acuerdo
+    assert _acuerdo([]) is None
+    assert _acuerdo([{"respuesta": "si"}]) is None

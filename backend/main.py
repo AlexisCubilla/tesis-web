@@ -1018,6 +1018,157 @@ def get_revision_config():
     }
 
 
+#: --------------------------------------------------------------------------------------
+#: Catálogo — la Etapa 2.5
+#:
+#: La Etapa 2 es la clasificación: un revisor mira un evento y dice si le parece anómalo. Eso pasa
+#: en el taller, evento por evento, y cada uno ve solo lo suyo. La 2.5 es lo que hace falta después,
+#: y es otra actividad: mirar TODO lo cargado junto, ver dónde falta trabajo, y ver en qué
+#: coinciden y en qué no los revisores entre sí. Es el paso que convierte votos sueltos en un
+#: catálogo, y la materia prima de la taxonomía que viene después.
+#:
+#: POR ESO ES SOLO DEL ADMINISTRADOR, y no es una restricción de permisos sino la etapa siguiente.
+#: Quien mira acá no es ninguno de los revisores cuya independencia hay que preservar —ver el ADR
+#: A17—, así que puede ver quién dijo qué. Con la pantalla cerrada por rol el ciego se cumple por
+#: construcción, sin un filtro que haya que acordarse de aplicar bien en cada consulta.
+#: --------------------------------------------------------------------------------------
+
+def _acuerdo(respuestas: list[dict]) -> str | None:
+    """Si dos o más revisores miraron un evento, ¿coincidieron?
+
+    Coincidir es caer del MISMO LADO, no marcar la misma casilla: «sí» y «definitivamente sí» son
+    la misma respuesta a la pregunta con distinta convicción, y contarlas como desacuerdo mediría la
+    escala en lugar del juicio. Se compara el signo del valor, que es para lo que la escala lo trae.
+
+    Devuelve `None` con menos de dos respuestas: un evento que miró una sola persona no es un
+    acuerdo ni un desacuerdo, y meterlo en cualquiera de los dos montones ensucia la cifra.
+    """
+    if len(respuestas) < 2:
+        return None
+    valores = {o["codigo"]: o["valor"] for o in clasificacion.ESCALA}
+    signos = {(v > 0) - (v < 0) for v in (valores.get(r["respuesta"], 0) for r in respuestas)}
+    return "acuerdo" if len(signos) == 1 else "desacuerdo"
+
+
+@app.get("/api/clasificacion")
+def get_catalogado(request: Request):
+    """El catálogo entero: qué clasificó cada quién, con las cifras de cobertura y coincidencia.
+
+    HOJA Y RANGO SALEN DEL ENTREGABLE de cada rama, que es su única fuente. Una rama cuyo resultado
+    ya no esté en disco aporta sus juicios sin ese contexto en vez de desaparecer del catálogo.
+    """
+    _administrador(request)
+    por_nodo = clasificacion.catalogado()
+    valores = {o["codigo"]: o["valor"] for o in clasificacion.ESCALA}
+
+    ramas, global_ = [], {"acuerdo": 0, "desacuerdo": 0, "un_solo_juicio": 0,
+                          "eventos": 0, "juicios": 0, "eventos_totales": 0, "ramas_sin_tocar": 0}
+    por_revisor: dict[str, dict] = {}
+
+    # SE RECORRE EL ÁRBOL, NO LA TABLA DE CLASIFICACIONES. La primera versión iteraba lo votado, y
+    # entonces una rama sin ningún juicio no aparecía: no tenía fila de dónde salir. Con cuatro
+    # ramas de eventos y una clasificada, el catálogo mostraba una sola y prometía decir «dónde
+    # falta trabajo» — justamente las ramas donde falta TODO eran las invisibles.
+    #
+    # Se listan todas las ramas de eventos con resultado, y las claves votadas que ya no están en el
+    # árbol se agregan al final. No debería haber ninguna, porque borrar una rama borra sus
+    # clasificaciones; si aparece una, conviene verla en vez de que se pierda en silencio.
+    de_eventos = [n["clave"] for n in almacen.listar(_con)
+                  if n["etapa"] == "eventos" and n["tiene_resultado"]]
+    huerfanas = [c for c in por_nodo if c not in de_eventos]
+
+    for clave in de_eventos + sorted(huerfanas):
+        eventos = por_nodo.get(clave, {})
+        nodo = almacen.obtener(_con, clave)
+        contexto, total_eventos = {}, None
+        if nodo is not None and nodo["tiene_resultado"]:
+            try:
+                tabla = almacen.cargar_resultado(clave)["eventos"]
+                total_eventos = int(len(tabla))
+                pedidas = tabla[tabla["event_id"].isin(list(eventos))]
+                contexto = {
+                    int(f["event_id"]): {
+                        "hoja": str(f["SheetName"]), "desde": int(f["start"]),
+                        "hasta": int(f["end"]), "n_ventanas": int(f["n_ventanas"]),
+                        "n_detectores": int(f["n_detectores"]),
+                    }
+                    for _, f in pedidas.iterrows()
+                }
+            except Exception:
+                pass    # el resultado se limpió: los juicios se muestran igual, sin rango
+
+        filas, cuenta = [], {"acuerdo": 0, "desacuerdo": 0, "un_solo_juicio": 0}
+        for ev, respuestas in sorted(eventos.items()):
+            estado = _acuerdo(respuestas)
+            cuenta[estado or "un_solo_juicio"] += 1
+            for r in respuestas:
+                d = por_revisor.setdefault(r["usuario"], {"n": 0, "reparto": {}})
+                d["n"] += 1
+                d["reparto"][r["respuesta"]] = d["reparto"].get(r["respuesta"], 0) + 1
+            filas.append({
+                "event_id": ev,
+                **contexto.get(ev, {}),
+                "sin_contexto": ev not in contexto,
+                "estado": estado,
+                "respuestas": [
+                    {"usuario": r["usuario"], "respuesta": r["respuesta"],
+                     "valor": valores.get(r["respuesta"], 0), "comentario": r["comentario"],
+                     "actualizado_en": r["actualizado_en"]}
+                    for r in respuestas
+                ],
+            })
+
+        for k, v in cuenta.items():
+            global_[k] += v
+        global_["eventos"] += len(filas)
+        global_["juicios"] += sum(len(f["respuestas"]) for f in filas)
+        global_["eventos_totales"] += total_eventos or 0
+        if not filas:
+            global_["ramas_sin_tocar"] += 1
+
+        # LA ★ ES LA CONFIGURACIÓN DE LA TESIS, no «tiene etiqueta». La primera versión de la
+        # pantalla se la ponía a cualquier rama con nombre, así que «la del 1% con tope» salía con
+        # estrella al lado de la tesis. Se calcula con `_diferencias_con_la_tesis`, que es lo mismo
+        # que mira la hoja de Procedencia del Excel: cero diferencias en toda la cadena.
+        es_tesis = False
+        if nodo is not None:
+            es_tesis = not _diferencias_con_la_tesis(almacen.cadena_hasta(_con, clave))
+
+        ramas.append({
+            "nodo": clave,
+            "existe": nodo is not None,
+            "etiqueta": (nodo["etiqueta"] if nodo else None),
+            "etapa": (nodo["etapa"] if nodo else None),
+            "es_tesis": es_tesis,
+            "total_eventos": total_eventos,
+            "cuenta": cuenta,
+            "eventos": filas,
+        })
+
+    # EL ORDEN: la tesis primero, después por trabajo hecho. La rama de la tesis va arriba siempre
+    # —es la que importa, y buscarla entre las demás no tiene sentido cuando el sitio entero existe
+    # para ella—. El resto baja por cantidad de eventos clasificados: adelante lo que ya tiene
+    # trabajo encima y al final las que no se tocaron, que es el orden en que uno las va a mirar.
+    #
+    # Se desempata por total de eventos y después por clave. Lo último no es decorativo: sin un
+    # criterio final, dos ramas con el mismo trabajo podrían intercambiarse de lugar entre dos
+    # cargas de la pantalla, y una lista que se reordena sola es difícil de leer.
+    ramas.sort(key=lambda r: (not r["es_tesis"], -len(r["eventos"]),
+                              -(r["total_eventos"] or 0), r["nodo"]))
+
+    comparables = global_["acuerdo"] + global_["desacuerdo"]
+    return {
+        "ramas": ramas,
+        "global": {**global_,
+                   "comparables": comparables,
+                   "coincidencia": (global_["acuerdo"] / comparables) if comparables else None},
+        "por_revisor": por_revisor,
+        "revisores": clasificacion.revisores(),
+        "escala": [dict(o) for o in clasificacion.ESCALA],
+        "pregunta": clasificacion.PREGUNTA,
+    }
+
+
 @app.get("/api/revision")
 def get_revisiones(nodo: str | None = None):
     """Todos los documentos de revisión, o los de una rama."""
@@ -1340,10 +1491,25 @@ async def revalidar_el_frontend(request, call_next):
 #:   `.../clasificacion`                      · es «lo que respondí YO». Sin sesión no hay un yo,
 #:                                              y devolverla vacía sería mentir menos que devolver
 #:                                              la de otro, pero mentir igual.
-_LECTURAS_PRIVADAS = ("/api/yo", "/api/usuarios", "/usuarios", "/api/revision", "/revision")
+_LECTURAS_PRIVADAS = ("/api/yo", "/api/usuarios", "/usuarios", "/api/revision", "/revision",
+                      "/catalogo")
 
 #: Los dos POST que no pueden pedir sesión: el que la crea y el que la cierra.
 _ESCRITURAS_ABIERTAS = frozenset({"/api/sesion", "/api/sesion/salir"})
+
+#: Lo que además de sesión pide ROL ADMINISTRADOR. Son las dos actividades que empiezan cuando la
+#: clasificación ya se hizo —el catálogo de la Etapa 2.5 y la revisión de los entregables— más la
+#: administración de cuentas. Un revisor clasifica en el taller y nada más; que no entre acá no es
+#: una desconfianza, es que el catálogo muestra lo que respondieron TODOS y verlo mientras se
+#: clasifica arruinaría lo que el ADR A17 quiere medir.
+#:
+#: VA EN LA REJA Y NO EN CADA ENDPOINT. Son once rutas entre las tres familias; con un
+#: `_administrador(request)` por función, la número doce nace abierta y nadie se entera. Acá pasa
+#: lo contrario: `/api/revision/algo-nuevo` nace cerrado, que es la misma propiedad que hace
+#: `_necesita_sesion` con los métodos de escritura.
+_SOLO_ADMIN = ("/api/clasificacion", "/catalogo",
+               "/api/usuarios", "/usuarios",
+               "/api/revision", "/revision")
 
 
 def _necesita_sesion(metodo: str, ruta: str) -> bool:
@@ -1358,6 +1524,34 @@ def _necesita_sesion(metodo: str, ruta: str) -> bool:
     if ruta.endswith("/clasificacion"):
         return True
     return any(ruta == r or ruta.startswith(r + "/") for r in _LECTURAS_PRIVADAS)
+
+
+def _necesita_admin(metodo: str, ruta: str) -> bool:
+    """¿Esta ruta pide rol administrador, además de sesión?
+
+    El Document Server queda afuera por lo mismo que en `_necesita_sesion`: no tiene con qué
+    autenticarse y lo protege la ficha del documento.
+
+    `/api/nodo/{clave}/revision/{tipo}` —crear el documento de una rama— también entra, aunque no
+    empiece con los prefijos: se resuelve por el segmento, no por el comienzo de la ruta.
+
+    LA EXCEPCIÓN DE `/contrasena`. Cambiar la propia contraseña cuelga de `/api/usuarios/{nombre}/`,
+    así que el prefijo se la llevaba puesta y un revisor dejaba de poder cambiar su clave —lo
+    encontró `test_cada_uno_cambia_su_propia_contrasena_y_no_la_ajena`, que ya existía—. Ese
+    endpoint tiene su propia regla, más fina que un rol: administrador, **o** el dueño de la cuenta.
+    Eso no se puede expresar acá, donde solo se sabe la ruta, así que se lo deja pasar y decide él.
+
+    Es el límite de resolver el acceso por prefijo: alcanza para «esta familia es del admin» y no
+    para «esto es tuyo». Cuando aparezca la segunda excepción conviene mirar si la lista sigue
+    siendo la herramienta adecuada.
+    """
+    if _es_del_document_server(metodo, ruta):
+        return False
+    if ruta.endswith("/contrasena"):
+        return False
+    if any(ruta == r or ruta.startswith(r + "/") for r in _SOLO_ADMIN):
+        return True
+    return "/revision" in ruta and ruta.startswith("/api/nodo/")
 
 
 def _es_del_document_server(metodo: str, ruta: str) -> bool:
@@ -1409,6 +1603,15 @@ async def exigir_sesion(request: Request, call_next):
         # Es la misma razón por la que el frontend enlaza todo relativo (`estatico/…`, `taller`).
         destino = ruta.lstrip("/") + (f"?{request.url.query}" if request.url.query else "")
         return RedirectResponse(f"login?destino={quote(destino, safe='')}", status_code=303)
+
+    # Con sesión pero sin el rol: 403 a la API, y a una NAVEGACIÓN se la deja pasar. La pantalla se
+    # sirve igual y su propio pedido a la API recibe el 403, así el revisor ve una explicación
+    # dentro del taller —qué es esa pantalla y dónde clasificar— en vez de un error del servidor.
+    if (request.state.usuario is not None
+            and request.state.usuario["rol"] != cuentas.ADMIN
+            and _necesita_admin(request.method, ruta)
+            and ruta.startswith("/api/")):
+        return JSONResponse({"detail": "Solo el administrador puede hacer esto"}, status_code=403)
 
     return await call_next(request)
 
@@ -1634,6 +1837,17 @@ def login_html():
 def usuarios_html():
     """La pantalla de administración de cuentas. Pide sesión; el rol lo verifica la API."""
     return FileResponse(WEB / "usuarios.html")
+
+
+@app.get("/catalogo")
+def catalogo_html():
+    """El catálogo de la Etapa 2.5. Pide sesión; el rol lo verifica la API.
+
+    Igual que `/usuarios`: la pantalla se sirve a cualquiera con sesión y es `GET /api/clasificacion`
+    el que exige administrador. Devolver un 403 en el HTML dejaría a un revisor frente a una página
+    en blanco del servidor; así llega a la pantalla y ella le explica qué es esto y dónde clasificar.
+    """
+    return FileResponse(WEB / "catalogo.html")
 
 
 @app.get("/revision")

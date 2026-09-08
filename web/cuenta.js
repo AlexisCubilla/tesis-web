@@ -70,7 +70,7 @@
 
   /* --- Con sesión: un avatar, y el resto adentro. ----------------------------------------- */
   function pintarMenu(usuario) {
-    if (usuario.rol === 'admin') agregarPestanaUsuarios();
+    if (usuario.rol === 'admin') { agregarPestana('usuarios', 'Usuarios'); agregarPestana('catalogo', 'Catálogo'); }
 
     const caja = document.createElement('div');
     caja.className = 'cuenta';
@@ -136,17 +136,18 @@
     });
   }
 
-  /** La pestaña de Usuarios, para el administrador, junto a las otras dos.
+  /** Una pestaña que solo ve el administrador —Usuarios, Catálogo—, junto a las otras.
    *
-   *  `usuarios.html` ya la trae escrita —y marcada como activa— así que ahí no se agrega nada:
-   *  duplicaría el enlace, y además la escrita llega con la página en lugar de aparecer cuando
-   *  responde `api/yo`. En las demás pantallas la pone esta función.
+   *  Cada una de esas pantallas ya trae SU pestaña escrita y marcada como activa, así que la
+   *  comprobación de duplicado no es defensiva: es lo que evita que en `usuarios.html` aparezca
+   *  «Usuarios» dos veces. Y la escrita a mano llega con la página, en vez de aparecer recién
+   *  cuando responde `api/yo`, que es lo que hace que la barra no salte en la pantalla propia.
    */
-  function agregarPestanaUsuarios() {
-    if (!nav || nav.querySelector('a[href="usuarios"]')) return;
+  function agregarPestana(href, texto) {
+    if (!nav || nav.querySelector(`a[href="${href}"]`)) return;
     const a = document.createElement('a');
-    a.href = 'usuarios';
-    a.textContent = 'Usuarios';
+    a.href = href;
+    a.textContent = texto;
     nav.appendChild(a);
   }
 })();

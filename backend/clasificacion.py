@@ -256,6 +256,42 @@ def resumen_nodo(nodo: str) -> dict:
         "revisores": int(revisores["n"]),
     }
 
+
+def catalogado() -> dict[str, dict]:
+    """Todo lo clasificado, agrupado por rama y evento. Para el catálogo de la Etapa 2.5.
+
+    Devuelve `{nodo: {event_id: [{usuario, respuesta, comentario, …}, …]}}`, con nombre y todo.
+
+    EL CIEGO NO SE PROTEGE ACÁ, se protege por rol. Esta función es la única del módulo que expone
+    quién dijo qué, y por eso su único consumidor es un endpoint cerrado al administrador: el
+    catálogo es la Etapa 2.5, que empieza cuando la clasificación ya se hizo, y quien la mira no es
+    ninguno de los revisores cuya independencia hay que preservar.
+
+    Hubo una versión que devolvía «lo mío completo y de los demás solo el reparto sin nombres», para
+    que un revisor pudiera ver el conjunto sin romper el ciego. Se descartó al separar las etapas:
+    un filtro que hay que acordarse de aplicar bien en cada consulta es más frágil que una pantalla
+    a la que el revisor no entra. El precedente es `de_evento`, que existe desde el principio y
+    ningún endpoint usaba, justamente por este miedo.
+
+    NO TRAE HOJA NI RANGO. Eso sale del entregable de la rama, que es su única fuente; ver en el
+    encabezado por qué la copia dentro de la fila se quitó.
+    """
+    filas = conexion().execute(
+        """SELECT nodo, event_id, usuario, respuesta, comentario, creado_en, actualizado_en
+             FROM clasificaciones ORDER BY nodo, event_id, usuario"""
+    ).fetchall()
+    por_nodo: dict[str, dict] = {}
+    for f in filas:
+        por_nodo.setdefault(f["nodo"], {}).setdefault(f["event_id"], []).append(dict(f))
+    return por_nodo
+
+
+def revisores() -> list[str]:
+    """Quiénes clasificaron algo, alguna vez. Para las columnas del catálogo."""
+    return [f["usuario"] for f in conexion().execute(
+        "SELECT DISTINCT usuario FROM clasificaciones ORDER BY usuario")]
+
+
 def borrar_de(nodos: list[str]) -> int:
     """Borra las clasificaciones de esas ramas. Devuelve cuántas se fueron.
 

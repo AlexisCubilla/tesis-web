@@ -1439,7 +1439,11 @@ async function bloqueDeRevision(clave) {
   if (!caja) return;
   // La revisión experta es escritura: abrir un documento entrega su ficha. Sin sesión ni se
   // pregunta, para no gastar dos peticiones que el backend va a contestar 401.
-  if (!S.usuario) return;
+  /* Sin sesión no hay revisión, y sin rol admin tampoco: la revisión de los entregables pasó a ser
+     del administrador junto con el catálogo —las dos son actividades de después de clasificar—. Se
+     sale ACÁ y no se muestra el bloque en gris: un revisor no tiene nada que hacer con él, y la
+     API le contestaría 403 en las dos llamadas de abajo. */
+  if (!S.usuario || S.usuario.rol !== 'admin') return;
 
   let cfg;
   try {

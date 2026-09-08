@@ -616,3 +616,76 @@ se está viendo entero.
 `401` es la respuesta normal a algo que necesita sesión, y redirigir expulsaba del taller a un
 visitante por una petición que ni siquiera hizo a propósito. Ahora la distinción es explícita: se
 redirige solo si *había* un usuario. «Se venció» y «nunca hubo» son cosas distintas.
+
+## A19 — El catálogo es la Etapa 2.5, y por eso es del administrador
+
+**Decisión.** Una pantalla nueva, `/catalogo`, reúne todo lo clasificado: qué respondió cada revisor
+en cada evento, con nombre, más las cifras de cobertura y coincidencia. Pide rol administrador. La
+revisión de los entregables (`/revision`) pasa al mismo rol.
+
+**Son dos actividades distintas, no dos permisos.** La Etapa 2 es clasificar: un revisor mira un
+evento en el paso 6 del taller y dice si le parece anómalo, de a uno y sin ver lo que respondieron
+los demás. La 2.5 es lo que hace falta después y es otro trabajo: mirar el conjunto, ver dónde falta
+un segundo juicio, y ver en qué coinciden y en qué no. Es el paso que convierte votos sueltos en un
+catálogo, y la materia prima de la taxonomía que viene después.
+
+**El rol protege el ciego por construcción.** El A17 apoya la Etapa 2 en la coincidencia entre
+revisores independientes, y eso se pierde entero si el segundo ve la respuesta del primero. Hubo una
+versión de este endpoint que devolvía «lo mío completo, y de los demás solo el reparto sin nombres»,
+para que un revisor pudiera ver el conjunto sin romper nada. Se descartó: un filtro que hay que
+acordarse de aplicar bien en cada consulta es más frágil que una pantalla a la que el revisor no
+entra. El precedente estaba a la vista — `clasificacion.de_evento()` existe desde el principio y
+ningún endpoint la usaba, justamente por este miedo.
+
+**Por qué la revisión de entregables se mudó al mismo rol.** Los documentos que el experto comenta
+a mano perdieron centralidad frente a la encuesta: la Etapa 2 pasó a ser la clasificación. Comentar
+una planilla dejó de ser el trabajo del revisor, así que cerrar esa pantalla no le quita nada, y
+agrupa las dos actividades de después-de-clasificar detrás del mismo rol.
+
+**El rol se exige en la reja, no endpoint por endpoint.** `_necesita_admin()` resuelve por prefijo
+de ruta, igual que `_necesita_sesion()` resuelve por método. Son once rutas entre las tres familias
+—catálogo, cuentas, revisión— y con un `_administrador(request)` por función la número doce nace
+abierta y nadie se entera; así nace cerrada.
+
+*El precio son las excepciones, y hay que fijarlas con tests.* Cambiar la propia contraseña cuelga
+de `/api/usuarios/{nombre}/contrasena`, así que el prefijo se la llevó puesta y un revisor dejó de
+poder cambiar su clave. Lo encontró un test que ya existía. Ese endpoint tiene una regla más fina
+que un rol —administrador **o** el dueño de la cuenta— y eso no se puede expresar donde solo se
+conoce la ruta. Alcanza para «esta familia es del admin» y no para «esto es tuyo»; cuando aparezca
+la segunda excepción, conviene revisar si la lista sigue siendo la herramienta.
+
+**El HTML se sirve, la API corta.** `/catalogo` y `/revision` responden 200 a cualquier sesión y es
+su propio pedido a la API el que devuelve 403. Cortar el HTML dejaría al revisor frente a una página
+de error del servidor, fuera del taller; así llega a la pantalla y ella le explica qué es esto y que
+su clasificación se hace en el paso 6. Y es 403 y no 401 a propósito: con 401 el frontend lo mandaría
+a la pantalla de ingreso, donde volvería a entrar la misma persona y llegaría al mismo 401.
+
+**Coincidir es caer del mismo lado, no marcar la misma casilla.** «Sí» y «Definitivamente sí» son la
+misma respuesta con distinta convicción; contarlas como desacuerdo mediría la escala en lugar del
+juicio. Se compara el signo del valor, que es para lo que la escala lo trae. Y un evento que miró una
+sola persona no es acuerdo ni desacuerdo: queda afuera de la cifra, porque con cuarenta eventos
+vistos por uno solo y dos por dos, meterlos en el mismo montón daría un 95 % que no describe nada.
+
+**El reparto por revisor no es una cifra de calidad.** Si alguien dice «sí» al 90 % y otro al 10 %,
+eso es un dato sobre cómo se entendió la pregunta, no sobre quién tiene razón. Se muestra sin nada
+que sugiera un ranking.
+
+**Se listan TODAS las ramas de eventos, no solo las clasificadas.** La primera versión recorría la
+tabla de clasificaciones, así que una rama sin ningún juicio no tenía fila de dónde salir: con
+cuatro ramas y una clasificada, el catálogo mostraba una sola mientras prometía decir «dónde falta
+trabajo» — justo las ramas donde falta todo eran las invisibles. Ahora recorre el árbol y une.
+
+**El orden: la tesis primero, después por trabajo hecho.** La rama de la tesis va arriba siempre; el
+resto baja por cantidad de eventos clasificados, así adelante queda lo que ya tiene trabajo encima y
+al final lo que no se tocó. Se desempata por total de eventos y después por clave — lo último no es
+decorativo: sin un criterio final, dos ramas con el mismo trabajo pueden intercambiarse entre dos
+cargas, y una lista que se reordena sola es difícil de leer.
+
+*Y la ★ es la configuración de la tesis, no «tiene nombre».* Calcularla destapó un bug del A7:
+`_diferencias_con_la_tesis` comparaba solo las claves que la configuración de referencia nombra, y
+el taller tiene perillas propias que allá no existen —`filtrado.descartar`, que apaga el filtrado
+entero—. Una rama que saltea un paso que la tesis necesita respondía «cero diferencias», y la hoja
+de Procedencia del Excel escribía «SÍ — coincide en todos los parámetros» sobre ella: exactamente el
+archivo indistinguible del oficial que el A7 existe para evitar. `app.js` ya recorría la unión de
+claves y usaba el `defecto` de la etapa como valor esperado; la copia del backend se había quedado
+atrás. Corregido y con tres tests que lo fijan.

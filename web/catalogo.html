@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo — Taller Etapa 1</title>
+<link rel="stylesheet" href="estatico/estilos.css">
+<script>
+/* El tema, ANTES del primer cuadro. Va inline en el `<head>` y no en `tema.js` a propósito: ese
+   archivo se carga al final del cuerpo, cuando el navegador ya pintó, y quien tenga el claro
+   guardado vería un destello oscuro en cada carga. Es una de las tres fallas que el ADR A8 le
+   achacaba al interruptor; esta es su arreglo. */
+try { document.documentElement.dataset.tema = localStorage.getItem('tema') || 'oscuro'; }
+catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
+</script>
+<style>
+  /* Las cifras de arriba. Mismo lenguaje que las tarjetas del taller: el número grande y el rótulo
+     abajo, sin recuadros de color — el color acá codificaría algo que el número ya dice. */
+  .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 22px; }
+  .cifra { background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio);
+    padding: 13px 15px; }
+  .cifra .n { font-size: 1.7rem; font-weight: 600; line-height: 1.1;
+    font-variant-numeric: tabular-nums; }
+  .cifra .r { font-size: .78rem; color: var(--texto-2); margin-top: 3px; }
+  .cifra .d { font-size: .72rem; color: var(--texto-3); margin-top: 5px; }
+
+  .rama { background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio);
+    margin-bottom: 16px; overflow: hidden; }
+  .rama > summary, .rama > .cab { padding: 11px 15px; display: flex; align-items: center;
+    gap: 12px; flex-wrap: wrap; font-size: .88rem; }
+  .rama > summary { cursor: pointer; }
+  /* La rama sin empezar: mismo lugar en la lista, menos peso. Sin fondo de panel para que la fila
+     no prometa contenido que no hay. */
+  .rama.sin-tocar { background: none; }
+  .rama.sin-tocar .cab { color: var(--texto-3); }
+  .rama > summary::marker { color: var(--texto-3); }
+  .rama .clave { font-family: var(--mono); font-size: .8rem; color: var(--texto-2); }
+  /* El nombre de la rama NO lleva estilo propio acá: `.nombre-rama` ya existe en `estilos.css` y
+     el mapa del taller la usa para lo mismo —el nombre que alguien le puso a una rama—, así que
+     reusarla hace que se vea igual en las dos pantallas. La primera versión definía una variante
+     local que sobrescribía la mitad de sus propiedades y dejaba el resto, con lo cual salía un
+     híbrido: cursiva sobre el recuadro verde del sistema. */
+  .rama .cuenta { font-size: .76rem; color: var(--texto-3); margin-left: auto; }
+
+  table.cat { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  table.cat th { text-align: left; font-weight: 600; font-size: .74rem; color: var(--texto-2);
+    padding: 7px 10px; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde);
+    background: var(--fondo-2); white-space: nowrap; }
+  table.cat td { padding: 7px 10px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  table.cat tr:last-child td { border-bottom: none; }
+  table.cat .num { text-align: right; font-variant-numeric: tabular-nums;
+    font-family: var(--mono); font-size: .78rem; }
+
+  /* El estado de un evento. `acuerdo` y `desacuerdo` llevan color porque son un juicio sobre los
+     datos; «un solo juicio» no lo lleva, porque no es un resultado sino trabajo que falta. */
+  .est { font-size: .74rem; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+  .est.acuerdo { background: var(--chip-ok-b); color: var(--chip-ok-t); }
+  .est.desacuerdo { background: var(--chip-err-b); color: var(--chip-err-t); }
+  .est.solo { color: var(--texto-3); padding-left: 0; }
+
+  .voto { display: inline-block; margin-right: 9px; white-space: nowrap; }
+  .voto b { font-weight: 600; }
+  .voto .q { color: var(--texto-2); font-size: .76rem; }
+  .voto.pos b { color: var(--ok); }
+  .voto.neg b { color: var(--peligro); }
+  .voto.cero b { color: var(--texto-2); }
+  .com { display: block; color: var(--texto-2); font-size: .78rem; margin-top: 3px;
+    padding-left: 2px; border-left: 2px solid var(--borde); padding-left: 7px; }
+
+  .revisores { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px; margin-bottom: 22px; }
+  .barrita { display: flex; height: 7px; border-radius: 4px; overflow: hidden; margin-top: 8px;
+    background: var(--fondo-2); }
+  .barrita span { display: block; }
+
+  .vacio { text-align: center; color: var(--texto-2); padding: 44px 20px; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="estrellas"></div>
+
+<header class="barra">
+  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <nav>
+    <a href=".">El proyecto</a>
+    <a href="taller">Taller</a>
+    <a href="catalogo" class="activo">Catálogo</a>
+  </nav>
+</header>
+
+<div class="envoltorio">
+  <h1>Catálogo de lo clasificado</h1>
+  <p class="tenue" id="intro">
+    Lo que los revisores marcaron, junto. La clasificación en sí se hace en el paso 6 del taller,
+    de a un evento y sin ver lo que respondieron los demás; acá se mira el conjunto: dónde falta
+    trabajo, y en qué coinciden y en qué no.
+  </p>
+
+  <div id="aviso"></div>
+  <div id="cuerpo"></div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+async function api(ruta, op) {
+  const r = await fetch(ruta, op);
+  if (r.status === 401) {
+    location.href = 'login?destino=' + encodeURIComponent(location.pathname.split('/').pop());
+    throw new Error('Hace falta iniciar sesión');
+  }
+  if (!r.ok) {
+    /* El código va PEGADO al error, no solo el texto. El 403 de esta pantalla necesita una
+       explicación propia —qué es el catálogo y dónde clasificar— y distinguirlo por el mensaje no
+       funciona: el backend manda su propio `detail`, así que buscar «403» en el texto nunca
+       acierta. Fue exactamente el bug de la primera versión. */
+    const err = new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}
+
+let ESCALA = [];
+const etiqueta = (cod) => (ESCALA.find((o) => o.codigo === cod) || {}).etiqueta || cod;
+
+/** El signo de una respuesta, para colorear el voto. Ver `_acuerdo` en el backend: lo que importa
+ *  es de qué lado cae, no con cuánta convicción. */
+function signo(valor) {
+  return valor > 0 ? 'pos' : valor < 0 ? 'neg' : 'cero';
+}
+
+function cifra(n, rotulo, detalle) {
+  return `<div class="cifra"><div class="n">${n}</div><div class="r">${rotulo}</div>${
+    detalle ? `<div class="d">${detalle}</div>` : ''}</div>`;
+}
+
+function pintarCifras(g) {
+  const coincidencia = g.coincidencia === null ? '—'
+    : `${Math.round(g.coincidencia * 100)}%`;
+  return `<div class="cifras">
+    ${cifra(g.juicios, 'juicios cargados',
+            g.eventos_totales
+              ? `sobre ${g.eventos} de los ${g.eventos_totales} eventos que hay`
+              : `sobre ${g.eventos} evento${g.eventos === 1 ? '' : 's'}`)}
+    ${cifra(coincidencia, 'coincidencia', g.comparables
+              ? `en ${g.comparables === 1 ? 'el único evento' : `los ${g.comparables} eventos`} que miró más de uno`
+              : 'ningún evento lo miró más de una persona')}
+    ${cifra(g.desacuerdo, 'desacuerdos', 'candidatos a discutir')}
+    ${cifra(g.un_solo_juicio, 'con un solo juicio',
+            g.ramas_sin_tocar
+              ? `y ${g.ramas_sin_tocar} rama${g.ramas_sin_tocar === 1 ? '' : 's'} sin empezar`
+              : 'falta un segundo revisor')}
+  </div>`;
+}
+
+/* Cada revisor, con cómo se reparten sus respuestas. NO ES UNA CIFRA DE CALIDAD: si alguien dice
+   «sí» al 90 % y otro al 10 %, eso es un dato sobre cómo se entendió la pregunta, no sobre quién
+   tiene razón. Por eso va sin ningún adorno que sugiera un ranking. */
+function pintarRevisores(porRevisor) {
+  const nombres = Object.keys(porRevisor).sort();
+  if (!nombres.length) return '';
+  const tono = { si_definitivo: 'var(--ok)', si: 'var(--ok)', neutral: 'var(--texto-3)',
+                 no: 'var(--peligro)', no_definitivo: 'var(--peligro)' };
+  return `<h2>Cada revisor</h2>
+    <div class="revisores">${nombres.map((n) => {
+      const d = porRevisor[n];
+      const partes = ESCALA.map((o) => [o.codigo, d.reparto[o.codigo] || 0])
+        .filter(([, v]) => v > 0);
+      return `<div class="cifra">
+        <div class="n" style="font-size:1.05rem">${esc(n)}</div>
+        <div class="r">${d.n} juicio${d.n === 1 ? '' : 's'}</div>
+        <div class="barrita">${partes.map(([cod, v]) =>
+          `<span style="flex:${v};background:${tono[cod] || 'var(--texto-3)'}"
+                 title="${esc(etiqueta(cod))}: ${v}"></span>`).join('')}</div>
+        <div class="d">${partes.map(([cod, v]) => `${esc(etiqueta(cod))} ${v}`).join(' · ')}</div>
+      </div>`;
+    }).join('')}</div>`;
+}
+
+/** La marca de una rama: la ★ solo si ES la configuración de la tesis, y su nombre si lo tiene.
+ *
+ *  Son dos cosas distintas y la primera versión las confundía: le ponía la ★ a cualquier rama con
+ *  etiqueta, así que «la del 1% con tope» aparecía marcada igual que la tesis. La estrella es lo
+ *  que dice el ADR A7 —esta corrida coincide en TODOS los parámetros con la configuración firmada—
+ *  y el backend la calcula con `_diferencias_con_la_tesis`, la misma cuenta que hace la hoja de
+ *  Procedencia del Excel. Una etiqueta es un nombre que alguien escribió, y no promete nada.
+ */
+function marcaDeRama(r) {
+  const estrella = r.es_tesis ? '<span class="chip oficial">★ tesis</span>' : '';
+  const nombre = r.etiqueta && !(r.es_tesis && r.etiqueta === 'tesis')
+    ? `<span class="nombre-rama">${esc(r.etiqueta)}</span>` : '';
+  return estrella + nombre;
+}
+
+function pintarRama(r) {
+  const cobertura = r.total_eventos
+    ? `${r.eventos.length} de ${r.total_eventos} eventos` : `${r.eventos.length} eventos`;
+  const partes = [];
+  if (r.cuenta.acuerdo) partes.push(`${r.cuenta.acuerdo} en acuerdo`);
+  if (r.cuenta.desacuerdo) partes.push(`${r.cuenta.desacuerdo} en desacuerdo`);
+  if (r.cuenta.un_solo_juicio) partes.push(`${r.cuenta.un_solo_juicio} con un solo juicio`);
+
+  /* UNA RAMA SIN NINGÚN JUICIO SE MUESTRA IGUAL, y es la mitad del sentido de esta pantalla: decir
+     dónde falta trabajo. Va sin flecha de desplegar —no hay nada adentro que ver— y con el aire
+     visual de una fila apagada, para que se distinga de un vistazo de las que sí tienen trabajo
+     hecho sin necesitar leer los números. */
+  if (!r.eventos.length) {
+    return `<div class="rama sin-tocar">
+      <div class="cab">
+        <span class="clave">${esc(r.nodo.slice(0, 12))}</span>
+        ${marcaDeRama(r)}
+        <span class="tenue">${r.total_eventos !== null
+          ? `${r.total_eventos} eventos, ninguno clasificado` : 'sin clasificar'}</span>
+        <span class="cuenta">sin empezar</span>
+      </div>
+    </div>`;
+  }
+
+  return `<details class="rama"${r.cuenta.desacuerdo ? ' open' : ''}>
+    <summary>
+      <span class="clave">${esc(r.nodo.slice(0, 12))}</span>
+      ${marcaDeRama(r)}
+      <span>${cobertura}</span>
+      <span class="cuenta">${partes.join(' · ')}</span>
+    </summary>
+    <table class="cat">
+      <thead><tr>
+        <th class="num">evento</th><th>hoja</th><th class="num">mediciones</th>
+        <th class="num">tramos</th><th>estado</th><th>lo que dijeron</th>
+      </tr></thead>
+      <tbody>${r.eventos.map((e) => `
+        <tr>
+          <td class="num">${e.event_id}</td>
+          <td>${e.sin_contexto ? '<span class="tenue">—</span>' : esc(e.hoja)}</td>
+          <td class="num">${e.sin_contexto ? '—' : `${e.desde}–${e.hasta}`}</td>
+          <td class="num">${e.sin_contexto ? '—' : e.n_ventanas}</td>
+          <td>${e.estado
+            ? `<span class="est ${e.estado}">${e.estado}</span>`
+            : '<span class="est solo">un solo juicio</span>'}</td>
+          <td>${e.respuestas.map((v) => `
+            <span class="voto ${signo(v.valor)}">
+              <span class="q">${esc(v.usuario)}:</span> <b>${esc(etiqueta(v.respuesta))}</b>
+            </span>${v.comentario ? `<span class="com">${esc(v.comentario)}</span>` : ''}`).join('')}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </details>`;
+}
+
+async function arrancar() {
+  let d;
+  try {
+    d = await api('api/clasificacion');
+  } catch (e) {
+    /* El 403 es el caso esperado, no una falla: un revisor que llega acá por la URL. Se le dice qué
+       es esta pantalla y por qué no la ve, en vez de un «HTTP 403» que parece un error del sitio. */
+    $('#cuerpo').innerHTML = e.status === 403
+      ? `<div class="vacio">
+          <p><strong>Esta pantalla es del administrador.</strong></p>
+          <p class="tenue">El catálogo reúne lo que respondieron todos los revisores, y verlo
+            mientras se clasifica arruinaría justo lo que se quiere medir: si dos personas, mirando
+            el mismo evento por separado, coinciden. Tu clasificación se hace en el
+            <a href="taller">paso 6 del taller</a>, y ahí ves la tuya cuando quieras.</p>
+        </div>`
+      : `<div class="vacio"><p><strong>No se pudo cargar el catálogo.</strong></p>
+          <p class="tenue mono">${esc(e.message)}</p></div>`;
+    return;
+  }
+
+  ESCALA = d.escala || [];
+  if (!d.ramas.length) {
+    $('#cuerpo').innerHTML = `<div class="vacio">
+      <p><strong>Todavía no hay nada clasificado.</strong></p>
+      <p class="tenue">Cuando alguien responda la encuesta de un evento en el
+        <a href="taller">paso 6 del taller</a>, aparece acá.</p></div>`;
+    return;
+  }
+
+  $('#cuerpo').innerHTML =
+    pintarCifras(d.global) +
+    pintarRevisores(d.por_revisor) +
+    `<h2>Por rama</h2>` +
+    d.ramas.map(pintarRama).join('');
+}
+
+arrancar();
+</script>
+<script src="estatico/cuenta.js" defer></script>
+<script src="estatico/tema.js" defer></script>
+</body>
+</html>
