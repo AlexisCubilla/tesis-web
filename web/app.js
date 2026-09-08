@@ -1333,8 +1333,8 @@ function verEventos(d) {
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="avance-clas"></span>
       <span class="tenue" style="font-size:.78rem">${S.usuario
-        ? 'clic = ver señales · doble clic = clasificar'
-        : 'clic = ver señales'}</span></div>
+        ? 'clic en una fila = ver y clasificar'
+        : 'clic en una fila = ver las señales'}</span></div>
     <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
       cabeceraOrdenable(c, rot[c] || c)).join('')}${
@@ -1347,7 +1347,7 @@ function verEventos(d) {
       return typeof v === 'number' ? `<td class="num">${v}</td>` : `<td>${v}</td>`;
     }).join('')}${S.usuario
       ? `<td class="celda-clas">${marcaClasificacion(f.event_id)}</td>` : ''}</tr>`).join('')}</tbody></table></div>
-    <div id="detalle-evento" style="margin-top:16px"></div>`;
+`;
   _tablaEventos = { d, filas };
   /* Ordenar por una columna redibuja con los datos que ya están en memoria: no vuelve a pedir
      nada. `S.tabla` vive en el estado y no en el DOM para que sobreviva a un repintado de la fase
@@ -1363,17 +1363,21 @@ function verEventos(d) {
     });
   });
   lineaDeEventos($('#caja-linea'), d, filas);
-  /* Un clic abre las señales abajo, como siempre; el doble clic abre el diálogo para clasificar.
-     Conviven sin pelearse porque el navegador dispara los dos y el segundo no deshace al primero:
-     al cerrar el diálogo, el detalle de ese mismo evento ya quedó abierto detrás. */
+  /* UN CLIC ABRE EL DIÁLOGO, y eso es todo. Antes había dos gestos: un clic dibujaba las señales
+     en un panel debajo de la tabla y el doble clic abría el diálogo para clasificar. Los dos
+     mostraban el MISMO gráfico del mismo evento —el panel de abajo era una copia más chica y sin
+     encuesta— así que había dos lugares donde mirar lo mismo y uno donde además se podía trabajar.
+
+     Y el doble clic no se descubre: había que leer el rótulo que lo anunciaba al lado de la tabla.
+
+     PARA EL MODO LECTURA ESTO NO ES UN RECORTE, es lo contrario. El panel de abajo era la única
+     forma de ver un evento sin cuenta, porque el doble clic se enganchaba solo con sesión; quitarlo
+     sin más habría dejado a un visitante sin manera de mirar nada. Ahora el diálogo se abre para
+     todos y es la ENCUESTA la que aparece solo con sesión: sin ella se ven las señales, el contexto
+     y las features, con una línea que dice dónde se entra para clasificar. */
   document.querySelectorAll('#fase-visual tr[data-ev]').forEach((tr) => {
-    tr.addEventListener('click', () => verEvento(Number(tr.dataset.ev)));
-    // Sin sesión no hay a quién atribuir un juicio, así que el doble clic no engancha nada: la
-    // encuesta no existe en modo lectura en vez de abrirse y fallar al guardar.
-    if (S.usuario) {
-      tr.addEventListener('dblclick', () =>
-        abrirDialogoEvento(Number(tr.dataset.ev), filas.map((f) => f.event_id), 'tabla'));
-    }
+    tr.addEventListener('click', () =>
+      abrirDialogoEvento(Number(tr.dataset.ev), filas.map((f) => f.event_id), 'tabla'));
   });
   pintarAvanceClasificacion(filas.length);
   bloqueDeRevision(S.sel);
@@ -1717,18 +1721,21 @@ function lineaDeEventos(destino, d, filas) {
             describir —`C.mias` viene vacía— y el doble clic no engancha nada, así que prometerlo
             era mandar a alguien a hacer clic dos veces sobre algo que no iba a pasar. Es el mismo
             criterio que el resto del modo lectura: no ofrecer lo que no se puede hacer. */
+         /* ACÁ SIGUE SIENDO DOBLE CLIC, y en la tabla es uno solo. No es un olvido: en un gráfico
+            el clic simple es del zoom y del arrastre, así que abrir un diálogo con él pelearía con
+            la herramienta. En una fila de tabla no hay con qué pelear. */
          (S.usuario
            ? ' El contorno es tu respuesta: verde de trazo largo si lo marcaste como anomalía,' +
              ' rojo de trazo corto si dijiste que no lo es, gris punteado si quedó neutral.' +
              ' Doble clic sobre un evento para verlo y clasificarlo.'
-           : ' Clic sobre un evento para ver sus señales.'),
+           : ' Doble clic sobre un evento para ver sus señales.'),
   });
 }
 
 
 /* ================================================================ el diálogo de clasificación
  *
- * Doble clic sobre un evento —en la línea de tiempo o en la tabla— y se abre esto: las tres señales
+ * Un clic sobre una fila de la tabla, o doble clic en la línea de tiempo, y se abre esto: las señales
  * del tramo, y debajo la pregunta con su escala y un comentario.
  *
  * POR QUÉ UN DIÁLOGO Y NO UN PANEL MÁS. Clasificar cuarenta eventos es una tarea repetitiva que se
@@ -1918,6 +1925,11 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       ${leyendaContexto(d)}
       <p class="porque">${ev.features_top || ''}</p>
 
+      ${!S.usuario ? `
+        <p class="pista" style="margin-top:14px">Para clasificar este evento hace falta
+          <a href="login?destino=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}">iniciar sesión</a>.
+          El juicio se guarda con el nombre de quien lo emite, así que sin cuenta no hay a quién
+          atribuirlo.</p>` : `
       <form class="encuesta" id="form-clas">
         <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
         <div class="escala">${C.escala.map((o) => `
@@ -1938,7 +1950,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
             : mia ? `Respondido el ${new Date(mia.actualizado_en).toLocaleString('es',
                       { dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
         </div>
-      </form>`;
+      </form>`}`;
 
     dlg.querySelector('#cerrar-dlg').addEventListener('click', cerrar);
 
@@ -2035,6 +2047,13 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
     /* No hace falta forzar un `resize`: el diálogo ya está abierto y con tamaño cuando se crea el
        gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
        gráfico cubre cualquier cambio posterior. */
+
+    /* SIN SESIÓN EL DIÁLOGO TERMINA ACÁ: se ve el gráfico, el contexto y las features, y nada más.
+       El `return` va DESPUÉS de dibujar y no antes —el primer intento lo puso arriba y el diálogo
+       salía vacío en modo lectura, que es exactamente lo que este cambio venía a evitar—. Lo que
+       falta abajo es todo de la encuesta, así que se sale de una vez en lugar de proteger quince
+       `querySelector` con la misma comprobación. */
+    if (!dlg.querySelector('#form-clas')) return;
 
     /* Guardar es una función y no el submit de un botón, porque ahora la dispara cualquiera de
        tres cosas: elegir una opción, dejar de escribir el comentario, o irse del evento. Devuelve
@@ -2135,33 +2154,6 @@ function leyendaContexto(d) {
        + `los métodos. A los lados hay ${antes} y ${despues} mediciones de contexto: son señal del `
        + `mismo tramo continuo que nadie marcó, para poder comparar contra lo que el pipeline `
        + `considera normal.</p>`;
-}
-
-async function verEvento(id) {
-  const cont = $('#detalle-evento');
-  cont.innerHTML = '<p class="tenue" style="font-size:.84rem">Cargando…</p>';
-  try {
-    const d = await api(`api/nodo/${S.sel}/evento/${id}`);
-    const ev = d.evento;
-    cont.innerHTML = `<div style="background:var(--fondo-2);border:1px solid var(--borde);
-        border-radius:10px;padding:14px">
-      <div class="fila-sup"><h4 style="font-size:.9rem">Evento ${id} · ${ev.SheetName}</h4>
-        <span class="chip ${ev.n_detectores >= 4 ? 'listo' : 'pendiente'}">${ev.n_detectores}/5 métodos</span>
-        <span class="esp"></span><span class="mono tenue" style="font-size:.76rem">
-        mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos</span></div>
-      <div id="caja-ev"></div>
-      ${leyendaContexto(d)}
-      <p class="mono tenue" style="font-size:.74rem;margin-top:8px">${ev.features_top || ''}</p></div>`;
-    Grafico.lineas($('#caja-ev'), {
-      titulo: `Señales del evento ${id}`,
-      xNombre: 'medición',
-      sustantivo: 'mediciones',
-      paneles: d.senales.map((s, i) => ({ nombre: s, valores: d.valores.map((f) => f[i]) })),
-      ...conContexto(d),
-    });
-  } catch (e) {
-    cont.innerHTML = `<p class="tenue" style="font-size:.84rem">No se pudo cargar: ${e.message}</p>`;
-  }
 }
 
 iniciar().catch((e) => document.querySelector('.envoltorio').insertAdjacentHTML('afterbegin',
