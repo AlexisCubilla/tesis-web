@@ -1338,7 +1338,7 @@ function verEventos(d) {
     <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
       cabeceraOrdenable(c, rot[c] || c)).join('')}${
-      S.usuario ? cabeceraOrdenable('juicio', 'mi juicio') : ''}</tr></thead>
+      S.usuario ? cabeceraOrdenable('juicio', 'mi decisión') : ''}</tr></thead>
     <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer"${
       atributoTono(f.event_id)}>${cols.map((c) => {
       const v = f[c];

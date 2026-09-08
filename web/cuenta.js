@@ -113,7 +113,7 @@
       usuarios.className = 'op';
       usuarios.setAttribute('role', 'menuitem');
       usuarios.href = 'usuarios';
-      usuarios.innerHTML = `${ICONO_USUARIOS}<span>Usuarios</span>`;
+      usuarios.innerHTML = `${ICONO_USUARIOS}<span>Gestionar usuarios</span>`;
       menu.appendChild(usuarios);
     }
 
@@ -121,7 +121,7 @@
     salir.type = 'button';
     salir.className = 'op';
     salir.setAttribute('role', 'menuitem');
-    salir.innerHTML = `${ICONO_SALIR}<span>Salir</span>`;
+    salir.innerHTML = `${ICONO_SALIR}<span>Cerrar sesión</span>`;
     salir.addEventListener('click', async () => {
       salir.disabled = true;
       try {
