@@ -125,13 +125,19 @@ window.Grafico = (function () {
 
       this.pintar();
 
-      /* Doble clic sobre un elemento del gráfico. Va acá y no en quien pide el gráfico porque
-         ESTE archivo es el único que conoce ECharts (ver el encabezado): si `app.js` hiciera
+      /* Clic sobre un elemento del gráfico. Va acá y no en quien pide el gráfico porque ESTE
+         archivo es el único que conoce ECharts (ver el encabezado): si `app.js` hiciera
          `.eco.on(...)`, la promesa de poder cambiar de librería tocando un solo archivo se
          rompería en silencio. El que llama recibe `{dataIndex, value, seriesIndex}` y nada más.
-         Se hereda al agrandar, porque `_agrandar` copia la configuración entera. */
-      if (typeof cfg.alDobleClic === 'function') {
-        this.eco.on('dblclick', (p) => cfg.alDobleClic({
+         Se hereda al agrandar, porque `_agrandar` copia la configuración entera.
+
+         ERA `dblclick` Y PASÓ A SER `click`. El doble clic estaba por miedo a pisarle el gesto a
+         las herramientas del gráfico, pero el único gráfico que usa este gancho —la línea de
+         eventos— no lleva `dataZoom` ni caja de selección: su barra tiene un botón, «agrandar». No
+         había nada que pisar, y un gesto que hay que anunciar con un rótulo al costado es un gesto
+         que no se descubre. Si algún día lo pide un gráfico CON zoom, ahí habrá que distinguir. */
+      if (typeof cfg.alClic === 'function') {
+        this.eco.on('click', (p) => cfg.alClic({
           dataIndex: p.dataIndex, value: p.value, seriesIndex: p.seriesIndex,
         }));
       }
@@ -412,7 +418,7 @@ window.Grafico = (function () {
     lineas,
     barras,
     /** Escotilla para gráficos a medida (la pantalla de análisis): recibe la opción ya armada.
-     *  Además de lo de siempre acepta `alDobleClic(info)`, que se llama con `{dataIndex, value,
+     *  Además de lo de siempre acepta `alClic(info)`, que se llama con `{dataIndex, value,
      *  seriesIndex}` al hacer doble clic sobre un elemento — sin exponer nada de ECharts. */
     medida: (destino, cfg) => new Grafo(destino, cfg),
     paleta: { serie, varCss, comun, herramientas, fmt },

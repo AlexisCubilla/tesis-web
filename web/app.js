@@ -1607,7 +1607,7 @@ function lineaDeEventos(destino, d, filas) {
     alto,
     /* El `event_id` va en la posición 4 del dato de la serie de eventos (ver `data` más abajo).
        La pista gris es la serie 0 y es `silent`, así que nunca llega acá. */
-    alDobleClic: (info) => {
+    alClic: (info) => {
       if (info.seriesIndex === 1 && Array.isArray(info.value)) {
         // Desde la línea se avanza en el tiempo, que es lo que la línea muestra. `filas` puede
         // venir ordenada por cualquier columna, así que acá se reordena para este recorrido.
@@ -1721,21 +1721,18 @@ function lineaDeEventos(destino, d, filas) {
             describir —`C.mias` viene vacía— y el doble clic no engancha nada, así que prometerlo
             era mandar a alguien a hacer clic dos veces sobre algo que no iba a pasar. Es el mismo
             criterio que el resto del modo lectura: no ofrecer lo que no se puede hacer. */
-         /* ACÁ SIGUE SIENDO DOBLE CLIC, y en la tabla es uno solo. No es un olvido: en un gráfico
-            el clic simple es del zoom y del arrastre, así que abrir un diálogo con él pelearía con
-            la herramienta. En una fila de tabla no hay con qué pelear. */
          (S.usuario
            ? ' El contorno es tu respuesta: verde de trazo largo si lo marcaste como anomalía,' +
              ' rojo de trazo corto si dijiste que no lo es, gris punteado si quedó neutral.' +
-             ' Doble clic sobre un evento para verlo y clasificarlo.'
-           : ' Doble clic sobre un evento para ver sus señales.'),
+             ' Clic sobre un evento para verlo y clasificarlo.'
+           : ' Clic sobre un evento para ver sus señales.'),
   });
 }
 
 
 /* ================================================================ el diálogo de clasificación
  *
- * Un clic sobre una fila de la tabla, o doble clic en la línea de tiempo, y se abre esto: las señales
+ * Un clic sobre un evento —en la tabla o en la línea de tiempo— y se abre esto: las señales
  * del tramo, y debajo la pregunta con su escala y un comentario.
  *
  * POR QUÉ UN DIÁLOGO Y NO UN PANEL MÁS. Clasificar cuarenta eventos es una tarea repetitiva que se
