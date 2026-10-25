@@ -71,6 +71,26 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   .com { display: block; color: var(--texto-2); font-size: .78rem; margin-top: 3px;
     padding-left: 2px; border-left: 2px solid var(--borde); padding-left: 7px; }
 
+  /* Las secciones de un revisor: dónde dentro del evento puso cada respuesta. La FRANJA es el
+     evento entero de punta a punta y cada bloque una sección, así que dos revisores que marcaron la
+     misma parte se reconocen de un vistazo, uno arriba del otro, sin comparar números. Debajo, la
+     lista con los números para quien quiera precisión. */
+  .franja { position: relative; display: block; height: 7px; margin: 5px 0 3px; max-width: 280px;
+    background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 3px; }
+  .franja i { position: absolute; top: 0; bottom: 0; min-width: 2px; }
+  .franja i.pos { background: var(--ok); }
+  .franja i.neg { background: var(--peligro); }
+  .franja i.cero { background: var(--texto-3); }
+  /* Sin decisión: el rango está marcado pero no respondido. Solo contorno, como la nota. */
+  .franja i.nota { background: none; outline: 1px dashed var(--texto-3); outline-offset: -1px; }
+  .secc { display: block; font-size: .78rem; color: var(--texto-2); margin-top: 2px; }
+  .secc .r { font-family: var(--mono); font-size: .74rem; color: var(--texto-3); }
+  .secc.pos b { color: var(--ok); }
+  .secc.neg b { color: var(--peligro); }
+  .secc.cero b { color: var(--texto-2); }
+  .secc.nota b { color: var(--texto-3); font-style: italic; font-weight: 400; }
+  .secc b { font-weight: 600; }
+
   .revisores { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 12px; margin-bottom: 22px; }
   .barrita { display: flex; height: 7px; border-radius: 4px; overflow: hidden; margin-top: 8px;
@@ -129,6 +149,9 @@ async function api(ruta, op) {
 
 let ESCALA = [];
 const etiqueta = (cod) => (ESCALA.find((o) => o.codigo === cod) || {}).etiqueta || cod;
+/** El `valor` de un código de la escala, o `null` si no hay respuesta. Las secciones traen solo el
+ *  código; los votos ya vienen con su valor desde el backend. */
+const valorDe = (cod) => (cod ? (ESCALA.find((o) => o.codigo === cod) || {}).valor ?? null : null);
 
 /** El signo de una respuesta, para colorear el voto. Ver `_acuerdo` en el backend: lo que importa
  *  es de qué lado cae, no con cuánta convicción. `null` es una nota sin decisión: no tiene lado. */
@@ -165,8 +188,14 @@ function pintarCifras(g) {
 /* Cada revisor, con cómo se reparten sus respuestas. NO ES UNA CIFRA DE CALIDAD: si alguien dice
    «sí» al 90 % y otro al 10 %, eso es un dato sobre cómo se entendió la pregunta, no sobre quién
    tiene razón. Por eso va sin ningún adorno que sugiera un ranking. */
-function pintarRevisores(porRevisor) {
+function pintarRevisores(porRevisor, ramas) {
   const nombres = Object.keys(porRevisor).sort();
+  // Las secciones se cuentan acá, recorriendo lo que ya llegó, en vez de pedirle otra cifra al
+  // backend: son un agregado de las respuestas, no una cuenta con reglas propias como `_acuerdo`.
+  const secc = {};
+  for (const r of ramas) for (const e of r.eventos) for (const v of e.respuestas) {
+    secc[v.usuario] = (secc[v.usuario] || 0) + (v.secciones || []).length;
+  }
   if (!nombres.length) return '';
   const tono = { si_definitivo: 'var(--ok)', si: 'var(--ok)', neutral: 'var(--texto-3)',
                  no: 'var(--peligro)', no_definitivo: 'var(--peligro)' };
@@ -178,7 +207,8 @@ function pintarRevisores(porRevisor) {
       return `<div class="cifra">
         <div class="n" style="font-size:1.05rem">${esc(n)}</div>
         <div class="r">${d.n} decisi${d.n === 1 ? 'ón' : 'ones'}${
-          d.notas ? ` · ${d.notas} nota${d.notas === 1 ? '' : 's'}` : ''}</div>
+          d.notas ? ` · ${d.notas} nota${d.notas === 1 ? '' : 's'}` : ''}${
+          secc[n] ? ` · ${secc[n]} secci${secc[n] === 1 ? 'ón' : 'ones'}` : ''}</div>
         <div class="barrita">${partes.map(([cod, v]) =>
           `<span style="flex:${v};background:${tono[cod] || 'var(--texto-3)'}"
                  title="${esc(etiqueta(cod))}: ${v}"></span>`).join('')}</div>
@@ -195,6 +225,30 @@ function pintarRevisores(porRevisor) {
  *  y el backend la calcula con `_diferencias_con_la_tesis`, la misma cuenta que hace la hoja de
  *  Procedencia del Excel. Una etiqueta es un nombre que alguien escribió, y no promete nada.
  */
+/** Las secciones de UN revisor en UN evento: la franja y la lista.
+ *
+ *  La franja necesita el rango del evento, que sale del entregable de la rama; si la rama perdió
+ *  su resultado (`sin_contexto`) no hay contra qué ubicarlas y queda solo la lista, que igual dice
+ *  todo con números. Los rangos son semiabiertos, [desde, hasta), como los del evento.
+ */
+function pintarSecciones(secciones, e) {
+  if (!secciones || !secciones.length) return '';
+  let franja = '';
+  if (!e.sin_contexto && e.hasta > e.desde) {
+    const largo = e.hasta - e.desde;
+    franja = `<span class="franja" title="El evento entero, de ${e.desde} a ${e.hasta}">${
+      secciones.map((s, k) => `<i class="${signo(valorDe(s.respuesta))}"
+        style="left:${((s.desde - e.desde) / largo) * 100}%;width:${((s.hasta - s.desde) / largo) * 100}%"
+        title="#${k + 1} · ${s.desde}–${s.hasta} · ${esc(s.respuesta ? etiqueta(s.respuesta) : 'sin decidir')}"></i>`
+      ).join('')}</span>`;
+  }
+  return franja + secciones.map((s, k) => `
+    <span class="secc ${signo(valorDe(s.respuesta))}">#${k + 1}
+      <span class="r">${s.desde}–${s.hasta}</span>
+      <b>${s.respuesta ? esc(etiqueta(s.respuesta)) : 'sin decidir'}</b>${
+      s.comentario ? ` · ${esc(s.comentario)}` : ''}</span>`).join('');
+}
+
 function marcaDeRama(r) {
   const estrella = r.es_tesis ? '<span class="chip oficial">★ tesis</span>' : '';
   const nombre = r.etiqueta && !(r.es_tesis && r.etiqueta === 'tesis')
@@ -254,7 +308,8 @@ function pintarRama(r) {
             <span class="voto ${signo(v.valor)}">
               <span class="q">${esc(v.usuario)}:</span> <b>${
                 v.respuesta ? esc(etiqueta(v.respuesta)) : 'sin decidir'}</b>
-            </span>${v.comentario ? `<span class="com">${esc(v.comentario)}</span>` : ''}`).join('')}
+            </span>${v.comentario ? `<span class="com">${esc(v.comentario)}</span>` : ''}${
+            pintarSecciones(v.secciones, e)}`).join('')}
           </td>
         </tr>`).join('')}
       </tbody>
@@ -293,7 +348,7 @@ async function arrancar() {
 
   $('#cuerpo').innerHTML =
     pintarCifras(d.global) +
-    pintarRevisores(d.por_revisor) +
+    pintarRevisores(d.por_revisor, d.ramas) +
     `<h2>Por rama</h2>` +
     d.ramas.map(pintarRama).join('');
 }
