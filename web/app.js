@@ -1855,6 +1855,22 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
   dlg.addEventListener('click', (e) => { if (e.target === dlg) cerrar(); });
   dlg.addEventListener('close', () => { asegurar(); limpiar(); });
   dlg.addEventListener('cancel', () => { asegurar(); limpiar(); });   // Escape
+
+  /* LA RUEDA SOBRE EL FONDO DESPLAZA EL DIÁLOGO. Con la página trabada mientras hay un modal
+     abierto (`html:has(dialog[open])` en `estilos.css`), la rueda fuera del recuadro no tenía nada
+     que mover, y había que llevar el cursor adentro para seguir bajando: un viaje de ratón por
+     evento, en una tarea que se repite cuarenta veces. El fondo es el propio `<dialog>` —su
+     `::backdrop` no es un elemento—, así que `e.target === dlg` es exactamente «fuera del recuadro»,
+     el mismo criterio que usa el clic para cerrar. Ctrl+rueda se deja pasar: es el zoom del
+     navegador. */
+  dlg.addEventListener('wheel', (e) => {
+    if (e.target !== dlg || e.ctrlKey) return;
+    const cuerpo = dlg.querySelector('.cuerpo');
+    if (!cuerpo) return;
+    // `deltaMode` dice en qué viene la cifra: píxeles, renglones (Firefox, a veces) o páginas.
+    const escala = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? cuerpo.clientHeight : 1;
+    cuerpo.scrollBy({ top: e.deltaY * escala });
+  }, { passive: true });
   dlg.showModal();
 
   /* El diálogo se abre UNA vez y después solo se repinta por dentro. Cerrarlo y volver a abrirlo en
