@@ -184,6 +184,11 @@
      un color de estado le daría la respuesta antes de la pregunta. Dice «esto es lo que marcaron
      los métodos», no «esto está mal». */
   --marca-evento: rgba(255, 255, 255, .055);
+  /* Las secciones que marcó el revisor dentro del evento. Con el acento y no neutras: acá no hay
+     respuesta que sugerir, es lo que la propia persona señaló, y tiene que distinguirse del
+     sombreado de los métodos que queda debajo. La activa —la que se está editando— va más fuerte. */
+  --marca-seccion: rgba(127, 168, 214, .16);
+  --marca-seccion-activa: rgba(127, 168, 214, .32);
   /* La fila de un evento contestado, teñida según LA RESPUESTA: `--ok` si es anomalía, `--peligro`
      si no lo es, `--texto` si quedó neutral. Cada una va en dos alturas porque `tbody tr:hover`
      empata en especificidad con el selector de atributo, así que sin la segunda la fila que se
@@ -431,6 +436,8 @@ html[data-tema="claro"] {
   --fila-hover: rgba(0, 108, 196, .10);
   --opcion-activa: rgba(0, 108, 196, .22);
   --marca-evento: rgba(0, 0, 0, .08);
+  --marca-seccion: rgba(0, 108, 196, .13);
+  --marca-seccion-activa: rgba(0, 108, 196, .28);
 
   /* La fila de un evento contestado, teñida según la respuesta. Mismos matices, alfas más bajos. */
   --fila-si:            rgba(0, 122, 74, .15);
@@ -1149,6 +1156,30 @@ th.ordenable.num button { justify-content: flex-end; }
   font: inherit; font-size: .88rem; line-height: 1.55; resize: vertical; min-height: 76px; }
 .encuesta textarea:focus { outline: none; border-color: var(--borde-fuerte); }
 .encuesta .pie { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+/* Las secciones de un evento: una fila por sección, con su número —el mismo que se ve sobre el
+   gráfico—, el rango, la respuesta y el comentario. En una sola línea mientras entra: la lista se
+   lee como una tabla, de arriba abajo en orden de medición. */
+.secciones { margin-top: 16px; }
+.secciones .pregunta-secc { font-weight: 650; font-size: .9rem; margin: 0 0 4px; }
+.seccion { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0;
+  border-top: 1px solid var(--borde); font-size: .84rem; }
+/* La elegida, que es la que el gráfico resalta. Con la misma raya de acento que lleva allá en los
+   bordes, para que se lea como la misma cosa en los dos lugares. */
+.seccion { outline: none; padding-left: 8px; border-left: 3px solid transparent; }
+.seccion.activa { background: var(--fila-hover); border-left-color: var(--acento); }
+.seccion .num { font: inherit; font-family: var(--mono); font-weight: 650; min-width: 3ch;
+  padding: 2px 4px; border: none; border-radius: var(--radio-2); background: none;
+  color: var(--texto); cursor: pointer; }
+.seccion .num:hover { background: var(--boton-hover); }
+.seccion.activa .num { color: var(--acento); }
+.seccion label { display: flex; align-items: center; gap: 4px; color: var(--texto-2); }
+.seccion input, .seccion select { font: inherit; font-size: .84rem; padding: 4px 6px;
+  border-radius: var(--radio-2); border: 1px solid var(--borde); background: var(--fondo-2);
+  color: var(--texto); }
+.seccion input[type="number"] { width: 8ch; font-family: var(--mono); }
+.seccion .s-com { flex: 1 1 180px; min-width: 0; }
+.seccion input:focus, .seccion select:focus { outline: none; border-color: var(--borde-fuerte); }
 
 
 /* Marca de «ya lo clasifiqué» en la tabla de eventos. La ETIQUETA es texto y no un ícono de color:

@@ -1153,9 +1153,11 @@ function verScores(d) {
    `C.mias` va indexado por `event_id` en TEXTO: viene de JSON, que no tiene claves numéricas.
    Convertirlo a número al recibirlo era una tentación; se dejó como llegó y se convierte al
    consultar, que es un solo lugar. */
-const C = { pregunta: '', escala: [], mias: {} };
+const C = { pregunta: '', escala: [], mias: {}, secciones: {} };
 
 const miRespuesta = (id) => C.mias[String(id)] || null;
+/** Mis secciones de un evento, en orden de medición. Mismo criterio de claves en texto que `mias`. */
+const misSecciones = (id) => C.secciones[String(id)] || [];
 const etiquetaEscala = (codigo) => (C.escala.find((o) => o.codigo === codigo) || {}).etiqueta || codigo;
 
 /** El signo de mi respuesta para un evento: `si`, `no`, `neutral`, o `null` si no la contesté.
@@ -1181,13 +1183,14 @@ const atributoTono = (id) => {
 
 async function cargarClasificacion(clave) {
   // «Lo que respondí yo» no existe sin un yo: en modo lectura ni se pide.
-  if (!S.usuario) { C.pregunta = ''; C.escala = []; C.mias = {}; return; }
+  if (!S.usuario) { C.pregunta = ''; C.escala = []; C.mias = {}; C.secciones = {}; return; }
   try {
     const d = await api(`api/nodo/${clave}/clasificacion`);
     C.pregunta = d.pregunta; C.escala = d.escala; C.mias = d.mias || {};
+    C.secciones = d.secciones || {};
   } catch (e) {
     // Que falle la encuesta no puede dejar sin tabla de eventos: son dos cosas independientes.
-    C.pregunta = ''; C.escala = []; C.mias = {};
+    C.pregunta = ''; C.escala = []; C.mias = {}; C.secciones = {};
   }
 }
 
@@ -1396,13 +1399,18 @@ function verEventos(d) {
  */
 function marcaClasificacion(id) {
   const mia = miRespuesta(id);
+  // Las secciones van como agregado y no como un cuarto estado: no responden la pregunta del
+  // evento entero, así que no cambian si está clasificado o no.
+  const n = misSecciones(id).length;
+  const secc = n ? ` <span class="tenue" title="Secciones marcadas dentro del evento">· ${n} ${
+    n === 1 ? 'sección' : 'secciones'}</span>` : '';
   if (mia && mia.respuesta) {
-    return `<span class="marca-clas si" title="${mia.comentario ? 'Con comentario' : 'Sin comentario'}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>`;
+    return `<span class="marca-clas si" title="${mia.comentario ? 'Con comentario' : 'Sin comentario'}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>${secc}`;
   }
   if (mia && mia.comentario) {
-    return '<span class="marca-clas pendiente" title="Con una nota, sin decisión">sin clasificar ✎</span>';
+    return `<span class="marca-clas pendiente" title="Con una nota, sin decisión">sin clasificar ✎</span>${secc}`;
   }
-  return '<span class="marca-clas pendiente">sin clasificar</span>';
+  return `<span class="marca-clas pendiente">sin clasificar</span>${secc}`;
 }
 
 /** «12 de 40 clasificados» arriba de la tabla: lo primero que hace falta al volver a una sesión. */
@@ -1891,7 +1899,8 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
   dlg.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     const foco = document.activeElement;
-    if (foco && (foco.tagName === 'TEXTAREA' || foco.type === 'radio')) return;
+    // Los campos de las secciones también: en un número o un desplegable la flecha es suya.
+    if (foco && ['TEXTAREA', 'INPUT', 'SELECT'].includes(foco.tagName)) return;
     const i = orden.indexOf(actual);
     if (i < 0) return;
     e.preventDefault();
@@ -1955,6 +1964,16 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
             ${puesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
         <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
           maxlength="4000">${esc(comentario)}</textarea>
+        <!-- SECCIONES: si la anomalía ocupa solo una parte del evento, cada parte con su respuesta.
+             La pregunta de arriba sigue siendo sobre el evento entero; estas la precisan. -->
+        <div class="secciones">
+          <p class="pregunta-secc">Secciones <span class="tenue">· opcional</span></p>
+          <p class="pista" style="margin:0 0 8px">Si lo anómalo es solo una parte del evento,
+            arrastrá sobre las señales para marcarla, dentro de la zona sombreada. Cada sección
+            lleva su propia respuesta.</p>
+          <div id="lista-secc"></div>
+          <span class="tenue" style="font-size:.78rem" id="estado-secc"></span>
+        </div>
         <!-- SIN BOTONES. Guardar, cerrar y seguir ya estaban en otra parte: la respuesta se
              guarda al elegirla, la ✕ del encabezado cierra —y Escape—, y para moverse hay dos
              flechas ahí arriba más las del teclado. Tres botones que repiten lo que la pantalla
@@ -2061,7 +2080,17 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
     if (bAnt) bAnt.addEventListener('click', () => irA(anterior));
     if (bSig) bSig.addEventListener('click', () => irA(siguiente));
 
-    Grafico.lineas(dlg.querySelector('#caja-dlg-ev'), {
+    /* Las secciones se guardan en mediciones del tramo continuo —las coordenadas de `start`/`end`
+       del evento— y el gráfico cuenta desde el borde de lo dibujado. `origen` es la conversión, y
+       vale también sin contexto: ahí lo dibujado empieza justo en el evento. */
+    const origen = d.contexto ? d.contexto.desde : ev.start;
+    const conSesion = !!dlg.querySelector('#form-clas');
+    let activa = null;     // la sección elegida en la lista, que se resalta en el gráfico
+    const aDibujo = () => misSecciones(id).map((s, k) => ({
+      desde: s.desde - origen, hasta: s.hasta - origen, etiqueta: `#${k + 1}`, activa: s.id === activa,
+    }));
+
+    const grafo = Grafico.lineas(dlg.querySelector('#caja-dlg-ev'), {
       // Sin título propio: el encabezado del diálogo ya dice de qué evento es, y repetirlo dos
       // renglones más abajo sería la misma frase dos veces. Pero al agrandarlo el gráfico sale de
       // ese contexto y necesita nombrarse — de eso se ocupa `tituloAgrandado`.
@@ -2071,6 +2100,12 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       sustantivo: 'mediciones',
       paneles: d.senales.map((s, k) => ({ nombre: s, valores: d.valores.map((f) => f[k]) })),
       ...conContexto(d),
+      secciones: aDibujo(),
+      // Solo con sesión: sin un yo no hay a quién atribuir la sección.
+      ...(conSesion ? {
+        alSeleccionar: (r) => agregarSeccion(r),
+        limitesSeleccion: { desde: ev.start - origen, hasta: ev.end - origen },
+      } : {}),
     });
     /* No hace falta forzar un `resize`: el diálogo ya está abierto y con tamaño cuando se crea el
        gráfico —`showModal()` corre antes, con el «Cargando…»— y el `ResizeObserver` del propio
@@ -2127,7 +2162,14 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         return false;
       }
     }
-    guardarAlSalir = guardar;
+    // Salir del evento asegura las dos cosas: la respuesta de conjunto y lo tipeado en las secciones.
+    // Las dos arrancan antes del primer `await`, por lo mismo que explica `asegurar`: cada una lee
+    // sus campos al entrar, y el diálogo puede estar cerrándose en ese mismo cuadro.
+    guardarAlSalir = async (opciones) => {
+      const a = guardar(opciones);
+      const b = asegurarSecciones();
+      return (await a) && (await b);
+    };
 
     /* EL COMENTARIO SE GUARDA SOLO, un segundo después de la última tecla. Con un botón esto no
        hacía falta; sin él, cada palabra escrita es trabajo que hay que asegurar sin pedir un gesto.
@@ -2150,6 +2192,200 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       });
       caja.addEventListener('blur', () => { clearTimeout(reloj); guardar(); });
     }
+
+    /* ---- Secciones -----------------------------------------------------------------------
+       Mismo régimen que la respuesta de conjunto: sin botón de guardar. Arrastrar sobre el gráfico
+       CREA la sección ya guardada —sin respuesta, que se elige después—; cambiar rango o respuesta
+       guarda en el acto, y el comentario un segundo después de la última tecla.
+
+       NI ARRASTRAR NI LOS NÚMEROS ACEPTAN UNA SECCIÓN AFUERA DEL EVENTO O ENCIMADA. Lo decide el
+       backend (`clasificacion._validar_seccion`); acá el arrastre solo se recorta al borde para no
+       hacer fallar a quien se pasó por dos mediciones. */
+    const lista = dlg.querySelector('#lista-secc');
+    const estadoSecc = (t) => {
+      const e = dlg.querySelector('#estado-secc');
+      if (e) e.textContent = t;
+    };
+    /** Comentarios tipeados que todavía esperan su segundo, por sección. */
+    const pendientes = new Map();
+
+    function ponerSecciones(nuevas) {
+      nuevas.sort((a, b) => a.desde - b.desde);
+      if (nuevas.length) C.secciones[String(id)] = nuevas;
+      else delete C.secciones[String(id)];
+      refrescarMarca(id);
+    }
+
+    /** Rehace la lista y el sombreado. Solo al agregar, quitar o mover una: rehacer la lista
+     *  mientras se escribe en otra fila le sacaría el foco a quien escribe. */
+    function pintarSecciones() {
+      lista.innerHTML = '';
+      misSecciones(id).forEach((s, k) => lista.appendChild(filaSeccion(s, k)));
+      grafo.marcarSecciones(aDibujo());
+    }
+
+    function filaSeccion(s, k) {
+      const f = document.createElement('div');
+      f.className = 'seccion' + (s.id === activa ? ' activa' : '');
+      f.dataset.sid = s.id;
+      // Enfocable sin entrar al orden del Tab: así un clic en el fondo de la fila también la elige.
+      f.tabIndex = -1;
+      f.innerHTML = `
+        <button type="button" class="num" title="Ver la sección #${k + 1} en el gráfico"
+                aria-label="Ver la sección #${k + 1} en el gráfico">#${k + 1}</button>
+        <label title="Primera medición de la sección">de <input type="number" class="s-desde" step="1"></label>
+        <label title="La medición «hasta» no se incluye, igual que en el rango del evento">hasta
+          <input type="number" class="s-hasta" step="1"></label>
+        <select class="s-resp" aria-label="Respuesta para la sección #${k + 1}">
+          <option value="">— sin decisión —</option>
+          ${C.escala.map((o) => `<option value="${o.codigo}">${esc(o.etiqueta)}</option>`).join('')}
+        </select>
+        <input type="text" class="s-com" maxlength="4000" placeholder="Comentario (opcional)"
+               aria-label="Comentario de la sección #${k + 1}">
+        <button type="button" class="boton plano s-quitar" title="Quitar la sección"
+                aria-label="Quitar la sección #${k + 1}">✕</button>`;
+      // Los valores van por propiedad y no en el HTML: un comentario con comillas rompería el atributo.
+      const [iD, iH] = [f.querySelector('.s-desde'), f.querySelector('.s-hasta')];
+      for (const i of [iD, iH]) { i.min = ev.start; i.max = ev.end; }
+      iD.value = s.desde;
+      iH.value = s.hasta;
+      f.querySelector('.s-resp').value = s.respuesta || '';
+      f.querySelector('.s-com').value = s.comentario || '';
+
+      iD.addEventListener('change', () => guardarSeccion(s.id));
+      iH.addEventListener('change', () => guardarSeccion(s.id));
+      f.querySelector('.s-resp').addEventListener('change', () => guardarSeccion(s.id));
+      const com = f.querySelector('.s-com');
+      com.addEventListener('input', () => {
+        clearTimeout((pendientes.get(s.id) || {}).reloj);
+        estadoSecc('Sin guardar…');
+        pendientes.set(s.id, { reloj: setTimeout(() => guardarSeccion(s.id), 1000) });
+      });
+      com.addEventListener('blur', () => guardarSeccion(s.id));
+      f.querySelector('.s-quitar').addEventListener('click', () => quitarSeccion(s.id, k));
+
+      /* Tocar cualquier parte de la fila la ELIGE, y queda elegida hasta que se elija otra: el
+         gráfico la resalta y la fila también. No cuelga del foco, como la primera versión, porque
+         lo natural después de elegirla es subir a mirarla en el gráfico, y cualquier clic ahí
+         —para acercar, para leer un valor— le sacaba el foco a la fila y apagaba el resaltado
+         justo cuando hacía falta. */
+      f.addEventListener('focusin', () => elegirSeccion(s.id));
+      // `#k` además lleva al gráfico: con la lista a la vista, el gráfico suele quedar arriba,
+      // fuera de pantalla, y es lo que la persona quiere ver al elegir.
+      f.querySelector('.num').addEventListener('click', () => {
+        elegirSeccion(s.id);
+        dlg.querySelector('#caja-dlg-ev').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return f;
+    }
+
+    function elegirSeccion(sid) {
+      if (activa === sid) return;
+      activa = sid;
+      for (const fila of lista.querySelectorAll('.seccion')) {
+        fila.classList.toggle('activa', Number(fila.dataset.sid) === sid);
+      }
+      grafo.marcarSecciones(aDibujo());
+    }
+
+    async function agregarSeccion(r) {
+      if (r.vacia) {
+        estadoSecc('Una sección tiene que caer dentro de la zona sombreada: es el rango que '
+                   + 'marcaron los métodos.');
+        return;
+      }
+      estadoSecc('Guardando la sección…');
+      try {
+        const nueva = await api(`api/nodo/${clave}/evento/${id}/seccion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ desde: r.desde + origen, hasta: r.hasta + origen }),
+        });
+        ponerSecciones([...misSecciones(id), nueva]);
+        activa = nueva.id;
+        pintarSecciones();
+        const k = misSecciones(id).findIndex((s) => s.id === nueva.id);
+        estadoSecc(`Sección #${k + 1} marcada: mediciones ${nueva.desde}–${nueva.hasta}`
+                   + `${r.recortada ? ', recortada al borde del evento' : ''}. Falta su respuesta.`);
+        const sel = lista.querySelector(`[data-sid="${nueva.id}"] .s-resp`);
+        if (sel) sel.focus();
+      } catch (e) {
+        estadoSecc(`No se pudo marcar: ${e.message}`);
+      }
+    }
+
+    /** Guarda una sección con lo que haya en su fila. Devuelve si quedó guardada. */
+    async function guardarSeccion(sid) {
+      clearTimeout((pendientes.get(sid) || {}).reloj);
+      pendientes.delete(sid);
+      const f = lista.querySelector(`[data-sid="${sid}"]`);
+      const ya = misSecciones(id).find((s) => s.id === sid);
+      if (!f || !ya) return true;
+      // Se lee todo antes del primer `await`: ver la nota de `guardarAlSalir`.
+      const pedido = {
+        desde: parseInt(f.querySelector('.s-desde').value, 10),
+        hasta: parseInt(f.querySelector('.s-hasta').value, 10),
+        respuesta: f.querySelector('.s-resp').value || null,
+        comentario: f.querySelector('.s-com').value,
+      };
+      if (pedido.desde === ya.desde && pedido.hasta === ya.hasta
+          && pedido.respuesta === (ya.respuesta || null)
+          && pedido.comentario === (ya.comentario || '')) return true;
+      const movida = pedido.desde !== ya.desde || pedido.hasta !== ya.hasta;
+      estadoSecc('Guardando…');
+      try {
+        const hecha = await api(`api/nodo/${clave}/evento/${id}/seccion/${sid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pedido),
+        });
+        ponerSecciones(misSecciones(id).map((s) => (s.id === sid ? hecha : s)));
+        if (movida) pintarSecciones();
+        estadoSecc(`Guardado ${new Date(hecha.actualizado_en)
+          .toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`);
+        return true;
+      } catch (e) {
+        /* El rango vuelve a lo guardado: un rango rechazado —encimado, fuera del evento— no puede
+           quedar en pantalla como si valiera. El comentario y la respuesta se quedan como están,
+           para no tirar lo escrito; se reintentan al próximo cambio o al salir. */
+        f.querySelector('.s-desde').value = ya.desde;
+        f.querySelector('.s-hasta').value = ya.hasta;
+        estadoSecc(`No se pudo guardar: ${e.message}`);
+        return false;
+      }
+    }
+
+    /** Lo que `guardarAlSalir` necesita: que ningún comentario quede esperando su segundo. */
+    async function asegurarSecciones() {
+      if (!lista) return true;
+      const ids = misSecciones(id).map((s) => s.id);
+      const hechas = await Promise.all(ids.map((sid) => guardarSeccion(sid)));
+      return hechas.every(Boolean);
+    }
+
+    async function quitarSeccion(sid, k) {
+      const s = misSecciones(id).find((x) => x.id === sid);
+      if (!s) return;
+      /* Pide confirmación solo si hay algo que perder además del rango. A diferencia de retirar la
+         respuesta del evento, esto no se rehace con un clic: el rango habría que volver a
+         arrastrarlo y el comentario volver a escribirlo. */
+      const f = lista.querySelector(`[data-sid="${sid}"]`);
+      const conAlgo = s.respuesta || s.comentario || (f && f.querySelector('.s-com').value.trim());
+      if (conAlgo && !confirm(`¿Quitar la sección #${k + 1}? Se pierden su respuesta y su comentario.`)) return;
+      clearTimeout((pendientes.get(sid) || {}).reloj);
+      pendientes.delete(sid);
+      try {
+        await api(`api/nodo/${clave}/evento/${id}/seccion/${sid}`, { method: 'DELETE' });
+        if (activa === sid) activa = null;
+        ponerSecciones(misSecciones(id).filter((x) => x.id !== sid));
+        pintarSecciones();
+        estadoSecc(`Sección #${k + 1} quitada.`);
+      } catch (e) {
+        estadoSecc(`No se pudo quitar: ${e.message}`);
+      }
+    }
+
+    pintarSecciones();
   }
 }
 

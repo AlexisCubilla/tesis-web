@@ -67,6 +67,14 @@ class PeticionClasificacion(BaseModel):
     comentario: str = ""
 
 
+class PeticionSeccion(BaseModel):
+    #: En mediciones del tramo continuo, como `start`/`end` del evento. Semiabierto: [desde, hasta).
+    desde: int
+    hasta: int
+    respuesta: str | None = None
+    comentario: str = ""
+
+
 # --------------------------------------------------------------------------------------
 # API
 # --------------------------------------------------------------------------------------
@@ -1135,7 +1143,8 @@ def get_catalogado(request: Request):
                 "respuestas": [
                     {"usuario": r["usuario"], "respuesta": r["respuesta"],
                      "valor": valores.get(r["respuesta"]), "comentario": r["comentario"],
-                     "actualizado_en": r["actualizado_en"]}
+                     "actualizado_en": r["actualizado_en"],
+                     "secciones": r.get("secciones", [])}
                     for r in respuestas
                 ],
             })
@@ -1768,20 +1777,25 @@ def delete_usuario(nombre: str, request: Request):
 # Clasificación de eventos: la encuesta por revisor
 # --------------------------------------------------------------------------------------
 
-def _exigir_evento(clave: str, event_id: int) -> None:
-    """Se planta con 404 si esa rama no tiene ese evento. No devuelve nada: solo valida.
+def _exigir_evento(clave: str, event_id: int) -> tuple[int, int]:
+    """Se planta con 404 si esa rama no tiene ese evento; si lo tiene, devuelve su `(start, end)`.
 
     Antes devolvía la fila entera serializada, porque `clasificacion.guardar` copiaba hoja, rango y
     prioridad dentro de la respuesta. Esa copia se quitó —ver el encabezado de `clasificacion`— y
     con ella la serialización; los dos 404 se quedan, que son la parte que hacía falta: sin esto se
     podría dejar una opinión sobre un `event_id` que la rama no tiene.
+
+    El rango volvió por las secciones, que tienen que caer dentro del evento. Sale del entregable,
+    que es su única fuente: el frontend lo manda pero no se le cree.
     """
     nodo = almacen.obtener(_con, clave)
     if nodo is None or nodo["etapa"] != "eventos" or not nodo["tiene_resultado"]:
         raise HTTPException(404, "No hay eventos en ese nodo")
     tabla = almacen.cargar_resultado(clave)["eventos"]
-    if tabla[tabla["event_id"] == event_id].empty:
+    fila = tabla[tabla["event_id"] == event_id]
+    if fila.empty:
         raise HTTPException(404, "Evento inexistente")
+    return int(fila.iloc[0]["start"]), int(fila.iloc[0]["end"])
 
 
 @app.get("/api/nodo/{clave}/clasificacion")
@@ -1793,10 +1807,14 @@ def get_clasificacion(clave: str, request: Request):
     """
     usuario = _usuario(request)
     mias = clasificacion.del_nodo(clave, usuario["nombre"])
+    secciones = clasificacion.secciones_del_nodo(clave, usuario["nombre"])
     return {
         "pregunta": clasificacion.PREGUNTA,
         "escala": [dict(o) for o in clasificacion.ESCALA],
         "mias": {str(k): v for k, v in mias.items()},
+        # Va acá, con lo demás que es «mío», y no en un GET propio: así hereda la regla de
+        # `_necesita_sesion` para `.../clasificacion` en vez de nacer pública.
+        "secciones": {str(k): v for k, v in secciones.items()},
         "resumen": clasificacion.resumen_nodo(clave),
     }
 
@@ -1840,6 +1858,47 @@ def delete_clasificacion(clave: str, event_id: int, request: Request):
     if not clasificacion.retirar(clave, event_id, usuario["nombre"]):
         raise HTTPException(404, "No hay una respuesta tuya para ese evento")
     return {"retirada": True, "event_id": event_id}
+
+
+@app.post("/api/nodo/{clave}/evento/{event_id}/seccion")
+def post_seccion(clave: str, event_id: int, pet: PeticionSeccion, request: Request):
+    """Marca una sección del evento: un rango con su propia respuesta. 400 si se sale o se encima."""
+    usuario = _usuario(request)
+    limites = _exigir_evento(clave, event_id)
+    try:
+        return clasificacion.agregar_seccion(
+            clave, event_id, usuario["nombre"], pet.desde, pet.hasta, limites,
+            pet.respuesta, pet.comentario,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.put("/api/nodo/{clave}/evento/{event_id}/seccion/{seccion_id}")
+def put_seccion(clave: str, event_id: int, seccion_id: int, pet: PeticionSeccion,
+                request: Request):
+    """Corrige una sección propia. 404 si no existe o es de otro: desde acá no se distinguen."""
+    usuario = _usuario(request)
+    limites = _exigir_evento(clave, event_id)
+    try:
+        hecha = clasificacion.editar_seccion(
+            seccion_id, clave, event_id, usuario["nombre"], pet.desde, pet.hasta, limites,
+            pet.respuesta, pet.comentario,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if hecha is None:
+        raise HTTPException(404, "No hay una sección tuya con ese número")
+    return hecha
+
+
+@app.delete("/api/nodo/{clave}/evento/{event_id}/seccion/{seccion_id}")
+def delete_seccion(clave: str, event_id: int, seccion_id: int, request: Request):
+    """Quita una sección propia. 404 si no había, por lo mismo que `delete_clasificacion`."""
+    usuario = _usuario(request)
+    if not clasificacion.quitar_seccion(seccion_id, clave, event_id, usuario["nombre"]):
+        raise HTTPException(404, "No hay una sección tuya con ese número")
+    return {"quitada": True, "id": seccion_id}
 
 
 @app.get("/")

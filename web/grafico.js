@@ -151,6 +151,7 @@ window.Grafico = (function () {
       // `notMerge`: al cambiar de tema hay que reemplazar la opción entera, no fusionarla, o
       // quedan mezclados los colores viejos con los nuevos.
       this.eco.setOption(this.cfg.opcion(comun(), this.cfg.alto || 300, !!this.cfg.enModal), true);
+      if (this.cfg.trasPintar) this.cfg.trasPintar(this);
     }
 
     /** Abre una copia del mismo gráfico a pantalla casi completa. */
@@ -269,6 +270,45 @@ window.Grafico = (function () {
     const altoPanel = cfg.altoPanel || (compacto ? 70 : 110);
     const alto = paneles.length * altoPanel + (compacto ? 34 : 78);
 
+    /* Los rangos sombreados de un panel: el del evento (`cfg.marca`) y, encima, las secciones que
+       marcó el revisor (`cfg.secciones`). Van en el mismo `markArea` para poder reemplazarlos sin
+       rehacer el gráfico —ver `marcarSecciones` abajo—, que perdería el acercamiento.
+
+       Todos los rangos son semiabiertos, [desde, hasta), como los del backend; en un eje de
+       categorías el área va de índice a índice, así que el borde derecho es `hasta - 1`. */
+    const areas = (c, i) => {
+      const data = [];
+      const rango = (desde, hasta) => [desde, Math.max(desde, hasta - 1)];
+      if (cfg.marca) {
+        const [a, b] = rango(cfg.marca.desde, cfg.marca.hasta);
+        data.push([{ xAxis: a, itemStyle: { color: varCss('--marca-evento') },
+                     label: i === 0 && cfg.marca.etiqueta
+                       ? { show: true, position: 'insideTop', color: c.tenue, fontSize: 10,
+                           formatter: cfg.marca.etiqueta }
+                       : { show: false } },
+                   { xAxis: b }]);
+      }
+      for (const s of cfg.secciones || []) {
+        const [a, b] = rango(s.desde, s.hasta);
+        /* La ACTIVA —la elegida en la lista— lleva relleno fuerte y los dos bordes en el acento.
+           Solo con más relleno no alcanzaba: entre .16 y .32 de alfa sobre fondo oscuro la
+           diferencia no se veía, y con dos secciones al lado no había forma de saber cuál era. */
+        data.push([{ xAxis: a,
+                     itemStyle: s.activa
+                       ? { color: varCss('--marca-seccion-activa'), borderColor: varCss('--acento'),
+                           borderWidth: 1.5 }
+                       : { color: varCss('--marca-seccion') },
+                     // El número de la sección, solo en el primer panel: es lo que la ata a su
+                     // renglón en la lista de abajo del gráfico.
+                     label: i === 0 && s.etiqueta
+                       ? { show: true, position: 'insideTop', fontSize: 10, fontWeight: 600,
+                           color: s.activa ? varCss('--acento') : c.tinta, formatter: s.etiqueta }
+                       : { show: false } },
+                   { xAxis: b }]);
+      }
+      return data.length ? { silent: true, data } : { data: [] };
+    };
+
     const opcion = (c, altoReal, enModal) => {
       const A = altoReal || alto;
       // Dentro del modal hay lugar de sobra: la miniatura se muestra como gráfico completo.
@@ -319,15 +359,7 @@ window.Grafico = (function () {
 
              El rótulo va solo en el primer panel: repetido en los tres sería la misma palabra tres
              veces sobre el mismo rango vertical. */
-          markArea: cfg.marca ? {
-            silent: true,
-            itemStyle: { color: varCss('--marca-evento') },
-            label: i === 0 && cfg.marca.etiqueta
-              ? { show: true, position: 'insideTop', color: c.tenue, fontSize: 10,
-                  formatter: cfg.marca.etiqueta }
-              : { show: false },
-            data: [[{ xAxis: cfg.marca.desde }, { xAxis: Math.max(cfg.marca.desde, cfg.marca.hasta - 1) }]],
-          } : undefined,
+          markArea: areas(c, i),
         });
       });
 
@@ -369,6 +401,22 @@ window.Grafico = (function () {
             textStyle: { color: c.tenue, fontSize: 10 } },
         ];
       }
+      /* ARRASTRAR MARCA UNA SECCIÓN, si quien pide el gráfico lo quiere (`cfg.alSeleccionar`). Es
+         la caja de selección de ECharts en modo `lineX`: un rango de mediciones, todo el alto, en
+         cualquiera de los paneles. Mientras está activa, arrastrar ya no desplaza el gráfico —las
+         dos cosas no pueden ser el mismo gesto—; para moverse queda la barra de abajo y Ctrl+rueda.
+
+         Solo en el gráfico del diálogo, no en la copia agrandada: la lista de secciones vive en el
+         diálogo, y una sección marcada en una ventana que tapa esa lista no se vería aparecer. */
+      if (cfg.alSeleccionar && !comp && !enModal) {
+        o.brush = {
+          xAxisIndex: 'all', brushType: 'lineX', brushMode: 'single', transformable: false,
+          brushStyle: { color: varCss('--marca-seccion-activa'), borderColor: varCss('--acento'),
+                        borderWidth: 1 },
+          // Sin atenuar lo que queda afuera: acá la caja no filtra datos, solo mide un rango.
+          inBrush: {}, outOfBrush: { colorAlpha: 1 },
+        };
+      }
       return o;
     };
 
@@ -376,8 +424,45 @@ window.Grafico = (function () {
     // muestra al abrirse en grande.
     const pie = `${n} ${cfg.sustantivo || 'puntos'}. Para acercarte a un tramo: arrastrá los `
       + 'extremos de la barra de abajo, o usá la lupa de la esquina y encerrá el tramo en un recuadro.';
-    return new Grafo(destino, { titulo: cfg.titulo, tituloAgrandado: cfg.tituloAgrandado,
-                                alto, opcion, pie, compacto });
+    const seleccionable = typeof cfg.alSeleccionar === 'function' && !compacto;
+    const g = new Grafo(destino, {
+      titulo: cfg.titulo, tituloAgrandado: cfg.tituloAgrandado, alto, opcion, pie, compacto,
+      /* La caja de selección hay que encenderla después de CADA `setOption` completo: el cambio de
+         tema rehace la opción entera y la apaga. */
+      trasPintar: seleccionable ? (grafo) => {
+        if (grafo.cfg.enModal) return;
+        grafo.eco.dispatchAction({ type: 'takeGlobalCursor', key: 'brush',
+                                   brushOption: { brushType: 'lineX', brushMode: 'single' } });
+      } : null,
+    });
+
+    if (seleccionable) {
+      /* Al soltar: se pasa el rango en índices de lo dibujado, semiabierto, recortado a
+         `cfg.limitesSeleccion` si lo hay, y la caja se borra — la sección la dibuja quien la
+         guarde, con `marcarSecciones`, recién cuando exista. Un clic sin arrastre no es nada. */
+      g.eco.on('brushEnd', (p) => {
+        const area = (p.areas || [])[0];
+        g.eco.dispatchAction({ type: 'brush', areas: [] });
+        if (!area || !area.coordRange) return;
+        let desde = Math.max(0, Math.round(area.coordRange[0]));
+        let hasta = Math.min(n, Math.round(area.coordRange[1]) + 1);
+        const lim = cfg.limitesSeleccion;
+        const pedido = [desde, hasta];
+        if (lim) { desde = Math.max(desde, lim.desde); hasta = Math.min(hasta, lim.hasta); }
+        if (pedido[1] - pedido[0] < 2) return;
+        cfg.alSeleccionar({ desde, hasta, vacia: hasta <= desde,
+                            recortada: desde !== pedido[0] || hasta !== pedido[1] });
+      });
+    }
+
+    /** Reemplaza las secciones sombreadas sin rehacer el gráfico, para no perder el acercamiento.
+     *  Recibe `[{desde, hasta, etiqueta, activa}]` en índices de lo dibujado. */
+    g.marcarSecciones = (lista) => {
+      cfg.secciones = lista || [];
+      const c = comun();
+      g.eco.setOption({ series: paneles.map((_, i) => ({ markArea: areas(c, i) })) });
+    };
+    return g;
   }
 
   /* ================================================================== barras horizontales

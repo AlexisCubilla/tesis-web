@@ -32,6 +32,11 @@ funciona; acá conservar era guardar un dato que nadie podía volver a ver.
 Que se vaya con la rama además es coherente con «es por rama», más arriba: si el juicio pertenece a
 la corrida donde se emitió, sin esa corrida no hay juicio que recuperar.
 
+**Un evento largo puede tener secciones.** El evento lo recorta el pipeline, y la anomalía que el
+revisor ve puede ocupar solo una parte. Una sección es un rango de mediciones DENTRO del evento con
+su propia respuesta en la misma escala y su propio comentario; la respuesta del evento queda como
+el veredicto de conjunto. Ver `agregar_seccion` por qué viven en tabla aparte y qué se valida.
+
 **Los dos borrados que sí existen, y quién los decide.** `retirar()` es una persona sacando su
 propia respuesta —la clave incluye al usuario, así que nadie toca la de otro—. `borrar_de()` es la
 rama entera yéndose, con el 409 de por medio. Lo que NO borra nada es dar de baja una cuenta: ahí
@@ -90,7 +95,27 @@ CREATE TABLE IF NOT EXISTS clasificaciones (
 );
 CREATE INDEX IF NOT EXISTS idx_clas_nodo    ON clasificaciones(nodo);
 CREATE INDEX IF NOT EXISTS idx_clas_usuario ON clasificaciones(usuario);
+
+-- `desde`/`hasta` en mediciones del tramo continuo, las mismas coordenadas que `start`/`end` del
+-- evento, y semiabierto como ellas: [desde, hasta).
+CREATE TABLE IF NOT EXISTS secciones (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    nodo          TEXT NOT NULL,
+    event_id      INTEGER NOT NULL,
+    usuario       TEXT NOT NULL,
+    desde         INTEGER NOT NULL,
+    hasta         INTEGER NOT NULL,
+    respuesta     TEXT,
+    comentario    TEXT NOT NULL DEFAULT '',
+    creado_en     TEXT NOT NULL,
+    actualizado_en TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_secc_evento ON secciones(nodo, event_id, usuario);
 """
+
+#: Tope de secciones por evento y por persona. Como `MAX_COMENTARIO`: no es un límite del método,
+#: es para que un arrastre nervioso sobre el gráfico no deje cuarenta rangos de una medición.
+MAX_SECCIONES = 20
 
 #: Las seis columnas que copiaban el evento. Ver `_migrar` justo abajo.
 _COLUMNAS_MUERTAS = ("hoja", "segmento", "desde", "hasta", "n_ventanas", "n_detectores")
@@ -294,6 +319,147 @@ def de_evento(nodo: str, event_id: int) -> list[dict]:
     return [dict(f) for f in filas]
 
 
+# --------------------------------------------------------------------------------------
+# Secciones: qué parte de un evento largo es la que el revisor juzga
+# --------------------------------------------------------------------------------------
+
+def _validar_seccion(
+    con: sqlite3.Connection,
+    nodo: str,
+    event_id: int,
+    usuario: str,
+    desde: int,
+    hasta: int,
+    limites: tuple[int, int],
+    respuesta: str | None,
+    excepto: int | None = None,
+) -> None:
+    """Las tres reglas de una sección. Se llama con `_lock` tomado: lee las otras para comparar.
+
+    DENTRO DEL EVENTO. El contexto que se dibuja alrededor es para comparar, no para juzgar: una
+    sección afuera sería una opinión sobre mediciones que el pipeline nunca propuso como candidatas,
+    y no habría evento al que atribuirla.
+
+    SIN SOLAPARSE con otra sección de la misma persona en el mismo evento. Dos rangos encimados con
+    respuestas distintas dejarían mediciones con dos etiquetas a la vez, y la Etapa 3 no tendría
+    cómo leerlas. Pegadas sí: [10, 20) y [20, 30) no comparten ninguna medición.
+    """
+    if respuesta is not None and respuesta not in CODIGOS:
+        raise ValueError(f"Respuesta desconocida: {respuesta!r}")
+    ini, fin = limites
+    if not (ini <= desde < hasta <= fin):
+        raise ValueError(f"La sección tiene que caer dentro del evento, entre {ini} y {fin}")
+    otras = con.execute(
+        "SELECT id, desde, hasta FROM secciones WHERE nodo = ? AND event_id = ? AND usuario = ?",
+        (nodo, event_id, usuario),
+    ).fetchall()
+    otras = [o for o in otras if o["id"] != excepto]
+    if excepto is None and len(otras) >= MAX_SECCIONES:
+        raise ValueError(f"Hay un máximo de {MAX_SECCIONES} secciones por evento")
+    for o in otras:
+        if desde < o["hasta"] and o["desde"] < hasta:
+            raise ValueError(f"Se superpone con otra sección ({o['desde']}–{o['hasta']})")
+
+
+def agregar_seccion(
+    nodo: str,
+    event_id: int,
+    usuario: str,
+    desde: int,
+    hasta: int,
+    limites: tuple[int, int],
+    respuesta: str | None = None,
+    comentario: str = "",
+) -> dict:
+    """Marca un rango del evento como sección. `limites` es el `(start, end)` del evento.
+
+    EN TABLA APARTE y no como columnas de `clasificaciones`, porque son varias por evento y porque
+    no dependen de que haya respuesta de conjunto: alguien puede marcar dónde mirar antes de decidir
+    qué piensa del evento entero. Retirar la respuesta del evento no las toca, por lo mismo.
+
+    SE ADMITE SIN RESPUESTA NI COMENTARIO, a diferencia de `guardar`. Ahí una fila vacía no
+    registraba nada; acá el rango mismo es el registro —«esto es lo que hay que mirar»—, y además es
+    el estado natural justo después de arrastrar sobre el gráfico, antes de elegir la respuesta.
+    """
+    comentario = (comentario or "").strip()[:MAX_COMENTARIO]
+    desde, hasta, event_id = int(desde), int(hasta), int(event_id)
+    ahora = _ahora()
+    con = conexion()
+    with _lock:
+        _validar_seccion(con, nodo, event_id, usuario, desde, hasta, limites, respuesta)
+        cur = con.execute(
+            """INSERT INTO secciones
+                 (nodo, event_id, usuario, desde, hasta, respuesta, comentario,
+                  creado_en, actualizado_en)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (nodo, event_id, usuario, desde, hasta, respuesta, comentario, ahora, ahora),
+        )
+        con.commit()
+    return _seccion(cur.lastrowid)
+
+
+def editar_seccion(
+    seccion_id: int,
+    nodo: str,
+    event_id: int,
+    usuario: str,
+    desde: int,
+    hasta: int,
+    limites: tuple[int, int],
+    respuesta: str | None = None,
+    comentario: str = "",
+) -> dict | None:
+    """Corrige rango, respuesta y comentario de una sección propia. `None` si no es tuya o no existe.
+
+    El `WHERE` lleva nodo, evento y usuario además del `id`: el `id` solo alcanzaría para encontrarla,
+    pero no para garantizar que quien la edita es quien la marcó.
+    """
+    comentario = (comentario or "").strip()[:MAX_COMENTARIO]
+    desde, hasta, event_id = int(desde), int(hasta), int(event_id)
+    con = conexion()
+    with _lock:
+        _validar_seccion(con, nodo, event_id, usuario, desde, hasta, limites, respuesta,
+                         excepto=int(seccion_id))
+        cur = con.execute(
+            """UPDATE secciones SET desde = ?, hasta = ?, respuesta = ?, comentario = ?,
+                                    actualizado_en = ?
+               WHERE id = ? AND nodo = ? AND event_id = ? AND usuario = ?""",
+            (desde, hasta, respuesta, comentario, _ahora(),
+             int(seccion_id), nodo, event_id, usuario),
+        )
+        con.commit()
+    return _seccion(int(seccion_id)) if cur.rowcount else None
+
+
+def quitar_seccion(seccion_id: int, nodo: str, event_id: int, usuario: str) -> bool:
+    """Borra una sección propia. Mismo criterio que `retirar`: la decide quien la marcó, y nadie más."""
+    con = conexion()
+    with _lock:
+        cur = con.execute(
+            "DELETE FROM secciones WHERE id = ? AND nodo = ? AND event_id = ? AND usuario = ?",
+            (int(seccion_id), nodo, int(event_id), usuario),
+        )
+        con.commit()
+    return cur.rowcount > 0
+
+
+def _seccion(seccion_id: int) -> dict:
+    fila = conexion().execute("SELECT * FROM secciones WHERE id = ?", (seccion_id,)).fetchone()
+    return dict(fila) if fila is not None else {}
+
+
+def secciones_del_nodo(nodo: str, usuario: str) -> dict[int, list[dict]]:
+    """Las secciones de una persona en una rama, por `event_id` y en orden de medición."""
+    filas = conexion().execute(
+        "SELECT * FROM secciones WHERE nodo = ? AND usuario = ? ORDER BY event_id, desde",
+        (nodo, usuario),
+    ).fetchall()
+    por_evento: dict[int, list[dict]] = {}
+    for f in filas:
+        por_evento.setdefault(int(f["event_id"]), []).append(dict(f))
+    return por_evento
+
+
 def resumen_nodo(nodo: str) -> dict:
     """Cuántas DECISIONES hay en una rama y cómo se reparten. Para el encabezado de la tabla.
 
@@ -340,21 +506,43 @@ def catalogado() -> dict[str, dict]:
 
     NO TRAE HOJA NI RANGO. Eso sale del entregable de la rama, que es su única fuente; ver en el
     encabezado por qué la copia dentro de la fila se quitó.
+
+    CADA RESPUESTA LLEVA SUS `secciones`. Quien marcó secciones sin responder el evento entero
+    aparece igual, con `respuesta` en `None`: para las cuentas es lo mismo que una nota —participó
+    sin pronunciarse sobre el conjunto—, y dejarlo afuera escondería trabajo hecho.
     """
-    filas = conexion().execute(
+    con = conexion()
+    filas = con.execute(
         """SELECT nodo, event_id, usuario, respuesta, comentario, creado_en, actualizado_en
              FROM clasificaciones ORDER BY nodo, event_id, usuario"""
     ).fetchall()
     por_nodo: dict[str, dict] = {}
+    por_clave: dict[tuple, dict] = {}
     for f in filas:
-        por_nodo.setdefault(f["nodo"], {}).setdefault(f["event_id"], []).append(dict(f))
+        r = {**dict(f), "secciones": []}
+        por_nodo.setdefault(f["nodo"], {}).setdefault(f["event_id"], []).append(r)
+        por_clave[(f["nodo"], f["event_id"], f["usuario"])] = r
+
+    for s in con.execute("SELECT * FROM secciones ORDER BY nodo, event_id, usuario, desde"):
+        clave = (s["nodo"], s["event_id"], s["usuario"])
+        if clave not in por_clave:
+            r = {"nodo": s["nodo"], "event_id": s["event_id"], "usuario": s["usuario"],
+                 "respuesta": None, "comentario": "", "creado_en": s["creado_en"],
+                 "actualizado_en": s["actualizado_en"], "secciones": []}
+            lista = por_nodo.setdefault(s["nodo"], {}).setdefault(s["event_id"], [])
+            lista.append(r)
+            lista.sort(key=lambda x: x["usuario"])
+            por_clave[clave] = r
+        por_clave[clave]["secciones"].append(
+            {k: s[k] for k in ("id", "desde", "hasta", "respuesta", "comentario", "actualizado_en")})
     return por_nodo
 
 
 def revisores() -> list[str]:
     """Quiénes clasificaron algo, alguna vez. Para las columnas del catálogo."""
     return [f["usuario"] for f in conexion().execute(
-        "SELECT DISTINCT usuario FROM clasificaciones ORDER BY usuario")]
+        """SELECT usuario FROM clasificaciones UNION SELECT usuario FROM secciones
+           ORDER BY usuario""")]
 
 
 def borrar_de(nodos: list[str]) -> int:
@@ -381,8 +569,9 @@ def borrar_de(nodos: list[str]) -> int:
     con = conexion()
     with _lock:
         cur = con.execute(f"DELETE FROM clasificaciones WHERE nodo IN ({marcas})", nodos)
+        cur_s = con.execute(f"DELETE FROM secciones WHERE nodo IN ({marcas})", nodos)
         con.commit()
-    return cur.rowcount
+    return cur.rowcount + cur_s.rowcount
 
 
 def cuantas_en(nodos: list[str]) -> int:
@@ -392,12 +581,14 @@ def cuantas_en(nodos: list[str]) -> int:
     igual que ya hace con los documentos de revisión. Por eso cuenta las notas: una nota es texto
     que alguien escribió y que el borrado se va a llevar, así que tiene que estar en el aviso. Es
     la diferencia con `resumen_nodo`, que mide juicios y las deja afuera — acá la pregunta no es
-    «cuánto se juzgó» sino «cuánto se pierde».
+    «cuánto se juzgó» sino «cuánto se pierde». Las secciones también suman, por el mismo motivo.
     """
     if not nodos:
         return 0
     marcas = ",".join("?" * len(nodos))
     fila = conexion().execute(
-        f"SELECT COUNT(*) AS n FROM clasificaciones WHERE nodo IN ({marcas})", nodos
+        f"""SELECT (SELECT COUNT(*) FROM clasificaciones WHERE nodo IN ({marcas}))
+                 + (SELECT COUNT(*) FROM secciones WHERE nodo IN ({marcas})) AS n""",
+        nodos + nodos,
     ).fetchone()
     return int(fila["n"])

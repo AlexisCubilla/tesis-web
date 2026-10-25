@@ -442,3 +442,119 @@ def test_la_migracion_de_nulos_no_se_queja_en_una_base_al_dia(clasificacion):
     con = clasificacion.conexion()
     assert clasificacion._migrar_respuesta_opcional(con) is False
     assert clasificacion._migrar_respuesta_opcional(con) is False
+
+
+# --- secciones de un evento ------------------------------------------------------------------
+#
+# Un evento largo puede tener varias secciones, cada una con su propia respuesta. Lo que importa
+# afirmar: que caen dentro del evento, que no se enciman, que son de quien las marcó y que se van
+# con la rama igual que las respuestas.
+
+LIM = (100, 200)    # el (start, end) del evento
+
+
+def test_una_seccion_se_guarda_sin_respuesta_y_despues_se_completa(clasificacion):
+    s = clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM)
+    assert (s["desde"], s["hasta"], s["respuesta"]) == (120, 140, None)
+    e = clasificacion.editar_seccion(s["id"], "nodoA", 7, "ana", 120, 145, LIM, "si", "caída")
+    assert (e["hasta"], e["respuesta"], e["comentario"]) == (145, "si", "caída")
+    assert e["creado_en"] == s["creado_en"]
+
+
+def test_varias_secciones_por_evento_en_orden_de_medicion(clasificacion):
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 170, 190, LIM, "neutral")
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 100, 110, LIM, "si_definitivo")
+    secs = clasificacion.secciones_del_nodo("nodoA", "ana")[7]
+    assert [(s["desde"], s["respuesta"]) for s in secs] == [(100, "si_definitivo"), (170, "neutral")]
+
+
+@pytest.mark.parametrize("desde,hasta", [(90, 120), (190, 201), (150, 150), (160, 150)])
+def test_una_seccion_fuera_del_evento_o_vacia_se_rechaza(clasificacion, desde, hasta):
+    with pytest.raises(ValueError):
+        clasificacion.agregar_seccion("nodoA", 7, "ana", desde, hasta, LIM)
+
+
+def test_los_bordes_del_evento_se_admiten(clasificacion):
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 100, 200, LIM)
+
+
+def test_dos_secciones_propias_no_se_enciman_pero_pueden_tocarse(clasificacion):
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM)
+    with pytest.raises(ValueError):
+        clasificacion.agregar_seccion("nodoA", 7, "ana", 139, 150, LIM)
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 140, 150, LIM)
+
+
+def test_editar_una_seccion_no_choca_consigo_misma_pero_si_con_las_otras(clasificacion):
+    a = clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM)
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 150, 160, LIM)
+    clasificacion.editar_seccion(a["id"], "nodoA", 7, "ana", 115, 145, LIM)
+    with pytest.raises(ValueError):
+        clasificacion.editar_seccion(a["id"], "nodoA", 7, "ana", 115, 155, LIM)
+
+
+def test_las_secciones_de_otro_revisor_no_cuentan_como_encimadas(clasificacion):
+    """El ciego vale también acá: lo que marcó otro no le restringe nada a nadie."""
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM)
+    clasificacion.agregar_seccion("nodoA", 7, "beto", 120, 140, LIM)
+    assert 7 not in clasificacion.secciones_del_nodo("nodoA", "carla")
+
+
+def test_nadie_edita_ni_quita_la_seccion_de_otro(clasificacion):
+    s = clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM, "si")
+    assert clasificacion.editar_seccion(s["id"], "nodoA", 7, "beto", 120, 140, LIM, "no") is None
+    assert clasificacion.quitar_seccion(s["id"], "nodoA", 7, "beto") is False
+    assert clasificacion.secciones_del_nodo("nodoA", "ana")[7][0]["respuesta"] == "si"
+
+
+def test_quitar_una_seccion(clasificacion):
+    s = clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM)
+    assert clasificacion.quitar_seccion(s["id"], "nodoA", 7, "ana") is True
+    assert clasificacion.quitar_seccion(s["id"], "nodoA", 7, "ana") is False
+    assert clasificacion.secciones_del_nodo("nodoA", "ana") == {}
+
+
+def test_una_seccion_con_respuesta_desconocida_se_rechaza(clasificacion):
+    with pytest.raises(ValueError):
+        clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM, "quizas")
+
+
+def test_hay_un_tope_de_secciones_por_evento(clasificacion):
+    for k in range(clasificacion.MAX_SECCIONES):
+        clasificacion.agregar_seccion("nodoA", 7, "ana", 100 + k * 2, 101 + k * 2, LIM)
+    with pytest.raises(ValueError):
+        clasificacion.agregar_seccion("nodoA", 7, "ana", 190, 195, LIM)
+
+
+def test_retirar_la_respuesta_del_evento_no_toca_sus_secciones(clasificacion):
+    clasificacion.guardar("nodoA", 7, "ana", "si")
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM, "si")
+    clasificacion.retirar("nodoA", 7, "ana")
+    assert len(clasificacion.secciones_del_nodo("nodoA", "ana")[7]) == 1
+
+
+def test_las_secciones_se_van_con_su_rama_y_cuentan_en_el_aviso(clasificacion):
+    clasificacion.guardar("nodoA", 7, "ana", "si")
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM)
+    clasificacion.agregar_seccion("nodoB", 7, "ana", 120, 140, LIM)
+    assert clasificacion.cuantas_en(["nodoA"]) == 2
+    assert clasificacion.borrar_de(["nodoA"]) == 2
+    assert clasificacion.secciones_del_nodo("nodoA", "ana") == {}
+    assert 7 in clasificacion.secciones_del_nodo("nodoB", "ana")
+
+
+def test_el_catalogo_trae_las_secciones_de_cada_respuesta(clasificacion):
+    clasificacion.guardar("nodoA", 7, "ana", "si")
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM, "si_definitivo")
+    (fila,) = clasificacion.catalogado()["nodoA"][7]
+    assert [(s["desde"], s["hasta"], s["respuesta"]) for s in fila["secciones"]] == [
+        (120, 140, "si_definitivo")]
+
+
+def test_secciones_sin_respuesta_de_conjunto_aparecen_en_el_catalogo(clasificacion):
+    clasificacion.guardar("nodoA", 7, "beto", "no")
+    clasificacion.agregar_seccion("nodoA", 7, "ana", 120, 140, LIM, "si")
+    filas = clasificacion.catalogado()["nodoA"][7]
+    assert [(r["usuario"], r["respuesta"]) for r in filas] == [("ana", None), ("beto", "no")]
+    assert len(filas[0]["secciones"]) == 1
+    assert clasificacion.revisores() == ["ana", "beto"]
