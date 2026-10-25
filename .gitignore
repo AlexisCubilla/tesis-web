@@ -17,6 +17,10 @@ data/ejecuciones.sqlite
 # carpeta de datos, que es donde vive todo el estado.
 data/revision/
 
+# Los juicios exportados para la Etapa 2 (`scripts/exportar_juicios.py`): lo mismo que la carpeta de
+# arriba —quién dijo qué sobre cada evento, con sus comentarios—, así que tampoco se publican.
+data/juicios_*.json
+
 # Estado del Document Server de desarrollo: sus registros y las claves que se genera solo al
 # arrancar (entre ellas una privada, que no tiene por qué andar en un repo). Es suyo, no nuestro, y
 # se regenera con el contenedor. En el servidor esta carpeta ni siquiera existe: allá el Document
