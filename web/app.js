@@ -116,6 +116,18 @@ async function iniciar() {
     if (url.get('vista') === 'analisis') S.vista = 'analisis';
     pintar();
     cargarVisual();
+  } else {
+    /* SIN NODO PEDIDO SE ABRE EL PASO 6 DE LA TESIS: los eventos de la rama ★. Es a lo que viene
+       casi todo el que entra —a clasificar—, y antes había que encontrar ese círculo en el mapa en
+       cada visita. «La de la tesis» es `ramaOficial`, el mismo criterio que pone la ★ en el mapa.
+       Si no existe todavía, o no tiene resultado, se arranca como antes: sin nada elegido. */
+    const tesis = S.nodos.find((n) => n.etapa === 'eventos' && n.tiene_resultado
+                                      && ramaOficial(n.clave));
+    if (tesis) {
+      S.sel = tesis.clave;
+      pintar();
+      cargarVisual();
+    }
   }
   $('#btn-nueva').addEventListener('click', () => { S.sel = null; pintar(); abrirForm('datos', null, 'nueva'); });
   $('#btn-oficial').addEventListener('click', correrOficial);
