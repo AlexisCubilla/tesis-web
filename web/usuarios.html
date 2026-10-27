@@ -25,6 +25,8 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   .fila-sup { display: flex; align-items: center; gap: 10px; }
   .esp { flex: 1; }
   td .boton { padding: 3px 10px; font-size: .78rem; }
+  td select { padding: 3px 6px; border-radius: var(--radio-2); border: 1px solid var(--borde);
+    background: var(--fondo-2); color: var(--texto); font: inherit; font-size: .8rem; }
 </style>
 </head>
 <body>
@@ -65,6 +67,17 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
             <option value="admin">Administrador — además gestiona usuarios</option>
           </select>
         </div>
+        <div class="campo">
+          <label for="experiencia">Grado de experiencia</label>
+          <!-- Sin opción premarcada, por lo mismo que la escala de clasificación (ADR A17): un
+               valor por defecto se colaría como si alguien lo hubiera elegido. -->
+          <select id="experiencia" required>
+            <option value="" disabled selected>Elegir…</option>
+            <option value="1">1 — menor</option>
+            <option value="2">2</option>
+            <option value="3">3 — mayor</option>
+          </select>
+        </div>
       </div>
       <button class="boton primario" type="submit">Crear usuario</button>
     </form>
@@ -74,11 +87,15 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
     <div class="fila-sup"><h3 style="margin:0;font-size:.95rem">Cuentas</h3><span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="cuenta-total"></span></div>
     <div class="tabla-scroll" style="margin-top:12px"><table id="tabla">
-      <thead><tr><th>usuario</th><th>rol</th><th>creado</th><th>último ingreso</th><th></th></tr></thead>
+      <thead><tr><th>usuario</th><th>rol</th><th>experiencia</th><th>creado</th><th>último ingreso</th><th></th></tr></thead>
       <tbody></tbody></table></div>
     <p class="pista" style="margin-top:12px">Dar de baja una cuenta <b>no borra sus
     clasificaciones</b>: son juicio humano y quedan atribuidas al nombre, igual que un documento de
     revisión sobrevive a la rama que lo originó.</p>
+    <p class="pista">El <b>grado de experiencia</b> (1 a 3) lo tienen todos los que clasifican, de
+    los dos roles, y viaja con los juicios que se exportan para la Etapa 2. Las cuentas que dicen
+    «sin indicar» son anteriores a que existiera, o la del <code>.env</code>: se carga acá mismo y
+    se guarda en el acto.</p>
   </div>
 </div>
 
@@ -123,6 +140,11 @@ async function cargar() {
     <tr>
       <td><b>${u.nombre}</b>${u.creado_por === '.env' ? ' <span class="chip oficial">del .env</span>' : ''}</td>
       <td>${u.rol === 'admin' ? 'Administrador' : 'Revisor'}</td>
+      <td><select data-experiencia="${u.nombre}" aria-label="Grado de experiencia de ${u.nombre}">
+        ${u.experiencia == null ? '<option value="" selected disabled>sin indicar</option>' : ''}
+        ${d.experiencias.map((g) =>
+          `<option value="${g}"${g === u.experiencia ? ' selected' : ''}>${g}</option>`).join('')}
+      </select></td>
       <td class="tenue" style="font-size:.8rem">${fecha(u.creado_en)}</td>
       <td class="tenue" style="font-size:.8rem">${fecha(u.ultimo_ingreso)}</td>
       <td style="white-space:nowrap;text-align:right">
@@ -136,6 +158,19 @@ async function cargar() {
     b.addEventListener('click', () => cambiarClave(b.dataset.clave)));
   document.querySelectorAll('[data-baja]').forEach((b) =>
     b.addEventListener('click', () => darDeBaja(b.dataset.baja)));
+  document.querySelectorAll('[data-experiencia]').forEach((s) =>
+    s.addEventListener('change', () => cambiarExperiencia(s.dataset.experiencia, Number(s.value))));
+}
+
+async function cambiarExperiencia(nombre, experiencia) {
+  try {
+    await api(`api/usuarios/${encodeURIComponent(nombre)}/experiencia`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ experiencia }),
+    });
+    avisar(`Grado de experiencia de <b>${nombre}</b>: ${experiencia}.`, 'info');
+  } catch (e) { avisar(e.message); }
+  cargar();
 }
 
 async function cambiarClave(nombre) {
@@ -167,10 +202,11 @@ $('#form-alta').addEventListener('submit', async (e) => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: $('#nombre').value, contrasena: $('#clave').value, rol: $('#rol').value,
+        experiencia: Number($('#experiencia').value),
       }),
     });
     avisar(`Usuario <b>${$('#nombre').value}</b> creado.`, 'info');
-    $('#nombre').value = ''; $('#clave').value = '';
+    $('#nombre').value = ''; $('#clave').value = ''; $('#experiencia').selectedIndex = 0;
     cargar();
   } catch (err) { avisar(err.message); }
 });

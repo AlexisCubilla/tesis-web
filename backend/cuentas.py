@@ -52,6 +52,11 @@ COOKIE = "sesion_taller"
 #: Roles. `admin` administra usuarios; `revisor` entra y clasifica.
 ADMIN, REVISOR = "admin", "revisor"
 
+#: Grado de experiencia de quien clasifica, de 1 (menor) a 3 (mayor). Lo tienen los dos roles,
+#: porque los dos clasifican. Viaja con los juicios exportados: la Etapa 2 necesita saber de quién
+#: es cada opinión, y no solo su nombre.
+EXPERIENCIAS = (1, 2, 3)
+
 # Parámetros de scrypt. 128 · N · r ≈ 16 MB por verificación: caro para quien prueba contraseñas al
 # por mayor, imperceptible para quien entra una vez al día.
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P, _SCRYPT_LEN = 2**14, 8, 1, 32
@@ -65,6 +70,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     nombre         TEXT PRIMARY KEY,
     clave          TEXT NOT NULL,
     rol            TEXT NOT NULL DEFAULT 'revisor',
+    experiencia    INTEGER,
     creado_en      TEXT NOT NULL,
     creado_por     TEXT,
     ultimo_ingreso TEXT
@@ -101,6 +107,13 @@ def preparar() -> sqlite3.Connection:
     _con = sqlite3.connect(BASE, check_same_thread=False)
     _con.row_factory = sqlite3.Row
     _con.executescript(ESQUEMA)
+    # Bases creadas antes del grado de experiencia: la columna se agrega vacía. Esas cuentas quedan
+    # «sin indicar» hasta que el administrador lo cargue desde Usuarios; inventarles un grado sería
+    # atribuirles algo que nadie dijo.
+    columnas = {f["name"] for f in _con.execute("PRAGMA table_info(usuarios)")}
+    if "experiencia" not in columnas:
+        _con.execute("ALTER TABLE usuarios ADD COLUMN experiencia INTEGER")
+        _con.commit()
     _sembrar_admin(_con)
     return _con
 
@@ -190,13 +203,27 @@ def obtener(nombre: str) -> dict | None:
 def listar() -> list[dict]:
     """Los usuarios, sin el hash de la contraseña: esto se sirve por la API."""
     filas = conexion().execute(
-        "SELECT nombre, rol, creado_en, creado_por, ultimo_ingreso FROM usuarios ORDER BY nombre"
+        "SELECT nombre, rol, experiencia, creado_en, creado_por, ultimo_ingreso"
+        " FROM usuarios ORDER BY nombre"
     ).fetchall()
     return [dict(f) for f in filas]
 
 
-def crear(nombre: str, clave: str, *, rol: str = REVISOR, creado_por: str | None = None) -> dict:
-    """Alta de usuario. Lanza `ValueError` con un motivo legible si el alta no es válida."""
+def _validar_experiencia(experiencia) -> int | None:
+    if experiencia is None:
+        return None
+    if isinstance(experiencia, bool) or experiencia not in EXPERIENCIAS:
+        raise ValueError("El grado de experiencia va de 1 a 3")
+    return int(experiencia)
+
+
+def crear(nombre: str, clave: str, *, rol: str = REVISOR, experiencia: int | None = None,
+          creado_por: str | None = None) -> dict:
+    """Alta de usuario. Lanza `ValueError` con un motivo legible si el alta no es válida.
+
+    `experiencia` puede faltar acá —el administrador del `.env` nace sin ella—; la API de alta sí
+    la exige.
+    """
     nombre = (nombre or "").strip()
     if not nombre:
         raise ValueError("El nombre de usuario no puede estar vacío")
@@ -206,16 +233,32 @@ def crear(nombre: str, clave: str, *, rol: str = REVISOR, creado_por: str | None
         raise ValueError("La contraseña tiene que tener al menos 8 caracteres")
     if rol not in (ADMIN, REVISOR):
         raise ValueError(f"Rol desconocido: {rol}")
+    experiencia = _validar_experiencia(experiencia)
     if obtener(nombre) is not None:
         raise ValueError(f"Ya existe un usuario llamado {nombre!r}")
     con = conexion()
     with _lock:
         con.execute(
-            "INSERT INTO usuarios (nombre, clave, rol, creado_en, creado_por) VALUES (?, ?, ?, ?, ?)",
-            (nombre, hashear(clave), rol, _iso(_ahora()), creado_por),
+            "INSERT INTO usuarios (nombre, clave, rol, experiencia, creado_en, creado_por)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (nombre, hashear(clave), rol, experiencia, _iso(_ahora()), creado_por),
         )
         con.commit()
-    return {"nombre": nombre, "rol": rol}
+    return {"nombre": nombre, "rol": rol, "experiencia": experiencia}
+
+
+def cambiar_experiencia(nombre: str, experiencia: int) -> None:
+    """Cambia el grado de experiencia. Es la vía para las cuentas que no lo tienen: las anteriores
+    a que existiera y el administrador del `.env`."""
+    if experiencia is None:
+        raise ValueError("El grado de experiencia va de 1 a 3")
+    experiencia = _validar_experiencia(experiencia)
+    if obtener(nombre) is None:
+        raise ValueError(f"No existe el usuario {nombre!r}")
+    con = conexion()
+    with _lock:
+        con.execute("UPDATE usuarios SET experiencia = ? WHERE nombre = ?", (experiencia, nombre))
+        con.commit()
 
 
 def cambiar_clave(nombre: str, clave: str) -> None:

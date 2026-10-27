@@ -9,6 +9,11 @@ comentario y las secciones. El rango va para que del otro lado se verifique que 
 y no se confíe en el número: `event_id` solo significa lo mismo con la misma configuración y el
 mismo código. Por lo mismo va la configuración de la rama y el commit de la tesis.
 
+CON EL GRADO DE EXPERIENCIA de cada revisor (1 a 3, `null` si su cuenta no lo tiene o ya no existe).
+Es el que tiene la cuenta al exportar, no al responder: si el administrador lo corrige, el archivo
+siguiente lleva el corregido. Es un campo agregado, no cambiado: quien lee `juicios-taller/1` sin
+conocerlo sigue funcionando.
+
 QUIÉN DIJO QUÉ VA CON NOMBRE. Es el mismo dato que ve el administrador en el catálogo; quien corre
 esto es quien prepara las etiquetas, no un revisor cuya independencia haya que cuidar.
 
@@ -27,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend import ajustes, almacen, clasificacion  # noqa: E402  (necesita el sys.path de arriba)
+from backend import ajustes, almacen, clasificacion, cuentas  # noqa: E402  (necesita el sys.path de arriba)
 
 FORMATO = "juicios-taller/1"
 
@@ -50,12 +55,15 @@ def config_de_la_rama(cadena: list[dict]) -> dict:
     }
 
 
-def armar(nodo: dict, cadena: list[dict], tabla_eventos, juicios_por_evento: dict) -> dict:
+def armar(nodo: dict, cadena: list[dict], tabla_eventos, juicios_por_evento: dict,
+          experiencia: dict[str, int | None] | None = None) -> dict:
     """El contenido del archivo. Función pura: recibe todo y no toca ninguna base.
 
     `juicios_por_evento` es lo que devuelve `clasificacion.catalogado()` para esta rama:
-    `{event_id: [{usuario, respuesta, comentario, secciones, …}, …]}`.
+    `{event_id: [{usuario, respuesta, comentario, secciones, …}, …]}`. `experiencia` es el grado
+    de cada usuario; quien no esté sale con `null`.
     """
+    experiencia = experiencia or {}
     por_id = tabla_eventos.set_index("event_id")
     eventos = []
     for eid in sorted(juicios_por_evento):
@@ -73,6 +81,7 @@ def armar(nodo: dict, cadena: list[dict], tabla_eventos, juicios_por_evento: dic
             "revisores": [
                 {
                     "usuario": r["usuario"],
+                    "experiencia": experiencia.get(r["usuario"]),
                     "respuesta": r["respuesta"],
                     "comentario": r["comentario"],
                     "secciones": [
@@ -119,11 +128,13 @@ def main() -> int:
         return 2
 
     clasificacion.preparar()
+    cuentas.preparar()
     contenido = armar(
         nodo,
         almacen.cadena_hasta(con, clave),
         almacen.cargar_resultado(clave)["eventos"],
         clasificacion.catalogado().get(clave, {}),
+        {u["nombre"]: u["experiencia"] for u in cuentas.listar()},
     )
     destino = args.salida or ajustes.DIR_DATOS / f"juicios_{clave}.json"
     destino.write_text(json.dumps(contenido, ensure_ascii=False, indent=2), encoding="utf-8")

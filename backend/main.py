@@ -55,6 +55,11 @@ class PeticionUsuario(BaseModel):
     nombre: str
     contrasena: str
     rol: str = cuentas.REVISOR
+    experiencia: int
+
+
+class PeticionExperiencia(BaseModel):
+    experiencia: int
 
 
 class PeticionContrasena(BaseModel):
@@ -1736,16 +1741,29 @@ def get_yo(request: Request):
 @app.get("/api/usuarios")
 def get_usuarios(request: Request):
     _administrador(request)
-    return {"usuarios": cuentas.listar(), "roles": [cuentas.ADMIN, cuentas.REVISOR]}
+    return {"usuarios": cuentas.listar(), "roles": [cuentas.ADMIN, cuentas.REVISOR],
+            "experiencias": list(cuentas.EXPERIENCIAS)}
 
 
 @app.post("/api/usuarios")
 def post_usuarios(pet: PeticionUsuario, request: Request):
     admin = _administrador(request)
     try:
-        return cuentas.crear(pet.nombre, pet.contrasena, rol=pet.rol, creado_por=admin["nombre"])
+        return cuentas.crear(pet.nombre, pet.contrasena, rol=pet.rol,
+                             experiencia=pet.experiencia, creado_por=admin["nombre"])
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.put("/api/usuarios/{nombre}/experiencia")
+def put_experiencia(nombre: str, pet: PeticionExperiencia, request: Request):
+    """Cambia el grado de experiencia de una cuenta. Solo el administrador."""
+    _administrador(request)
+    try:
+        cuentas.cambiar_experiencia(nombre, pet.experiencia)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"listo": True}
 
 
 @app.post("/api/usuarios/{nombre}/contrasena")

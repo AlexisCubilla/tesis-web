@@ -207,23 +207,27 @@ def test_el_admin_crea_usuarios_y_el_revisor_no(taller):
     _entrar(cliente, "jefa", "contrasena-larga")
 
     alta = cliente.post("/api/usuarios",
-                        json={"nombre": "revisor1", "contrasena": "clave-de-prueba", "rol": "revisor"})
+                        json={"nombre": "revisor1", "contrasena": "clave-de-prueba", "rol": "revisor",
+                              "experiencia": 2})
     assert alta.status_code == 200
     cliente.post("/api/sesion/salir")
 
     _entrar(cliente, "revisor1", "clave-de-prueba")
     assert cliente.get("/api/usuarios").status_code == 403
     assert cliente.post("/api/usuarios",
-                        json={"nombre": "otro", "contrasena": "clave-de-prueba"}).status_code == 403
+                        json={"nombre": "otro", "contrasena": "clave-de-prueba",
+                              "experiencia": 2}).status_code == 403
 
 
 def test_no_se_puede_repetir_el_nombre_ni_usar_una_clave_corta(taller):
     cliente, _ = taller
     _entrar(cliente, "jefa", "contrasena-larga")
     assert cliente.post("/api/usuarios",
-                        json={"nombre": "jefa", "contrasena": "clave-de-prueba"}).status_code == 400
+                        json={"nombre": "jefa", "contrasena": "clave-de-prueba",
+                              "experiencia": 2}).status_code == 400
     assert cliente.post("/api/usuarios",
-                        json={"nombre": "corto", "contrasena": "abc"}).status_code == 400
+                        json={"nombre": "corto", "contrasena": "abc",
+                              "experiencia": 2}).status_code == 400
 
 
 def test_el_admin_no_puede_borrarse_a_si_mismo(taller):
@@ -233,11 +237,67 @@ def test_el_admin_no_puede_borrarse_a_si_mismo(taller):
     assert cliente.delete("/api/usuarios/jefa").status_code == 400
 
 
+def test_el_alta_pide_grado_de_experiencia_de_1_a_3(taller):
+    cliente, _ = taller
+    _entrar(cliente, "jefa", "contrasena-larga")
+    base = {"nombre": "ana", "contrasena": "clave-de-prueba"}
+    assert cliente.post("/api/usuarios", json=base).status_code == 422
+    for fuera in (0, 4):
+        assert cliente.post("/api/usuarios", json={**base, "experiencia": fuera}).status_code == 400
+    # Los dos roles clasifican, así que los dos lo tienen.
+    assert cliente.post("/api/usuarios", json={**base, "experiencia": 3}).status_code == 200
+    assert cliente.post("/api/usuarios", json={"nombre": "otra", "contrasena": "clave-de-prueba",
+                                               "rol": "admin", "experiencia": 1}).status_code == 200
+    grados = {u["nombre"]: u["experiencia"] for u in cliente.get("/api/usuarios").json()["usuarios"]}
+    assert (grados["ana"], grados["otra"]) == (3, 1)
+    # El del `.env` nace sin grado: nadie lo dijo.
+    assert grados["jefa"] is None
+
+
+def test_el_admin_cambia_el_grado_y_el_revisor_no(taller):
+    cliente, _ = taller
+    _entrar(cliente, "jefa", "contrasena-larga")
+    cliente.post("/api/usuarios", json={"nombre": "ana", "contrasena": "clave-de-prueba",
+                                        "experiencia": 1})
+    assert cliente.put("/api/usuarios/jefa/experiencia", json={"experiencia": 3}).status_code == 200
+    assert cliente.put("/api/usuarios/ana/experiencia", json={"experiencia": 5}).status_code == 400
+    assert cliente.put("/api/usuarios/nadie/experiencia", json={"experiencia": 2}).status_code == 400
+    cliente.post("/api/sesion/salir")
+
+    _entrar(cliente, "ana", "clave-de-prueba")
+    # Tampoco el propio: el grado lo asigna el administrador, no quien clasifica.
+    assert cliente.put("/api/usuarios/ana/experiencia", json={"experiencia": 3}).status_code == 403
+
+
+def test_una_base_anterior_gana_la_columna_sin_inventar_grados(taller, tmp_path, monkeypatch):
+    import sqlite3
+    _, cuentas = taller
+    base = tmp_path / "vieja" / "cuentas.sqlite"
+    base.parent.mkdir()
+    vieja = sqlite3.connect(base)
+    vieja.execute("""CREATE TABLE usuarios (nombre TEXT PRIMARY KEY, clave TEXT NOT NULL,
+                     rol TEXT NOT NULL DEFAULT 'revisor', creado_en TEXT NOT NULL,
+                     creado_por TEXT, ultimo_ingreso TEXT)""")
+    vieja.execute("INSERT INTO usuarios VALUES ('ana', 'x', 'revisor', '2026-01-01', 'jefa', NULL)")
+    vieja.commit()
+    vieja.close()
+    monkeypatch.setattr(cuentas, "DIR_CUENTAS", base.parent)
+    monkeypatch.setattr(cuentas, "BASE", base)
+    monkeypatch.setattr(cuentas, "_con", None)
+    monkeypatch.delenv("ADMIN_USUARIO", raising=False)
+    cuentas.preparar()
+    assert [(u["nombre"], u["experiencia"]) for u in cuentas.listar()] == [("ana", None)]
+    cuentas.cambiar_experiencia("ana", 2)
+    assert cuentas.obtener("ana")["experiencia"] == 2
+
+
 def test_cada_uno_cambia_su_propia_contrasena_y_no_la_ajena(taller):
     cliente, _ = taller
     _entrar(cliente, "jefa", "contrasena-larga")
-    cliente.post("/api/usuarios", json={"nombre": "ana", "contrasena": "clave-de-prueba"})
-    cliente.post("/api/usuarios", json={"nombre": "beto", "contrasena": "clave-de-prueba"})
+    cliente.post("/api/usuarios", json={"nombre": "ana", "contrasena": "clave-de-prueba",
+                                        "experiencia": 2})
+    cliente.post("/api/usuarios", json={"nombre": "beto", "contrasena": "clave-de-prueba",
+                                        "experiencia": 2})
     cliente.post("/api/sesion/salir")
 
     _entrar(cliente, "ana", "clave-de-prueba")

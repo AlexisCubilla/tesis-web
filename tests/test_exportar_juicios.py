@@ -51,7 +51,7 @@ def test_armar_lleva_rango_revisores_y_secciones(exportar):
                         "comentario": "caída", "actualizado_en": "x"}]},
         {"usuario": "beto", "respuesta": "no", "comentario": "ruido", "secciones": []},
     ]}
-    a = exportar.armar(NODO, CADENA, TABLA, juicios)
+    a = exportar.armar(NODO, CADENA, TABLA, juicios, {"ana": 3})
     assert a["formato"] == "juicios-taller/1" and a["nodo"] == "abc123"
     assert a["commit_tesis"] == "0baac87"
     (ev,) = a["eventos"]
@@ -61,6 +61,8 @@ def test_armar_lleva_rango_revisores_y_secciones(exportar):
     assert ana["secciones"] == [{"desde": 264, "hasta": 300, "respuesta": "si",
                                  "comentario": "caída"}]
     assert (beto["respuesta"], beto["comentario"]) == ("no", "ruido")
+    # El grado de cada revisor; quien no tiene cuenta (o no lo tiene cargado) sale con `None`.
+    assert (ana["experiencia"], beto["experiencia"]) == (3, None)
 
 
 def test_solo_van_los_eventos_que_alguien_toco(exportar):

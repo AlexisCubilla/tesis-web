@@ -93,6 +93,12 @@ Hay dos roles. **Revisor** entra y clasifica; **administrador** además da de al
 Dar de baja a alguien **no borra sus clasificaciones**: son juicio humano y quedan atribuidas a su
 nombre.
 
+Cada cuenta tiene además un **grado de experiencia, de 1 (menor) a 3 (mayor)**, que se elige al
+darla de alta —sin valor por defecto— y el administrador puede cambiar desde la tabla de
+**Usuarios**. Lo tienen los dos roles, porque los dos clasifican. Las cuentas anteriores y la del
+`.env` quedan «sin indicar» hasta que se lo cargue. Viaja con los juicios que exporta
+`scripts/exportar_juicios.py`, en el campo `experiencia` de cada revisor.
+
 > Hace falta una cuenta por persona, no una compartida. No es burocracia: la clasificación de eventos
 > es por revisor, y una cuenta común haría imposible saber quién opinó qué — que es justamente lo que
 > la Etapa 2 necesita poder medir.
