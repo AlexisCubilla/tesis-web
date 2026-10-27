@@ -1986,19 +1986,25 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
           El juicio se guarda con el nombre de quien lo emite, así que sin cuenta no hay a quién
           atribuirlo.</p>` : `
       <form class="encuesta" id="form-clas">
-        <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
-        <div class="escala">${C.escala.map((o) => `
-          <label><input type="radio" name="respuesta" value="${o.codigo}"
-            ${puesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
-        <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
-          maxlength="4000">${esc(comentario)}</textarea>
+        <!-- Un fieldset para poder bloquear la pregunta del evento entera de una vez: ver
+             bloquearConjunto. -->
+        <fieldset id="conjunto">
+          <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
+          <div class="escala">${C.escala.map((o) => `
+            <label><input type="radio" name="respuesta" value="${o.codigo}"
+              ${puesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
+          <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
+            maxlength="4000">${esc(comentario)}</textarea>
+        </fieldset>
+        <p class="aviso info" id="aviso-conjunto" hidden></p>
         <!-- SECCIONES: si la anomalía ocupa solo una parte del evento, cada parte con su respuesta.
-             La pregunta de arriba sigue siendo sobre el evento entero; estas la precisan. -->
+             Mientras alguna tenga respuesta, mandan ellas y la pregunta de arriba queda bloqueada. -->
         <div class="secciones">
           <p class="pregunta-secc">Secciones <span class="tenue">· opcional</span></p>
           <p class="pista" style="margin:0 0 8px">Si lo anómalo es solo una parte del evento,
             arrastrá sobre las señales para marcarla, dentro de la zona sombreada. Cada sección
-            lleva su propia respuesta.</p>
+            lleva su propia respuesta. <b>En cuanto respondas una, lo que quede fuera de tus
+            secciones cuenta como «No»</b>, y la pregunta de arriba deja de usarse.</p>
           <div id="lista-secc"></div>
           <span class="tenue" style="font-size:.78rem" id="estado-secc"></span>
         </div>
@@ -2242,6 +2248,29 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       if (nuevas.length) C.secciones[String(id)] = nuevas;
       else delete C.secciones[String(id)];
       refrescarMarca(id);
+      bloquearConjunto();
+    }
+
+    /* CON UNA SECCIÓN RESPONDIDA, LA PREGUNTA DEL EVENTO SE BLOQUEA. Es lo que hace la Etapa 2
+       (ADR-0012 de la tesis): si hay secciones con respuesta, cada ventana toma la de la sección
+       que toca, las que no tocan ninguna valen «No», y la respuesta del evento no se usa. Dejar la
+       pregunta editable invitaba a contestarla creyendo que contaba —o que cubría lo que quedó
+       afuera de las secciones—.
+
+       Bloquear y no borrar: lo que ya se había respondido sigue guardado y a la vista, como
+       opinión de conjunto. Las secciones sin respuesta no bloquean nada, igual que allá no
+       cuentan. Se desbloquea sola al dejarlas todas sin decisión o quitarlas. */
+    function bloquearConjunto() {
+      const campo = dlg.querySelector('#conjunto');
+      const aviso = dlg.querySelector('#aviso-conjunto');
+      if (!campo || !aviso) return;
+      const n = misSecciones(id).filter((s) => s.respuesta).length;
+      campo.disabled = n > 0;
+      aviso.hidden = n === 0;
+      aviso.textContent = n === 0 ? '' : `Respondiste ${n === 1 ? 'una sección' : `${n} secciones`}: `
+        + 'mandan ellas, y lo que queda fuera cuenta como «No». La pregunta del evento queda '
+        + 'bloqueada' + (miRespuesta(id) ? ', con lo que ya habías puesto guardado como opinión '
+        + 'general' : '') + '. Para volver a usarla, dejá las secciones sin decisión o quitalas.';
     }
 
     /** Rehace la lista y el sombreado. Solo al agregar, quitar o mover una: rehacer la lista
@@ -2414,6 +2443,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
     }
 
     pintarSecciones();
+    bloquearConjunto();
   }
 }
 

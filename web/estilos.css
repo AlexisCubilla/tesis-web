@@ -1155,6 +1155,13 @@ th.ordenable.num button { justify-content: flex-end; }
   border: 1px solid var(--borde); background: var(--fondo-2); color: var(--texto);
   font: inherit; font-size: .88rem; line-height: 1.55; resize: vertical; min-height: 76px; }
 .encuesta textarea:focus { outline: none; border-color: var(--borde-fuerte); }
+/* La pregunta del evento va en un `fieldset` solo para poder bloquearla entera (`bloquearConjunto`
+   en app.js): sin borde ni sangría propios. Bloqueada se apaga, pero lo marcado se sigue leyendo. */
+.encuesta fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.encuesta fieldset:disabled { opacity: .45; }
+.encuesta fieldset:disabled .escala label { cursor: not-allowed; }
+.encuesta fieldset:disabled .escala label:hover { border-color: var(--borde); }
+#aviso-conjunto { margin: 12px 0 0; font-size: .82rem; }
 .encuesta .pie { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 
 /* Las secciones de un evento: una fila por sección, con su número —el mismo que se ve sobre el
