@@ -288,7 +288,8 @@ window.Grafico = (function () {
                        : { show: false } },
                    { xAxis: b }]);
       }
-      for (const s of cfg.secciones || []) {
+      // `cfg.previa` es el rango que se está arrastrando: se dibuja como una sección elegida más.
+      for (const s of [...(cfg.secciones || []), ...(cfg.previa ? [cfg.previa] : [])]) {
         const [a, b] = rango(s.desde, s.hasta);
         /* La ACTIVA —la elegida en la lista— lleva relleno fuerte y los dos bordes en el acento.
            Solo con más relleno no alcanzaba: entre .16 y .32 de alfa sobre fondo oscuro la
@@ -409,10 +410,13 @@ window.Grafico = (function () {
          Solo en el gráfico del diálogo, no en la copia agrandada: la lista de secciones vive en el
          diálogo, y una sección marcada en una ventana que tapa esa lista no se vería aparecer. */
       if (cfg.alSeleccionar && !comp && !enModal) {
+        /* LA CAJA ES INVISIBLE: lo que se ve mientras se arrastra es `cfg.previa`, dibujada en los
+           tres paneles. La caja de ECharts se queda en el panel donde empezó el arrastre aunque
+           mida sobre todos los ejes, así que al arrastrar se veía una franja en un solo panel y
+           al soltar aparecía la sección de arriba abajo: dos dibujos distintos para el mismo rango. */
         o.brush = {
           xAxisIndex: 'all', brushType: 'lineX', brushMode: 'single', transformable: false,
-          brushStyle: { color: varCss('--marca-seccion-activa'), borderColor: varCss('--acento'),
-                        borderWidth: 1 },
+          brushStyle: { color: 'rgba(0,0,0,0)', borderColor: 'rgba(0,0,0,0)', borderWidth: 0 },
           // Sin atenuar lo que queda afuera: acá la caja no filtra datos, solo mide un rango.
           inBrush: {}, outOfBrush: { colorAlpha: 1 },
         };
@@ -440,8 +444,28 @@ window.Grafico = (function () {
       /* Al soltar: se pasa el rango en índices de lo dibujado, semiabierto, recortado a
          `cfg.limitesSeleccion` si lo hay, y la caja se borra — la sección la dibuja quien la
          guarde, con `marcarSecciones`, recién cuando exista. Un clic sin arrastre no es nada. */
+      /* Mientras se arrastra, el rango se dibuja como sección en los tres paneles —ver la nota de
+         `o.brush`—. Un cuadro por vez: el evento llega con cada movimiento del ratón. */
+      let cuadro = null;
+      const previa = (rango) => {
+        cfg.previa = rango;
+        if (cuadro) return;
+        cuadro = requestAnimationFrame(() => {
+          cuadro = null;
+          const c = comun();
+          g.eco.setOption({ series: paneles.map((_, i) => ({ markArea: areas(c, i) })) });
+        });
+      };
+      g.eco.on('brush', (p) => {
+        const area = ((p.batch && p.batch[0] && p.batch[0].areas) || p.areas || [])[0];
+        if (!area || !area.coordRange) { if (cfg.previa) previa(null); return; }
+        const desde = Math.max(0, Math.round(area.coordRange[0]));
+        const hasta = Math.min(n, Math.round(area.coordRange[1]) + 1);
+        previa({ desde, hasta, activa: true });
+      });
       g.eco.on('brushEnd', (p) => {
         const area = (p.areas || [])[0];
+        previa(null);
         g.eco.dispatchAction({ type: 'brush', areas: [] });
         if (!area || !area.coordRange) return;
         let desde = Math.max(0, Math.round(area.coordRange[0]));
