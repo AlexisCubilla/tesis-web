@@ -38,6 +38,23 @@
     .then((usuario) => (usuario ? pintarMenu(usuario) : pintarSuelto()))
     .catch(() => {});   // sin red no hay nada útil que decir en la barra
 
+  const t = (es, en) => (window.I18n ? window.I18n.t(es, en) : es);
+
+  /** El selector de idioma: ES o EN, el que NO está puesto. Va suelto junto al tema, haya sesión o
+   *  no, por el mismo motivo: es una preferencia de quien mira, no de la cuenta. Ver `i18n.js`. */
+  function botonIdioma() {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-tema btn-idioma';
+    const otro = window.I18n ? window.I18n.otro : 'en';
+    b.textContent = otro.toUpperCase();
+    b.lang = otro;
+    b.title = otro === 'en' ? 'Switch to English' : 'Cambiar a español';
+    b.setAttribute('aria-label', b.title);
+    b.addEventListener('click', () => window.I18n && window.I18n.elegir(otro));
+    return b;
+  }
+
   /** El botón de tema. Va en la barra en los dos casos, con o sin sesión.
    *
    *  No hace falta mantenerle el ícono al día: `tema.js` recorre todos los `.btn-tema` cada vez que
@@ -48,7 +65,7 @@
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn-tema';
-    b.title = 'Cambiar de tema';
+    b.title = t('Cambiar de tema', 'Change theme');
     b.setAttribute('aria-label', b.title);
     b.innerHTML = window.Tema ? (window.Tema.actual() === 'oscuro'
       ? window.Tema.ICONO_SOL : window.Tema.ICONO_LUNA) : '';
@@ -60,6 +77,7 @@
   function pintarSuelto() {
     const caja = document.createElement('div');
     caja.className = 'cuenta sola';
+    caja.appendChild(botonIdioma());
     caja.appendChild(botonTema());
 
     if (!location.pathname.endsWith('/login')) {
@@ -67,7 +85,7 @@
       const entrar = document.createElement('a');
       entrar.className = 'boton';
       entrar.href = destino ? `login?destino=${encodeURIComponent(destino)}` : 'login';
-      entrar.textContent = 'Ingresar';
+      entrar.textContent = t('Ingresar', 'Sign in');
       caja.appendChild(entrar);
     }
     barra.appendChild(caja);
@@ -75,7 +93,7 @@
 
   /* --- Con sesión: un avatar, y el resto adentro. ----------------------------------------- */
   function pintarMenu(usuario) {
-    if (usuario.rol === 'admin') agregarPestana('catalogo', 'Catálogo');
+    if (usuario.rol === 'admin') agregarPestana('catalogo', t('Catálogo', 'Catalog'));
 
     const caja = document.createElement('div');
     caja.className = 'cuenta';
@@ -91,7 +109,7 @@
     // que se guarda queda firmado con tu nombre.
     disparador.innerHTML = `<span aria-hidden="true">${
       (usuario.nombre.trim()[0] || '?').toUpperCase()}</span>`;
-    disparador.setAttribute('aria-label', `Cuenta de ${usuario.nombre}`);
+    disparador.setAttribute('aria-label', t(`Cuenta de ${usuario.nombre}`, `${usuario.nombre}'s account`));
 
     const menu = document.createElement('div');
     menu.className = 'menu-cuenta';
@@ -101,7 +119,7 @@
     const quien = document.createElement('div');
     quien.className = 'quien';
     quien.innerHTML = `<strong>${usuario.nombre}</strong><span>${
-      usuario.rol === 'admin' ? 'Administrador' : 'Revisor'}</span>`;
+      usuario.rol === 'admin' ? t('Administrador', 'Administrator') : t('Revisor', 'Reviewer')}</span>`;
     menu.appendChild(quien);
 
     /* «Usuarios» va acá y no en las pestañas. Las tres pestañas son los destinos del TRABAJO —el
@@ -113,7 +131,7 @@
       usuarios.className = 'op';
       usuarios.setAttribute('role', 'menuitem');
       usuarios.href = 'usuarios';
-      usuarios.innerHTML = `${ICONO_USUARIOS}<span>Gestionar usuarios</span>`;
+      usuarios.innerHTML = `${ICONO_USUARIOS}<span>${t('Gestionar usuarios', 'Manage users')}</span>`;
       menu.appendChild(usuarios);
     }
 
@@ -121,7 +139,7 @@
     salir.type = 'button';
     salir.className = 'op';
     salir.setAttribute('role', 'menuitem');
-    salir.innerHTML = `${ICONO_SALIR}<span>Cerrar sesión</span>`;
+    salir.innerHTML = `${ICONO_SALIR}<span>${t('Cerrar sesión', 'Sign out')}</span>`;
     salir.addEventListener('click', async () => {
       salir.disabled = true;
       try {
@@ -132,6 +150,7 @@
     });
     menu.appendChild(salir);
 
+    caja.appendChild(botonIdioma());
     caja.appendChild(botonTema());
     caja.appendChild(disparador);
     caja.appendChild(menu);

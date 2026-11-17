@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ingresar — Taller Etapa 1</title>
+<title data-en="Sign in — Stage 1 Workshop">Ingresar — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
+<script src="estatico/i18n.js"></script>
 <script>
 /* El tema, ANTES del primer cuadro. Va inline en el `<head>` y no en `tema.js` a propósito: ese
    archivo se carga al final del cuerpo, cuando el navegador ya pintó, y quien tenga el claro
@@ -247,33 +248,34 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 </div>
 
 <header class="barra">
-  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <div class="marca" data-en="<span class=&quot;punto&quot;></span> Stage 1 · BIRDS-4 / TSURU"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
   <nav>
-    <a href=".">El proyecto</a>
-    <a href="taller">Taller</a>
+    <a href="." data-en="The project">El proyecto</a>
+    <a href="taller" data-en="Workshop">Taller</a>
   </nav>
 </header>
 
 <div class="ingreso">
-  <h1>Ingresar</h1>
+  <h1 data-en="Sign in">Ingresar</h1>
 
   <form id="form">
     <div class="campo">
-      <label for="usuario">Usuario</label>
-      <input id="usuario" name="usuario" autocomplete="username" placeholder="usuario"
+      <label for="usuario" data-en="Username">Usuario</label>
+      <input id="usuario" name="usuario" autocomplete="username" placeholder="usuario" data-en-placeholder="username"
              autofocus required>
     </div>
     <div class="campo">
-      <label for="contrasena">Contraseña</label>
+      <label for="contrasena" data-en="Password">Contraseña</label>
       <input id="contrasena" name="contrasena" type="password" placeholder="••••••••"
              autocomplete="current-password" required>
     </div>
-    <button class="boton primario entrar" type="submit" id="entrar">Iniciar sesión</button>
+    <button class="boton primario entrar" type="submit" id="entrar" data-en="Sign in">Iniciar sesión</button>
   </form>
 
   <div id="mensaje"></div>
 
-  <p class="nota">El modo de solo lectura no requiere autenticación.
+  <p class="nota" data-en="Read-only mode does not require signing in.
+     <strong>Signing in grants permission to run and classify.</strong>">El modo de solo lectura no requiere autenticación.
      <strong>Iniciar sesión otorga permisos de ejecución y clasificación.</strong></p>
 </div>
 
@@ -314,6 +316,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 <script>
 'use strict';
 const $ = (s) => document.querySelector(s);
+const t = I18n.t;
 
 /** A dónde volver después de entrar.
  *
@@ -350,8 +353,10 @@ function avisar(texto, clase = '') {
 fetch('api/acceso').then((r) => r.json()).then((d) => {
   if (d.usuario) { location.replace(destino()); return; }
   if (d.motivo) {
-    avisar(`<strong>El taller no tiene administrador configurado.</strong> ${d.motivo}. ` +
-           `Definilas en el <span class="mono">.env</span> y reiniciá el servidor.`);
+    avisar(t(`<strong>El taller no tiene administrador configurado.</strong> ${d.motivo}. ` +
+             `Definilas en el <span class="mono">.env</span> y reiniciá el servidor.`,
+             `<strong>The workshop has no administrator configured.</strong> ${d.motivo}. ` +
+             `Set them in <span class="mono">.env</span> and restart the server.`));
     $('#entrar').disabled = true;
   }
 }).catch(() => {});
@@ -360,7 +365,7 @@ $('#form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const boton = $('#entrar');
   boton.disabled = true;
-  boton.textContent = 'Entrando…';
+  boton.textContent = t('Entrando…', 'Signing in…');
   avisar('');
   try {
     const r = await fetch('api/sesion', {
@@ -378,7 +383,7 @@ $('#form').addEventListener('submit', async (e) => {
     $('#contrasena').value = '';
     $('#contrasena').focus();
     boton.disabled = false;
-    boton.textContent = 'Iniciar sesión';
+    boton.textContent = t('Iniciar sesión', 'Sign in');
   }
 });
 </script>

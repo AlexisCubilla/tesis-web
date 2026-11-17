@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
+<script src="estatico/i18n.js"></script>
 <script>
 /* El tema, ANTES del primer cuadro. Va inline en el `<head>` y no en `tema.js` a propósito: ese
    archivo se carga al final del cuerpo, cuando el navegador ya pintó, y quien tenga el claro
@@ -104,11 +105,11 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 <div class="estrellas"></div>
 
 <header class="barra">
-  <div class="marca"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
+  <div class="marca" data-en="<span class=&quot;punto&quot;></span> Stage 1 · BIRDS-4 / TSURU"><span class="punto"></span> Etapa 1 · BIRDS-4 / TSURU</div>
   <nav>
-    <a href=".">El proyecto</a>
-    <a href="taller">Taller</a>
-    <a href="catalogo" class="activo">Catálogo</a>
+    <a href="." data-en="The project">El proyecto</a>
+    <a href="taller" data-en="Workshop">Taller</a>
+    <a href="catalogo" class="activo" data-en="Catalog">Catálogo</a>
   </nav>
 </header>
 

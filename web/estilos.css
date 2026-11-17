@@ -828,6 +828,11 @@ p { margin: 0 0 1em; text-wrap: pretty; }
 .barra .btn-tema svg { width: 17px; height: 17px; }
 .barra .btn-tema:hover { color: var(--texto); background: var(--boton-hover); }
 
+/* El selector de idioma, al lado del tema y con su mismo peso: también es una preferencia de quien
+   mira. Muestra el idioma AL QUE SE VA, como el ícono del tema, y en siglas porque una bandera
+   dice país y no idioma. */
+.barra .btn-idioma { font: 600 .74rem/1 var(--mono, monospace); letter-spacing: .04em; }
+
 /* El avatar lleva la INICIAL y no un ícono genérico: con varios revisores, decir de quién es la
    sesión sin abrir nada importa, porque lo que se guarda queda firmado con ese nombre. */
 .barra .avatar {

@@ -47,7 +47,9 @@ const ICONO_LUNA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
     for (const b of document.querySelectorAll('.btn-tema')) {
       const destino = tema === 'oscuro' ? 'claro' : 'oscuro';
-      b.title = `Cambiar al tema ${destino}`;
+      b.title = window.I18n
+        ? window.I18n.t(`Cambiar al tema ${destino}`, `Switch to ${destino === 'claro' ? 'light' : 'dark'} theme`)
+        : `Cambiar al tema ${destino}`;
       b.setAttribute('aria-label', b.title);
       b.innerHTML = tema === 'oscuro' ? ICONO_SOL : ICONO_LUNA;
     }
