@@ -1182,8 +1182,13 @@ const etiquetaEscala = (codigo) => (C.escala.find((o) => o.codigo === codigo) ||
 function tonoDeRespuesta(id) {
   const mia = miRespuesta(id);
   // Una nota sin decisión no tiñe la fila: el tinte dice qué se respondió, y ahí no se respondió.
-  if (!mia || !mia.respuesta) return null;
-  const valor = (C.escala.find((o) => o.codigo === mia.respuesta) || {}).valor;
+  return mia ? tonoDeCodigo(mia.respuesta) : null;
+}
+
+/** El mismo signo para un código suelto de la escala; sirve también para una sección. */
+function tonoDeCodigo(codigo) {
+  if (!codigo) return null;
+  const valor = (C.escala.find((o) => o.codigo === codigo) || {}).valor;
   return valor > 0 ? 'si' : valor < 0 ? 'no' : 'neutral';
 }
 
@@ -1688,6 +1693,28 @@ function lineaDeEventos(destino, d, filas) {
                    fillOpacity: .35 + .65 * (n / maxDet),
                    stroke: fondo, lineWidth: 1 },
         };
+        /* RESPONDIDO EN PARTE: cada sección con respuesta lleva su contorno sobre el tramo que
+           ocupa, con el mismo código de color y trazo que el evento entero. Antes solo se miraba
+           la respuesta del evento, y un evento juzgado por secciones quedaba igual que uno sin
+           tocar.
+
+           Con secciones respondidas el contorno del evento entero NO se dibuja aunque haya
+           respuesta guardada: es la misma regla que bloquea la pregunta en el diálogo (la Etapa 2
+           toma las secciones y descarta la respuesta de conjunto), y la línea tiene que mostrar lo
+           que cuenta. Los dos píxeles hacia afuera solo se agregan en los bordes del evento; por
+           dentro, dos secciones pegadas se pisarían el trazo. */
+        const conRespuesta = misSecciones(api.value(4)).filter((s) => tonoDeCodigo(s.respuesta));
+        if (conRespuesta.length) {
+          const marcas = conRespuesta.map((s) => {
+            const t = contorno[tonoDeCodigo(s.respuesta)];
+            const a = api.coord([s.desde, api.value(0)])[0] - (s.desde <= api.value(1) ? 2 : 0);
+            const b = api.coord([s.hasta, api.value(0)])[0] + (s.hasta >= api.value(2) ? 2 : 0);
+            return { type: 'rect', z2: 2,
+                     shape: { x: a, y: y - 11, width: Math.max(3, b - a), height: 22, r: 4 },
+                     style: { fill: 'none', stroke: t.color, lineWidth: 2, lineDash: t.guion } };
+          });
+          return { type: 'group', children: [relleno, ...marcas] };
+        }
         const tono = tonoDeRespuesta(api.value(4));
         if (!tono) return relleno;
         /* Clasificado. Dos decisiones, las dos por lo mismo —que la marca se vea igual sobre
@@ -1765,6 +1792,7 @@ function lineaDeEventos(destino, d, filas) {
          (S.usuario
            ? ' El contorno es tu respuesta: verde de trazo largo si lo marcaste como anomalía,' +
              ' rojo de trazo corto si dijiste que no lo es, gris punteado si quedó neutral.' +
+             ' Si respondiste por secciones, el contorno va solo sobre cada sección.' +
              ' Clic sobre un evento para verlo y clasificarlo.'
            : ' Clic sobre un evento para ver sus señales.'),
   });
