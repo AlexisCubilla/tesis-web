@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Revisión del experto — Etapa 1</title>
+<title data-en="Expert review — Stage 1">Revisión del experto — Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
 <script src="estatico/i18n.js"></script>
 <script>
@@ -96,13 +96,13 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   <nav>
     <a href="." data-en="The project">El proyecto</a>
     <a href="taller" data-en="Workshop">Taller</a>
-    <a href="#" class="activo">Revisión</a>
+    <a href="#" class="activo" data-en="Review">Revisión</a>
   </nav>
 </header>
 
 <div class="envoltorio envoltorio-rev">
   <div class="cinta">
-    <a class="boton" href="taller">← Volver al taller</a>
+    <a class="boton" href="taller" data-en="← Back to the workshop">← Volver al taller</a>
     <div>
       <div class="titulo" id="rev-nombre">…</div>
       <div class="mono" id="rev-procedencia"></div>
@@ -120,13 +120,13 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
       <!-- Va como hermano del editor, no adentro: OnlyOffice reemplaza #editor por su iframe. -->
       <div class="velo" id="velo">
         <div>
-          <div class="titulo" id="velo-titulo">Abriendo el editor</div>
+          <div class="titulo" id="velo-titulo" data-en="Opening the editor">Abriendo el editor</div>
           <div class="detalle" id="velo-detalle">
             <span class="latido"></span><span class="latido"></span><span class="latido"></span>
           </div>
           <div class="acciones" id="velo-acciones" hidden>
-            <button class="boton acento" id="btn-reintentar">Reintentar</button>
-            <a class="boton" id="btn-bajar-igual" download>Bajar el archivo</a>
+            <button class="boton acento" id="btn-reintentar" data-en="Retry">Reintentar</button>
+            <a class="boton" id="btn-bajar-igual" download data-en="Download the file">Bajar el archivo</a>
           </div>
           <div class="bitacora" id="velo-bitacora"></div>
         </div>
@@ -135,8 +135,9 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 
     <aside class="rev-lateral">
       <div class="tarjeta">
-        <h4>Cómo se guarda</h4>
-        <p class="pista" style="margin:0;font-size:.78rem">
+        <h4 data-en="How it is saved">Cómo se guarda</h4>
+        <p class="pista" style="margin:0;font-size:.78rem" data-en="Write wherever you like: new columns, new sheets, cell comments. Every save creates a
+          <strong>new version</strong> — none overwrites the previous one, so nothing you write can be lost.">
           Escribí donde quieras: columnas nuevas, hojas nuevas, comentarios de celda. Cada vez que se
           guarda queda una <strong>versión nueva</strong> — ninguna pisa a la anterior, así que nada
           de lo que escribas se puede perder.
@@ -144,15 +145,15 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
       </div>
 
       <div class="tarjeta">
-        <h4>Versiones</h4>
+        <h4 data-en="Versions">Versiones</h4>
         <ul class="versiones" id="rev-versiones"><li class="vd">…</li></ul>
-        <p class="pista" style="margin:9px 0 0;font-size:.72rem">
+        <p class="pista" style="margin:9px 0 0;font-size:.72rem" data-en="v0 is what came out of the pipeline, before anyone touched it.">
           La v0 es lo que salió del pipeline, antes de que nadie lo tocara.
         </p>
       </div>
 
       <div class="tarjeta">
-        <h4>Lo que quedó escrito</h4>
+        <h4 data-en="What has been written">Lo que quedó escrito</h4>
         <div id="rev-comentarios" style="font-size:.78rem;color:var(--texto-2)">…</div>
       </div>
     </aside>
@@ -163,6 +164,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 const params = new URLSearchParams(location.search);
 const DOC = params.get('doc');
 const $ = (s) => document.querySelector(s);
+const t = I18n.t;
 //: La ficha del documento: hace falta para bajar el archivo y sus versiones, porque esas rutas
 //: quedan abiertas en el proxy de adelante (las usa el Document Server, que no se autentica).
 let FICHA = '';
@@ -170,7 +172,7 @@ let FICHA = '';
 const fecha = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
-  return isNaN(d) ? iso : d.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
+  return isNaN(d) ? iso : d.toLocaleString(I18n.locale, { dateStyle: 'short', timeStyle: 'short' });
 };
 const escapar = (s) => String(s ?? '').replace(/[&<>"]/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -191,12 +193,12 @@ function pintarVersiones(doc) {
     <li>
       <span class="vn">v${v.version}</span>
       <span class="vd">${fecha(v.guardado_en)}${v.autor ? ` · <span class="va">${escapar(v.autor)}</span>` : ''}</span>
-      <a href="api/revision/${encodeURIComponent(DOC)}/version/${v.version}?t=${FICHA}" download>bajar</a>
-    </li>`).join('') || '<li class="vd">todavía ninguna</li>';
+      <a href="api/revision/${encodeURIComponent(DOC)}/version/${v.version}?t=${FICHA}" download>${t('bajar', 'download')}</a>
+    </li>`).join('') || `<li class="vd">${t('todavía ninguna', 'none yet')}</li>`;
 
   $('#rev-estado').textContent = doc.version > 0
-    ? `v${doc.version} · último guardado ${fecha(doc.guardado_en)}`
-    : 'sin ediciones todavía';
+    ? t(`v${doc.version} · último guardado ${fecha(doc.guardado_en)}`, `v${doc.version} · last saved ${fecha(doc.guardado_en)}`)
+    : t('sin ediciones todavía', 'no edits yet');
 }
 
 async function pintarComentarios() {
@@ -204,24 +206,26 @@ async function pintarComentarios() {
   try {
     const c = await pedir(`api/revision/${encodeURIComponent(DOC)}/comentarios`);
     if (!c.total) {
-      caja.innerHTML = 'Nada todavía. Lo que escribas aparece acá después de guardar.';
+      caja.innerHTML = t('Nada todavía. Lo que escribas aparece acá después de guardar.',
+                       'Nothing yet. What you write shows up here after saving.');
       return;
     }
     const globitos = (c.comentarios_de_celda || []).map((g) =>
       `<li><span class="mono" style="color:var(--acento)">${escapar(g.celda)}</span>
        ${escapar(g.texto)}${g.autor ? ` <span class="tenue">— ${escapar(g.autor)}</span>` : ''}</li>`);
-    const enColumnas = (c.texto_en_columnas_nuevas || []).map((t) =>
-      `<li><span class="mono" style="color:var(--acento)">fila ${t.fila}</span>
-       ${escapar(t.texto)} <span class="tenue">— ${escapar(t.columna)}</span></li>`);
+    const enColumnas = (c.texto_en_columnas_nuevas || []).map((x) =>
+      `<li><span class="mono" style="color:var(--acento)">${t('fila', 'row')} ${x.fila}</span>
+       ${escapar(x.texto)} <span class="tenue">— ${escapar(x.columna)}</span></li>`);
     caja.innerHTML = `
-      <p style="margin:0 0 7px"><strong style="color:var(--texto)">${c.total}</strong> anotación(es).</p>
+      <p style="margin:0 0 7px"><strong style="color:var(--texto)">${c.total}</strong> ${t('anotación(es)', 'note(s)')}.</p>
       <ul style="margin:0;padding-left:15px;display:flex;flex-direction:column;gap:5px">
         ${[...globitos, ...enColumnas].join('')}
       </ul>
       <p class="pista" style="margin:9px 0 0;font-size:.72rem">
-        Esto es un resumen para poder buscar. El archivo es el que manda.</p>`;
+        ${t('Esto es un resumen para poder buscar. El archivo es el que manda.',
+            'This is a summary to make searching easy. The file is what counts.')}</p>`;
   } catch (e) {
-    caja.textContent = 'No se pudo leer el resumen.';
+    caja.textContent = t('No se pudo leer el resumen.', 'Could not read the summary.');
   }
 }
 
@@ -230,7 +234,7 @@ function cargarScript(src) {
     const s = document.createElement('script');
     s.src = src;
     s.onload = ok;
-    s.onerror = () => mal(new Error(`No se pudo cargar ${src}`));
+    s.onerror = () => mal(new Error(t(`No se pudo cargar ${src}`, `Could not load ${src}`)));
     document.head.appendChild(s);
   });
 }
@@ -272,9 +276,9 @@ let intentosDeApi = 0;
 
 //: Los tres entregables, con el nombre corto que usan los botones del taller.
 const TIPOS = [
-  ['experto', 'Para el experto'],
-  ['presentable', 'Presentable'],
-  ['normales', 'Contraste normal'],
+  ['experto', t('Para el experto', 'For the expert')],
+  ['presentable', t('Presentable', 'Presentable')],
+  ['normales', t('Contraste normal', 'Normal contrast')],
 ];
 
 /** Las solapas de los tres entregables de esta rama.
@@ -309,7 +313,7 @@ async function pintarSolapas(doc) {
       // Todavía no existe: se crea. El presentable tarda unos segundos en generarse.
       const antes = b.innerHTML;
       b.disabled = true;
-      b.innerHTML = 'Preparando…';
+      b.innerHTML = t('Preparando…', 'Preparing…');
       try {
         const r = await fetch(`api/nodo/${encodeURIComponent(doc.nodo)}/revision/${tipo}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
@@ -319,7 +323,8 @@ async function pintarSolapas(doc) {
       } catch (e) {
         b.disabled = false;
         b.innerHTML = antes;
-        aviso('peligro', `No se pudo abrir ese entregable: ${escapar(e.message)}`);
+        aviso('peligro', t(`No se pudo abrir ese entregable: ${escapar(e.message)}`,
+                           `Could not open that deliverable: ${escapar(e.message)}`));
       }
     });
   });
@@ -327,9 +332,11 @@ async function pintarSolapas(doc) {
 
 async function arrancar() {
   if (!DOC) {
-    velo('Falta decir qué documento abrir',
-         'La dirección tiene que traer <span class="mono">?doc=…</span>. '
-         + 'Se llega acá desde el paso 6 de una rama, en el taller.');
+    velo(t('Falta decir qué documento abrir', 'No document was specified'),
+         t('La dirección tiene que traer <span class="mono">?doc=…</span>. '
+           + 'Se llega acá desde el paso 6 de una rama, en el taller.',
+           'The address must include <span class="mono">?doc=…</span>. '
+           + 'You get here from step 6 of a branch, in the workshop.'));
     return;
   }
 
@@ -337,7 +344,7 @@ async function arrancar() {
   try {
     doc = await pedir(`api/revision/${encodeURIComponent(DOC)}`);
   } catch (e) {
-    velo('No se encontró ese documento',
+    velo(t('No se encontró ese documento', 'That document was not found'),
          `<span class="mono">${escapar(e.message)}</span>`);
     return;
   }
@@ -350,7 +357,8 @@ async function arrancar() {
 
   $('#rev-nombre').textContent = doc.nombre;
   $('#rev-procedencia').textContent =
-    `rama ${doc.nodo.slice(0, 8)} · ${doc.tipo} · tesis @ ${doc.commit_tesis || '—'}`;
+    t(`rama ${doc.nodo.slice(0, 8)} · ${doc.tipo} · tesis @ ${doc.commit_tesis || '—'}`,
+      `branch ${doc.nodo.slice(0, 8)} · ${doc.tipo} · thesis @ ${doc.commit_tesis || '—'}`);
   pintarVersiones(doc);
   pintarComentarios();
   pintarSolapas(doc);
@@ -359,9 +367,11 @@ async function arrancar() {
   try {
     cfg = await pedir(`api/revision/${encodeURIComponent(DOC)}/editor?autor=Experto`);
   } catch (e) {
-    velo('La revisión experta no está configurada',
-         'Falta <span class="mono">OO_URL_PUBLICA</span> en el <span class="mono">.env</span> del '
-         + 'taller. El archivo se puede bajar igual.', { acciones: true });
+    velo(t('La revisión experta no está configurada', 'Expert review is not configured'),
+         t('Falta <span class="mono">OO_URL_PUBLICA</span> en el <span class="mono">.env</span> del '
+           + 'taller. El archivo se puede bajar igual.',
+           '<span class="mono">OO_URL_PUBLICA</span> is missing from the workshop\'s '
+           + '<span class="mono">.env</span>. The file can still be downloaded.'), { acciones: true });
     $('#btn-reintentar').hidden = true;
     return;
   }
@@ -371,9 +381,11 @@ async function arrancar() {
   try {
     await asegurarDocsApi(cfg.url_publica);
   } catch (e) {
-    velo('El Document Server no respondió',
-         `No se pudo cargar el editor desde <span class="mono">${escapar(cfg.url_publica)}</span>. `
-         + 'Revisá que esté levantado y que esa dirección se vea desde este navegador.',
+    velo(t('El Document Server no respondió', 'The Document Server did not respond'),
+         t(`No se pudo cargar el editor desde <span class="mono">${escapar(cfg.url_publica)}</span>. `
+           + 'Revisá que esté levantado y que esa dirección se vea desde este navegador.',
+           `Could not load the editor from <span class="mono">${escapar(cfg.url_publica)}</span>. `
+           + 'Check that it is running and that this browser can reach that address.'),
          { acciones: true });
     return;
   }
@@ -416,14 +428,15 @@ function montarEditor(config) {
   window.__bitacora = bitacora;
 
   const arranque = performance.now();
-  let etapa = 'Trayendo el editor';
+  let etapa = t('Trayendo el editor', 'Fetching the editor');
   const segundos = () => Math.round((performance.now() - arranque) / 1000);
 
   const pintarEspera = () => velo(etapa, `
     <span class="latido"></span><span class="latido"></span><span class="latido"></span>
     <p style="margin:8px 0 0">${segundos()} s</p>
-    ${segundos() > 12 ? `<p style="margin:6px 0 0">La primera vez tarda: el editor son unos 2000
-      archivos. Después de la primera carga queda en caché y abre en un segundo.</p>` : ''}`);
+    ${segundos() > 12 ? `<p style="margin:6px 0 0">${t(`La primera vez tarda: el editor son unos 2000
+      archivos. Después de la primera carga queda en caché y abre en un segundo.`, `The first time is slow: the
+      editor is about 2000 files. After the first load it is cached and opens in a second.`)}</p>` : ''}`);
 
   pintarEspera();
   clearInterval(ticTac);
@@ -435,7 +448,7 @@ function montarEditor(config) {
   config.events = {
     // `onAppReady` es la señal de que el editor terminó de armarse. A partir de acá lo que falta es
     // el documento, que es rápido: conviene decirlo, porque son dos esperas muy distintas.
-    onAppReady: () => { anotar('onAppReady'); etapa = 'Cargando el documento'; pintarEspera(); },
+    onAppReady: () => { anotar('onAppReady'); etapa = t('Cargando el documento', 'Loading the document'); pintarEspera(); },
     onInfo: (e) => anotar('onInfo ' + JSON.stringify(e.data)),
     onWarning: (e) => anotar('onWarning ' + JSON.stringify(e.data)),
     onDocumentReady: () => {
@@ -471,7 +484,7 @@ function montarEditor(config) {
     if (!$('#velo').hidden && $('#velo-acciones') && !$('#velo-acciones').hidden) {
       // Ya se está mostrando la pantalla de fracaso: se refresca para que el error salga ahí.
       $('#velo-bitacora').innerHTML =
-        `avisos del editor: ${escapar(bitacora.join('  ·  '))}`;
+        `${t('avisos del editor', 'editor messages')}: ${escapar(bitacora.join('  ·  '))}`;
     }
   });
 }
@@ -600,9 +613,9 @@ function velo(titulo, detalleHtml, { acciones = false, bitacora = null } = {}) {
   const caja = $('#velo-bitacora');
   if (bitacora === null) { caja.textContent = ''; return; }
   caja.innerHTML = bitacora.length
-    ? `avisos del editor: ${escapar(bitacora.join('  ·  '))}`
-    : '<span style="color:var(--peligro)">el editor no emitió ni un aviso '
-      + '(ni siquiera onAppReady)</span>';
+    ? `${t('avisos del editor', 'editor messages')}: ${escapar(bitacora.join('  ·  '))}`
+    : `<span style="color:var(--peligro)">${t('el editor no emitió ni un aviso (ni siquiera onAppReady)',
+                                               'the editor did not emit a single message (not even onAppReady)')}</span>`;
 }
 
 /** Prueba, desde ESTE navegador, las dos cosas que el editor necesita del Document Server.
@@ -651,20 +664,24 @@ async function probarDocumentServer(urlPublica) {
 function noLlego(bitacora, error) {
   reintentos += 1;
   const detalle = error
-    ? `<p style="margin:0 0 8px">El editor devolvió
+    ? `<p style="margin:0 0 8px">${t('El editor devolvió', 'The editor returned')}
        <span class="mono">${escapar(JSON.stringify(error))}</span>.</p>`
-    : `<p style="margin:0 0 8px">El documento no llegó en
+    : `<p style="margin:0 0 8px">${t(`El documento no llegó en
        ${Math.round(ESPERA_MAXIMA_MS / 1000)} segundos. Puede que <strong>siga cargando</strong> por
-       detrás y aparezca solo en un rato — si es así, este aviso se va sin hacer nada.</p>`;
+       detrás y aparezca solo en un rato — si es así, este aviso se va sin hacer nada.`, `The document did not
+       arrive within ${Math.round(ESPERA_MAXIMA_MS / 1000)} seconds. It may <strong>still be loading</strong>
+       in the background and show up on its own shortly — if so, this notice goes away by itself.`)}</p>`;
 
-  velo('El documento no cargó', detalle + `
-    <p style="margin:0">Tus comentarios <strong>no se perdieron</strong>: están en las versiones
-    guardadas, que se siguen pudiendo bajar del costado.</p>
+  velo(t('El documento no cargó', 'The document did not load'), detalle + `
+    <p style="margin:0">${t(`Tus comentarios <strong>no se perdieron</strong>: están en las versiones
+    guardadas, que se siguen pudiendo bajar del costado.`, `Your comments <strong>were not lost</strong>: they
+    are in the saved versions, which can still be downloaded from the side panel.`)}</p>
     <div id="velo-diagnostico" style="margin-top:11px">
-      Probando qué falla<span class="latido"></span><span class="latido"></span><span class="latido"></span>
+      ${t('Probando qué falla', 'Testing what fails')}<span class="latido"></span><span class="latido"></span><span class="latido"></span>
     </div>`, { acciones: true, bitacora });
 
-  $('#btn-reintentar').textContent = reintentos > 1 ? `Reintentar (${reintentos})` : 'Reintentar';
+  $('#btn-reintentar').textContent = reintentos > 1
+    ? t(`Reintentar (${reintentos})`, `Retry (${reintentos})`) : t('Reintentar', 'Retry');
 
   // El diagnóstico se corre acá y no antes: solo interesa cuando algo falló.
   if (URL_PUBLICA) probarYContar(URL_PUBLICA);
@@ -675,27 +692,39 @@ async function probarYContar(urlPublica) {
   const caja = document.getElementById('velo-diagnostico');
   if (!caja) return;
 
+  /* Los resultados de `probarDocumentServer` quedan en español porque se comparan como valores
+     ('sí', 'abre'); se traducen solo al mostrarlos. */
+  const MOSTRAR = { 'sí': t('sí', 'yes'), 'NO': t('NO', 'NO'), 'abre': t('abre', 'opens'),
+                    'no contestó': t('no contestó', 'no answer'),
+                    'BLOQUEADO o rechazado': t('BLOQUEADO o rechazado', 'BLOCKED or rejected') };
   const marca = (v) => v === 'sí' || v === 'abre'
-    ? `<span style="color:var(--acento-2)">${escapar(v)}</span>`
-    : `<span style="color:var(--peligro)">${escapar(v)}</span>`;
+    ? `<span style="color:var(--acento-2)">${escapar(MOSTRAR[v] || v)}</span>`
+    : `<span style="color:var(--peligro)">${escapar(MOSTRAR[v] || v)}</span>`;
 
   // Cada combinación tiene una causa distinta, y hace falta decir cuál para no mandar a nadie a
   // revisar el servidor cuando el problema está del lado del navegador.
   let veredicto;
   if (r.alcanza !== 'sí') {
-    veredicto = `Este navegador <strong>no llega</strong> a
+    veredicto = t(`Este navegador <strong>no llega</strong> a
       <span class="mono">${escapar(urlPublica)}</span>. Si el taller lo ves por red o por un dominio,
       esa dirección tiene que ser una que se vea desde acá — no <span class="mono">localhost</span>,
-      que para vos es tu propia máquina.`;
+      que para vos es tu propia máquina.`, `This browser <strong>cannot reach</strong>
+      <span class="mono">${escapar(urlPublica)}</span>. If you see the workshop over the network or through a
+      domain, that address must be reachable from here — not <span class="mono">localhost</span>, which for
+      you is your own machine.`);
   } else if (r.websocket !== 'abre') {
-    veredicto = `Se llega al Document Server pero <strong>el websocket no abre</strong>, y es por ahí
+    veredicto = t(`Se llega al Document Server pero <strong>el websocket no abre</strong>, y es por ahí
       que el editor pide el documento. Suele ser un proxy o un cortafuegos que no deja pasar la
       conexión, o una extensión del navegador bloqueándola. Probá en una ventana de incógnito con las
-      extensiones apagadas.`;
+      extensiones apagadas.`, `The Document Server is reachable but <strong>the websocket does not open</strong>,
+      and that is how the editor requests the document. It is usually a proxy or firewall that blocks the
+      connection, or a browser extension blocking it. Try an incognito window with extensions turned off.`);
   } else {
-    veredicto = `Las dos pruebas dan bien, así que el camino está. Si igual no carga, puede ser una
+    veredicto = t(`Las dos pruebas dan bien, así que el camino está. Si igual no carga, puede ser una
       pestaña vieja con el editor cacheado: probá recargar forzando
-      (<span class="mono">Ctrl+Shift+R</span>).`;
+      (<span class="mono">Ctrl+Shift+R</span>).`, `Both tests pass, so the path is there. If it still does not
+      load, it may be an old tab with a cached editor: try a hard reload
+      (<span class="mono">Ctrl+Shift+R</span>).`);
   }
 
   // Los dos orígenes en juego. Si no coinciden en el HOST, el editor queda en un marco «de otro
@@ -709,18 +738,23 @@ async function probarYContar(urlPublica) {
 
   caja.innerHTML = `
     <div style="text-align:left;display:inline-block">
-      <div>Se llega al Document Server: ${marca(r.alcanza)}</div>
-      <div>Abre el websocket: ${marca(r.websocket)}</div>
-      <div>Estás viendo el taller en: <span class="mono">${escapar(location.origin)}</span></div>
-      <div>El editor se carga de: <span class="mono">${escapar(baseDelEditor())}</span></div>
+      <div>${t('Se llega al Document Server', 'Document Server reachable')}: ${marca(r.alcanza)}</div>
+      <div>${t('Abre el websocket', 'Websocket opens')}: ${marca(r.websocket)}</div>
+      <div>${t('Estás viendo el taller en', 'You are viewing the workshop at')}: <span class="mono">${escapar(location.origin)}</span></div>
+      <div>${t('El editor se carga de', 'The editor loads from')}: <span class="mono">${escapar(baseDelEditor())}</span></div>
     </div>
     ${mismoHost ? '' : `
-      <p style="margin:9px 0 0">El taller y el editor están en hosts distintos
+      <p style="margin:9px 0 0">${t(`El taller y el editor están en hosts distintos
       (<span class="mono">${escapar(hostTaller)}</span> contra
       <span class="mono">${escapar(hostEditor)}</span>). Probado acá no alcanza para romperlo, pero
       según cómo esté configurado el navegador puede molestar: vale la pena descartarlo poniendo
       <span class="mono">OO_URL_PUBLICA=http://${escapar(hostTaller)}:8080</span> en el
-      <span class="mono">.env</span> y reiniciando el taller.</p>`}
+      <span class="mono">.env</span> y reiniciando el taller.`, `The workshop and the editor are on different hosts
+      (<span class="mono">${escapar(hostTaller)}</span> vs
+      <span class="mono">${escapar(hostEditor)}</span>). Tested here that is not enough to break it, but
+      depending on the browser settings it can get in the way: worth ruling out by setting
+      <span class="mono">OO_URL_PUBLICA=http://${escapar(hostTaller)}:8080</span> in
+      <span class="mono">.env</span> and restarting the workshop.`)}</p>`}
     <p style="margin:9px 0 0">${veredicto}</p>`;
 }
 
@@ -732,7 +766,7 @@ async function refrescar() {
 }
 
 document.getElementById('btn-reintentar').addEventListener('click', async () => {
-  velo('Reintentando',
+  velo(t('Reintentando', 'Retrying'),
        '<span class="latido"></span><span class="latido"></span><span class="latido"></span>');
   try {
     // Se vuelve a pedir la configuración en vez de reusar la vieja: si mientras tanto se guardó una
