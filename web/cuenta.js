@@ -40,11 +40,10 @@
 
   const t = (es, en) => (window.I18n ? window.I18n.t(es, en) : es);
 
-  /* EL SELECTOR DE IDIOMA ESTÁ OCULTO mientras la traducción no cubra el sitio entero: hoy solo la
-     barra, el ingreso, usuarios y catálogo tienen inglés, y ofrecerlo en la demo mostraría un
-     inglés a medias. Se vuelve `true` cuando estén el taller, la revisión, la portada y los textos
-     del backend. Para probarlo antes: `I18n.elegir('en')` en la consola. */
-  const SELECTOR_IDIOMA = false;
+  /* El selector de idioma se puede apagar desde acá sin tocar nada más (`false` lo saca de la
+     barra; el idioma guardado sigue valiendo y `I18n.elegir()` sigue andando en la consola). Estuvo
+     apagado mientras la traducción cubría solo la barra y el ingreso. */
+  const SELECTOR_IDIOMA = true;
 
   /** El selector de idioma: ES o EN, el que NO está puesto. Va suelto junto al tema, haya sesión o
    *  no, por el mismo motivo: es una preferencia de quien mira, no de la cuenta. Ver `i18n.js`. */
