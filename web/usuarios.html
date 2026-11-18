@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Usuarios — Taller Etapa 1</title>
+<title data-en="Users — Stage 1 Workshop">Usuarios — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
 <script src="estatico/i18n.js"></script>
 <script>
@@ -42,58 +42,65 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 </header>
 
 <div class="envoltorio" style="padding-bottom:60px">
-  <h2 style="margin-top:26px">Usuarios del taller</h2>
-  <p class="pista">Cada revisor clasifica los eventos por su cuenta: dos personas pueden opinar del
+  <h2 style="margin-top:26px" data-en="Workshop users">Usuarios del taller</h2>
+  <p class="pista" data-en="Each reviewer classifies events on their own: two people can judge the
+  same event without seeing each other. That is why each person needs their own account and not a
+  shared one — a common account would make it impossible to know who judged what, which is exactly
+  what Stage 2 needs to measure.">Cada revisor clasifica los eventos por su cuenta: dos personas pueden opinar del
   mismo evento sin verse. Por eso hace falta una cuenta por persona y no una compartida — una cuenta
   común haría imposible saber quién opinó qué, que es justamente lo que la Etapa 2 necesita medir.</p>
 
   <div id="aviso"></div>
 
   <div class="tarjeta" style="margin:18px 0">
-    <h3 style="margin-top:0;font-size:.95rem">Dar de alta</h3>
+    <h3 style="margin-top:0;font-size:.95rem" data-en="Add a user">Dar de alta</h3>
     <form id="form-alta">
       <div class="rejilla">
         <div class="campo">
-          <label for="nombre">Usuario</label>
+          <label for="nombre" data-en="Username">Usuario</label>
           <input id="nombre" autocomplete="off" required>
         </div>
         <div class="campo">
-          <label for="clave">Contraseña</label>
+          <label for="clave" data-en="Password">Contraseña</label>
           <input id="clave" type="password" autocomplete="new-password" required minlength="8">
         </div>
         <div class="campo">
-          <label for="rol">Rol</label>
+          <label for="rol" data-en="Role">Rol</label>
           <select id="rol">
-            <option value="revisor">Revisor — entra y clasifica</option>
-            <option value="admin">Administrador — además gestiona usuarios</option>
+            <option value="revisor" data-en="Reviewer — signs in and classifies">Revisor — entra y clasifica</option>
+            <option value="admin" data-en="Administrator — also manages users">Administrador — además gestiona usuarios</option>
           </select>
         </div>
         <div class="campo">
-          <label for="experiencia">Grado de experiencia</label>
+          <label for="experiencia" data-en="Experience level">Grado de experiencia</label>
           <!-- Sin opción premarcada, por lo mismo que la escala de clasificación (ADR A17): un
                valor por defecto se colaría como si alguien lo hubiera elegido. -->
           <select id="experiencia" required>
-            <option value="" disabled selected>Elegir…</option>
-            <option value="1">1 — menor</option>
+            <option value="" disabled selected data-en="Choose…">Elegir…</option>
+            <option value="1" data-en="1 — lowest">1 — menor</option>
             <option value="2">2</option>
-            <option value="3">3 — mayor</option>
+            <option value="3" data-en="3 — highest">3 — mayor</option>
           </select>
         </div>
       </div>
-      <button class="boton primario" type="submit">Crear usuario</button>
+      <button class="boton primario" type="submit" data-en="Create user">Crear usuario</button>
     </form>
   </div>
 
   <div class="tarjeta">
-    <div class="fila-sup"><h3 style="margin:0;font-size:.95rem">Cuentas</h3><span class="esp"></span>
+    <div class="fila-sup"><h3 style="margin:0;font-size:.95rem" data-en="Accounts">Cuentas</h3><span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="cuenta-total"></span></div>
     <div class="tabla-scroll" style="margin-top:12px"><table id="tabla">
-      <thead><tr><th>usuario</th><th>rol</th><th>experiencia</th><th>creado</th><th>último ingreso</th><th></th></tr></thead>
+      <thead><tr><th data-en="user">usuario</th><th data-en="role">rol</th><th data-en="experience">experiencia</th><th data-en="created">creado</th><th data-en="last sign-in">último ingreso</th><th></th></tr></thead>
       <tbody></tbody></table></div>
-    <p class="pista" style="margin-top:12px">Dar de baja una cuenta <b>no borra sus
+    <p class="pista" style="margin-top:12px" data-en="Removing an account <b>does not delete its
+    classifications</b>: they are human judgment and stay attributed to the name, just as a review
+    document outlives the branch it came from.">Dar de baja una cuenta <b>no borra sus
     clasificaciones</b>: son juicio humano y quedan atribuidas al nombre, igual que un documento de
     revisión sobrevive a la rama que lo originó.</p>
-    <p class="pista">El <b>grado de experiencia</b> (1 a 3) lo tienen todos los que clasifican, de
+    <p class="pista" data-en="Everyone who classifies has an <b>experience level</b> (1 to 3), in
+    both roles, and it travels with the judgments exported for Stage 2. Accounts showing «not set»
+    predate it, or are the one from <code>.env</code>: set it right here and it is saved at once.">El <b>grado de experiencia</b> (1 a 3) lo tienen todos los que clasifican, de
     los dos roles, y viaja con los juicios que se exportan para la Etapa 2. Las cuentas que dicen
     «sin indicar» son anteriores a que existiera, o la del <code>.env</code>: se carga acá mismo y
     se guarda en el acto.</p>
@@ -103,6 +110,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 <script>
 'use strict';
 const $ = (s) => document.querySelector(s);
+const t = I18n.t;
 
 const api = async (ruta, op) => {
   const r = await fetch(ruta, op);
@@ -120,7 +128,7 @@ const avisar = (texto, clase = '') => {
   $('#aviso').innerHTML = texto ? `<div class="aviso ${clase}" style="margin:14px 0">${texto}</div>` : '';
 };
 
-const fecha = (iso) => iso ? new Date(iso).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+const fecha = (iso) => iso ? new Date(iso).toLocaleString(I18n.locale, { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 let yo = null;
 
@@ -129,29 +137,29 @@ async function cargar() {
   try {
     d = await api('api/usuarios');
   } catch (e) {
-    avisar(`<strong>No se pudo cargar.</strong> ${e.message}` +
-           (String(e.message).includes('administrador')
-             ? ' Esta pantalla es solo para administradores.' : ''));
+    avisar(`<strong>${t('No se pudo cargar.', 'Could not load.')}</strong> ${e.message}` +
+           (/administra(dor|tor)/i.test(String(e.message))
+             ? t(' Esta pantalla es solo para administradores.', ' This page is for administrators only.') : ''));
     document.querySelector('#form-alta').style.display = 'none';
     return;
   }
   if (!d) return;
-  $('#cuenta-total').textContent = `${d.usuarios.length} cuenta(s)`;
+  $('#cuenta-total').textContent = t(`${d.usuarios.length} cuenta(s)`, `${d.usuarios.length} account(s)`);
   $('#tabla tbody').innerHTML = d.usuarios.map((u) => `
     <tr>
-      <td><b>${u.nombre}</b>${u.creado_por === '.env' ? ' <span class="chip oficial">del .env</span>' : ''}</td>
-      <td>${u.rol === 'admin' ? 'Administrador' : 'Revisor'}</td>
-      <td><select data-experiencia="${u.nombre}" aria-label="Grado de experiencia de ${u.nombre}">
-        ${u.experiencia == null ? '<option value="" selected disabled>sin indicar</option>' : ''}
+      <td><b>${u.nombre}</b>${u.creado_por === '.env' ? ` <span class="chip oficial">${t('del .env', 'from .env')}</span>` : ''}</td>
+      <td>${u.rol === 'admin' ? t('Administrador', 'Administrator') : t('Revisor', 'Reviewer')}</td>
+      <td><select data-experiencia="${u.nombre}" aria-label="${t(`Grado de experiencia de ${u.nombre}`, `${u.nombre}'s experience level`)}">
+        ${u.experiencia == null ? `<option value="" selected disabled>${t('sin indicar', 'not set')}</option>` : ''}
         ${d.experiencias.map((g) =>
           `<option value="${g}"${g === u.experiencia ? ' selected' : ''}>${g}</option>`).join('')}
       </select></td>
       <td class="tenue" style="font-size:.8rem">${fecha(u.creado_en)}</td>
       <td class="tenue" style="font-size:.8rem">${fecha(u.ultimo_ingreso)}</td>
       <td style="white-space:nowrap;text-align:right">
-        <button class="boton" data-clave="${u.nombre}">Cambiar contraseña</button>
+        <button class="boton" data-clave="${u.nombre}">${t('Cambiar contraseña', 'Change password')}</button>
         ${u.nombre === (yo && yo.nombre) ? ''
-          : `<button class="boton" data-baja="${u.nombre}">Dar de baja</button>`}
+          : `<button class="boton" data-baja="${u.nombre}">${t('Dar de baja', 'Remove')}</button>`}
       </td>
     </tr>`).join('');
 
@@ -169,29 +177,34 @@ async function cambiarExperiencia(nombre, experiencia) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ experiencia }),
     });
-    avisar(`Grado de experiencia de <b>${nombre}</b>: ${experiencia}.`, 'info');
+    avisar(t(`Grado de experiencia de <b>${nombre}</b>: ${experiencia}.`,
+           `Experience level for <b>${nombre}</b>: ${experiencia}.`), 'info');
   } catch (e) { avisar(e.message); }
   cargar();
 }
 
 async function cambiarClave(nombre) {
-  const clave = prompt(`Contraseña nueva para ${nombre} (mínimo 8 caracteres).\n` +
-                       `Se cierran todas sus sesiones abiertas.`);
+  const clave = prompt(t(`Contraseña nueva para ${nombre} (mínimo 8 caracteres).\n` +
+                         `Se cierran todas sus sesiones abiertas.`,
+                         `New password for ${nombre} (at least 8 characters).\n` +
+                         `All of their open sessions will be closed.`));
   if (!clave) return;
   try {
     await api(`api/usuarios/${encodeURIComponent(nombre)}/contrasena`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contrasena: clave }),
     });
-    avisar(`Contraseña de <b>${nombre}</b> cambiada. Sus sesiones abiertas se cerraron.`, 'info');
+    avisar(t(`Contraseña de <b>${nombre}</b> cambiada. Sus sesiones abiertas se cerraron.`,
+             `Password for <b>${nombre}</b> changed. Their open sessions were closed.`), 'info');
   } catch (e) { avisar(e.message); }
 }
 
 async function darDeBaja(nombre) {
-  if (!confirm(`¿Dar de baja a ${nombre}?\n\nSus clasificaciones NO se borran: quedan atribuidas a su nombre.`)) return;
+  if (!confirm(t(`¿Dar de baja a ${nombre}?\n\nSus clasificaciones NO se borran: quedan atribuidas a su nombre.`,
+                  `Remove ${nombre}?\n\nTheir classifications are NOT deleted: they stay attributed to their name.`))) return;
   try {
     await api(`api/usuarios/${encodeURIComponent(nombre)}`, { method: 'DELETE' });
-    avisar(`<b>${nombre}</b> dado de baja.`, 'info');
+    avisar(t(`<b>${nombre}</b> dado de baja.`, `<b>${nombre}</b> removed.`), 'info');
     cargar();
   } catch (e) { avisar(e.message); }
 }
@@ -206,7 +219,7 @@ $('#form-alta').addEventListener('submit', async (e) => {
         experiencia: Number($('#experiencia').value),
       }),
     });
-    avisar(`Usuario <b>${$('#nombre').value}</b> creado.`, 'info');
+    avisar(t(`Usuario <b>${$('#nombre').value}</b> creado.`, `User <b>${$('#nombre').value}</b> created.`), 'info');
     $('#nombre').value = ''; $('#clave').value = ''; $('#experiencia').selectedIndex = 0;
     cargar();
   } catch (err) { avisar(err.message); }

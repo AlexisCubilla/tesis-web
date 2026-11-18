@@ -26,22 +26,25 @@
  * pedido sin que cada `fetch` tenga que mandarlo: los mensajes de error y los textos de las etapas
  * salen de allá.
  *
- * Por omisión, el del navegador: español si el navegador está en español, inglés si no. A
- * diferencia del tema, el idioma sí es una preferencia del sistema, y quien no lee español no
- * tiene por qué encontrar primero cómo cambiarlo.
+ * Por omisión, ESPAÑOL PARA TODOS, igual que el tema arranca en oscuro: el sitio está escrito en
+ * español y así se ve la primera vez. No se mira el idioma del navegador; quien quiera inglés lo
+ * pide con el selector, y esa elección se guarda.
  */
 (() => {
   'use strict';
   const CLAVE = 'idioma';
   const raiz = document.documentElement;
 
+  /* Lo guardado, y si `localStorage` está bloqueado, la cookie: sin ese respaldo, en navegación
+     privada elegir inglés recargaría la página otra vez en español. */
   const guardado = () => {
-    try { return localStorage.getItem(CLAVE); } catch { return null; }
+    try { const v = localStorage.getItem(CLAVE); if (v) return v; } catch { /* sigue a la cookie */ }
+    const m = document.cookie.match(/(?:^|;\s*)idioma=(es|en)\b/);
+    return m ? m[1] : null;
   };
-  const delNavegador = () => (/^es\b/i.test(navigator.language || '') ? 'es' : 'en');
   const valido = (i) => (i === 'en' || i === 'es' ? i : null);
 
-  const idioma = valido(guardado()) || delNavegador();
+  const idioma = valido(guardado()) || 'es';
   raiz.lang = idioma;
   document.cookie = `${CLAVE}=${idioma}; path=/; max-age=31536000; SameSite=Lax`;
 
@@ -96,6 +99,6 @@
   /* Volver con «atrás» restaura la página desde el bfcache sin correr este archivo. Si mientras
      tanto se cambió el idioma en otra pantalla, esta quedaría en el viejo: se recarga. */
   addEventListener('pageshow', (e) => {
-    if (e.persisted && (valido(guardado()) || delNavegador()) !== idioma) location.reload();
+    if (e.persisted && (valido(guardado()) || 'es') !== idioma) location.reload();
   });
 })();

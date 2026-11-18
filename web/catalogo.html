@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Catálogo — Taller Etapa 1</title>
+<title data-en="Catalog — Stage 1 Workshop">Catálogo — Taller Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
 <script src="estatico/i18n.js"></script>
 <script>
@@ -114,8 +114,10 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 </header>
 
 <div class="envoltorio">
-  <h1>Catálogo de lo clasificado</h1>
-  <p class="tenue" id="intro">
+  <h1 data-en="Catalog of what has been classified">Catálogo de lo clasificado</h1>
+  <p class="tenue" id="intro" data-en="What the reviewers marked, all together. Classification itself happens in step 6 of the
+    workshop, one event at a time and without seeing what the others answered; here you look at the
+    whole: where work is missing, and where they agree and where they do not.">
     Lo que los revisores marcaron, junto. La clasificación en sí se hace en el paso 6 del taller,
     de a un evento y sin ver lo que respondieron los demás; acá se mira el conjunto: dónde falta
     trabajo, y en qué coinciden y en qué no.
@@ -127,6 +129,7 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
 
 <script>
 const $ = (s) => document.querySelector(s);
+const t = I18n.t;
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -134,7 +137,7 @@ async function api(ruta, op) {
   const r = await fetch(ruta, op);
   if (r.status === 401) {
     location.href = 'login?destino=' + encodeURIComponent(location.pathname.split('/').pop());
-    throw new Error('Hace falta iniciar sesión');
+    throw new Error(t('Hace falta iniciar sesión', 'You need to sign in'));
   }
   if (!r.ok) {
     /* El código va PEGADO al error, no solo el texto. El 403 de esta pantalla necesita una
@@ -170,19 +173,25 @@ function pintarCifras(g) {
   const coincidencia = g.coincidencia === null ? '—'
     : `${Math.round(g.coincidencia * 100)}%`;
   return `<div class="cifras">
-    ${cifra(g.juicios, `decisi${g.juicios === 1 ? 'ón' : 'ones'} cargada${g.juicios === 1 ? '' : 's'}`,
+    ${cifra(g.juicios, t(`decisi${g.juicios === 1 ? 'ón' : 'ones'} cargada${g.juicios === 1 ? '' : 's'}`,
+                         `decision${g.juicios === 1 ? '' : 's'} recorded`),
             (g.eventos_totales
-              ? `sobre ${g.eventos} de los ${g.eventos_totales} eventos que hay`
-              : `sobre ${g.eventos} evento${g.eventos === 1 ? '' : 's'}`)
-            + (g.notas ? ` · y ${g.notas} nota${g.notas === 1 ? '' : 's'} sin decidir` : ''))}
-    ${cifra(coincidencia, 'coincidencia', g.comparables
-              ? `en ${g.comparables === 1 ? 'el único evento' : `los ${g.comparables} eventos`} que miró más de uno`
-              : 'ningún evento lo miró más de una persona')}
-    ${cifra(g.desacuerdo, 'desacuerdos', 'candidatos a discutir')}
-    ${cifra(g.un_solo_juicio, 'con una sola decisión',
+              ? t(`sobre ${g.eventos} de los ${g.eventos_totales} eventos que hay`,
+                  `on ${g.eventos} of the ${g.eventos_totales} events`)
+              : t(`sobre ${g.eventos} evento${g.eventos === 1 ? '' : 's'}`,
+                  `on ${g.eventos} event${g.eventos === 1 ? '' : 's'}`))
+            + (g.notas ? t(` · y ${g.notas} nota${g.notas === 1 ? '' : 's'} sin decidir`,
+                           ` · and ${g.notas} undecided note${g.notas === 1 ? '' : 's'}`) : ''))}
+    ${cifra(coincidencia, t('coincidencia', 'agreement'), g.comparables
+              ? t(`en ${g.comparables === 1 ? 'el único evento' : `los ${g.comparables} eventos`} que miró más de uno`,
+                  `on ${g.comparables === 1 ? 'the only event' : `the ${g.comparables} events`} seen by more than one`)
+              : t('ningún evento lo miró más de una persona', 'no event was seen by more than one person'))}
+    ${cifra(g.desacuerdo, t('desacuerdos', 'disagreements'), t('candidatos a discutir', 'candidates for discussion'))}
+    ${cifra(g.un_solo_juicio, t('con una sola decisión', 'with a single decision'),
             g.ramas_sin_tocar
-              ? `y ${g.ramas_sin_tocar} rama${g.ramas_sin_tocar === 1 ? '' : 's'} sin empezar`
-              : 'falta un segundo revisor')}
+              ? t(`y ${g.ramas_sin_tocar} rama${g.ramas_sin_tocar === 1 ? '' : 's'} sin empezar`,
+                  `and ${g.ramas_sin_tocar} branch${g.ramas_sin_tocar === 1 ? '' : 'es'} not started`)
+              : t('falta un segundo revisor', 'a second reviewer is missing'))}
   </div>`;
 }
 
@@ -200,16 +209,16 @@ function pintarRevisores(porRevisor, ramas) {
   if (!nombres.length) return '';
   const tono = { si_definitivo: 'var(--ok)', si: 'var(--ok)', neutral: 'var(--texto-3)',
                  no: 'var(--peligro)', no_definitivo: 'var(--peligro)' };
-  return `<h2>Cada revisor</h2>
+  return `<h2>${t('Cada revisor', 'Each reviewer')}</h2>
     <div class="revisores">${nombres.map((n) => {
       const d = porRevisor[n];
       const partes = ESCALA.map((o) => [o.codigo, d.reparto[o.codigo] || 0])
         .filter(([, v]) => v > 0);
       return `<div class="cifra">
         <div class="n" style="font-size:1.05rem">${esc(n)}</div>
-        <div class="r">${d.n} decisi${d.n === 1 ? 'ón' : 'ones'}${
-          d.notas ? ` · ${d.notas} nota${d.notas === 1 ? '' : 's'}` : ''}${
-          secc[n] ? ` · ${secc[n]} secci${secc[n] === 1 ? 'ón' : 'ones'}` : ''}</div>
+        <div class="r">${t(`${d.n} decisi${d.n === 1 ? 'ón' : 'ones'}`, `${d.n} decision${d.n === 1 ? '' : 's'}`)}${
+          d.notas ? t(` · ${d.notas} nota${d.notas === 1 ? '' : 's'}`, ` · ${d.notas} note${d.notas === 1 ? '' : 's'}`) : ''}${
+          secc[n] ? t(` · ${secc[n]} secci${secc[n] === 1 ? 'ón' : 'ones'}`, ` · ${secc[n]} section${secc[n] === 1 ? '' : 's'}`) : ''}</div>
         <div class="barrita">${partes.map(([cod, v]) =>
           `<span style="flex:${v};background:${tono[cod] || 'var(--texto-3)'}"
                  title="${esc(etiqueta(cod))}: ${v}"></span>`).join('')}</div>
@@ -237,34 +246,38 @@ function pintarSecciones(secciones, e) {
   let franja = '';
   if (!e.sin_contexto && e.hasta > e.desde) {
     const largo = e.hasta - e.desde;
-    franja = `<span class="franja" title="El evento entero, de ${e.desde} a ${e.hasta}">${
+    franja = `<span class="franja" title="${t(`El evento entero, de ${e.desde} a ${e.hasta}`, `The whole event, from ${e.desde} to ${e.hasta}`)}">${
       secciones.map((s, k) => `<i class="${signo(valorDe(s.respuesta))}"
         style="left:${((s.desde - e.desde) / largo) * 100}%;width:${((s.hasta - s.desde) / largo) * 100}%"
-        title="#${k + 1} · ${s.desde}–${s.hasta} · ${esc(s.respuesta ? etiqueta(s.respuesta) : 'sin decidir')}"></i>`
+        title="#${k + 1} · ${s.desde}–${s.hasta} · ${esc(s.respuesta ? etiqueta(s.respuesta) : t('sin decidir', 'undecided'))}"></i>`
       ).join('')}</span>`;
   }
   return franja + secciones.map((s, k) => `
     <span class="secc ${signo(valorDe(s.respuesta))}">#${k + 1}
       <span class="r">${s.desde}–${s.hasta}</span>
-      <b>${s.respuesta ? esc(etiqueta(s.respuesta)) : 'sin decidir'}</b>${
+      <b>${s.respuesta ? esc(etiqueta(s.respuesta)) : t('sin decidir', 'undecided')}</b>${
       s.comentario ? ` · ${esc(s.comentario)}` : ''}</span>`).join('');
 }
 
 function marcaDeRama(r) {
-  const estrella = r.es_tesis ? '<span class="chip oficial">★ tesis</span>' : '';
+  const estrella = r.es_tesis ? `<span class="chip oficial">★ ${t('tesis', 'thesis')}</span>` : '';
   const nombre = r.etiqueta && !(r.es_tesis && r.etiqueta === 'tesis')
     ? `<span class="nombre-rama">${esc(r.etiqueta)}</span>` : '';
   return estrella + nombre;
 }
 
+/** El estado de un evento, tal como lo nombra el backend (`_acuerdo`), en el idioma de la página. */
+const ESTADO = { acuerdo: t('acuerdo', 'agreement'), desacuerdo: t('desacuerdo', 'disagreement') };
+
 function pintarRama(r) {
   const cobertura = r.total_eventos
-    ? `${r.eventos.length} de ${r.total_eventos} eventos` : `${r.eventos.length} eventos`;
+    ? t(`${r.eventos.length} de ${r.total_eventos} eventos`, `${r.eventos.length} of ${r.total_eventos} events`)
+    : t(`${r.eventos.length} eventos`, `${r.eventos.length} events`);
   const partes = [];
-  if (r.cuenta.acuerdo) partes.push(`${r.cuenta.acuerdo} en acuerdo`);
-  if (r.cuenta.desacuerdo) partes.push(`${r.cuenta.desacuerdo} en desacuerdo`);
-  if (r.cuenta.un_solo_juicio) partes.push(`${r.cuenta.un_solo_juicio} con una sola decisión`);
-  if (r.cuenta.solo_notas) partes.push(`${r.cuenta.solo_notas} con nota sin decidir`);
+  if (r.cuenta.acuerdo) partes.push(t(`${r.cuenta.acuerdo} en acuerdo`, `${r.cuenta.acuerdo} in agreement`));
+  if (r.cuenta.desacuerdo) partes.push(t(`${r.cuenta.desacuerdo} en desacuerdo`, `${r.cuenta.desacuerdo} in disagreement`));
+  if (r.cuenta.un_solo_juicio) partes.push(t(`${r.cuenta.un_solo_juicio} con una sola decisión`, `${r.cuenta.un_solo_juicio} with a single decision`));
+  if (r.cuenta.solo_notas) partes.push(t(`${r.cuenta.solo_notas} con nota sin decidir`, `${r.cuenta.solo_notas} with an undecided note`));
 
   /* UNA RAMA SIN NINGÚN JUICIO SE MUESTRA IGUAL, y es la mitad del sentido de esta pantalla: decir
      dónde falta trabajo. Va sin flecha de desplegar —no hay nada adentro que ver— y con el aire
@@ -276,8 +289,9 @@ function pintarRama(r) {
         <span class="clave">${esc(r.nodo.slice(0, 12))}</span>
         ${marcaDeRama(r)}
         <span class="tenue">${r.total_eventos !== null
-          ? `${r.total_eventos} eventos, ninguno clasificado` : 'sin clasificar'}</span>
-        <span class="cuenta">sin empezar</span>
+          ? t(`${r.total_eventos} eventos, ninguno clasificado`, `${r.total_eventos} events, none classified`)
+          : t('sin clasificar', 'unclassified')}</span>
+        <span class="cuenta">${t('sin empezar', 'not started')}</span>
       </div>
     </div>`;
   }
@@ -291,8 +305,8 @@ function pintarRama(r) {
     </summary>
     <table class="cat">
       <thead><tr>
-        <th class="num">evento</th><th>hoja</th><th class="num">mediciones</th>
-        <th class="num">tramos</th><th>estado</th><th>lo que dijeron</th>
+        <th class="num">${t('evento', 'event')}</th><th>${t('hoja', 'sheet')}</th><th class="num">${t('mediciones', 'measurements')}</th>
+        <th class="num">${t('tramos', 'windows')}</th><th>${t('estado', 'status')}</th><th>${t('lo que dijeron', 'what they said')}</th>
       </tr></thead>
       <tbody>${r.eventos.map((e) => `
         <tr>
@@ -301,14 +315,14 @@ function pintarRama(r) {
           <td class="num">${e.sin_contexto ? '—' : `${e.desde}–${e.hasta}`}</td>
           <td class="num">${e.sin_contexto ? '—' : e.n_ventanas}</td>
           <td>${e.estado
-            ? `<span class="est ${e.estado}">${e.estado}</span>`
+            ? `<span class="est ${e.estado}">${ESTADO[e.estado] || e.estado}</span>`
             : (e.respuestas.some((v) => v.respuesta)
-              ? '<span class="est solo">una sola decisión</span>'
-              : '<span class="est nota">solo notas</span>')}</td>
+              ? `<span class="est solo">${t('una sola decisión', 'single decision')}</span>`
+              : `<span class="est nota">${t('solo notas', 'notes only')}</span>`)}</td>
           <td>${e.respuestas.map((v) => `
             <span class="voto ${signo(v.valor)}">
               <span class="q">${esc(v.usuario)}:</span> <b>${
-                v.respuesta ? esc(etiqueta(v.respuesta)) : 'sin decidir'}</b>
+                v.respuesta ? esc(etiqueta(v.respuesta)) : t('sin decidir', 'undecided')}</b>
             </span>${v.comentario ? `<span class="com">${esc(v.comentario)}</span>` : ''}${
             pintarSecciones(v.secciones, e)}`).join('')}
           </td>
@@ -326,31 +340,40 @@ async function arrancar() {
     /* El 403 es el caso esperado, no una falla: un revisor que llega acá por la URL. Se le dice qué
        es esta pantalla y por qué no la ve, en vez de un «HTTP 403» que parece un error del sitio. */
     $('#cuerpo').innerHTML = e.status === 403
-      ? `<div class="vacio">
+      ? t(`<div class="vacio">
           <p><strong>Esta pantalla es del administrador.</strong></p>
           <p class="tenue">El catálogo reúne lo que respondieron todos los revisores, y verlo
             mientras se clasifica arruinaría justo lo que se quiere medir: si dos personas, mirando
             el mismo evento por separado, coinciden. Tu clasificación se hace en el
             <a href="taller">paso 6 del taller</a>, y ahí ves la tuya cuando quieras.</p>
-        </div>`
-      : `<div class="vacio"><p><strong>No se pudo cargar el catálogo.</strong></p>
+        </div>`, `<div class="vacio">
+          <p><strong>This page is for the administrator.</strong></p>
+          <p class="tenue">The catalog gathers what every reviewer answered, and seeing it while
+            classifying would spoil exactly what is being measured: whether two people, looking at
+            the same event separately, agree. Your own classification happens in
+            <a href="taller">step 6 of the workshop</a>, where you can see yours at any time.</p>
+        </div>`)
+      : `<div class="vacio"><p><strong>${t('No se pudo cargar el catálogo.', 'Could not load the catalog.')}</strong></p>
           <p class="tenue mono">${esc(e.message)}</p></div>`;
     return;
   }
 
   ESCALA = d.escala || [];
   if (!d.ramas.length) {
-    $('#cuerpo').innerHTML = `<div class="vacio">
+    $('#cuerpo').innerHTML = t(`<div class="vacio">
       <p><strong>Todavía no hay nada clasificado.</strong></p>
       <p class="tenue">Cuando alguien responda la encuesta de un evento en el
-        <a href="taller">paso 6 del taller</a>, aparece acá.</p></div>`;
+        <a href="taller">paso 6 del taller</a>, aparece acá.</p></div>`, `<div class="vacio">
+      <p><strong>Nothing has been classified yet.</strong></p>
+      <p class="tenue">When someone answers an event's survey in
+        <a href="taller">step 6 of the workshop</a>, it shows up here.</p></div>`);
     return;
   }
 
   $('#cuerpo').innerHTML =
     pintarCifras(d.global) +
     pintarRevisores(d.por_revisor, d.ramas) +
-    `<h2>Por rama</h2>` +
+    `<h2>${t('Por rama', 'By branch')}</h2>` +
     d.ramas.map(pintarRama).join('');
 }
 
