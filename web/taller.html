@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Taller — Etapa 1</title>
+<title data-en="Workshop — Stage 1">Taller — Etapa 1</title>
 <link rel="stylesheet" href="estatico/estilos.css">
 <script src="estatico/i18n.js"></script>
 <script>
@@ -238,8 +238,23 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   <div id="alerta-datos"></div>
 
   <details class="tarjeta" id="guia" style="margin:18px 0 14px">
-    <summary style="cursor:pointer;font-weight:650">¿Qué es esto y cómo se usa?</summary>
-    <div style="margin-top:14px;font-size:.9rem" class="tenue">
+    <summary style="cursor:pointer;font-weight:650" data-en="What is this and how do I use it?">¿Qué es esto y cómo se usa?</summary>
+    <div style="margin-top:14px;font-size:.9rem" class="tenue" data-en="<p><strong style='color:var(--texto)'>What it does.</strong> This workshop runs, step by step, the
+      analysis the thesis uses to look for possible faults in a satellite battery. You can change any
+      parameter and see how the result changes. It is not a simulation: it runs the same code that
+      produces the results of the work.</p>
+      <p><strong style='color:var(--texto)'>The map above.</strong> Each circle is a step that has already
+      run. Read them left to right: the pipeline has 6 steps in that order. Click any circle to see in
+      detail what that step produced.</p>
+      <p><strong style='color:var(--texto)'>What a branch is.</strong> When you go back to a step and run
+      it with other values, the map splits in two: the old path stays intact and a new one starts. That is
+      a branch, and it shows as a fork in the drawing. Everything before the point where it split is
+      shared, so trying variants is fast.</p>
+      <p><strong style='color:var(--texto)'>A warning.</strong> This data has no correct answers: nobody
+      ever marked which windows are truly anomalous. No result here is «right» or «wrong». What you can
+      see is whether several methods agree and whether the result holds up when the configuration
+      changes. The numbers the thesis reports come from the configuration marked with
+      <svg class='ico ico-estrella' viewBox='0 0 16 13' fill='currentColor' aria-hidden='true'><path d='M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z'/></svg>.</p>">
       <p><strong style="color:var(--texto)">Qué hace.</strong> Este taller ejecuta, paso a paso, el
       análisis con el que la tesis busca posibles fallas en la batería de un satélite. Podés cambiar
       cualquier parámetro y ver cómo cambia el resultado. No es una simulación: corre el mismo código
@@ -265,12 +280,12 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   <!-- ================= mapa de ramas ================= -->
   <div class="tarjeta" style="padding:14px 16px">
     <div class="fila-sup">
-      <h3 style="font-size:.95rem">Mapa de ramas</h3>
+      <h3 style="font-size:.95rem" data-en="Branch map">Mapa de ramas</h3>
       <span class="esp"></span>
       <span class="tenue mono" id="cuenta" style="font-size:.75rem"></span>
       <span class="tenue mono" id="sello" style="font-size:.75rem"></span>
-      <button class="boton" id="btn-nueva" style="display:none;padding:6px 12px;font-size:.83rem">+ Empezar de cero</button>
-      <button class="boton" id="btn-oficial" style="display:none;padding:6px 12px;font-size:.83rem"><svg class="ico ico-estrella" viewBox="0 0 16 13" fill="currentColor" aria-hidden="true"><path d="M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z"/></svg> Ejecutar tesis</button>
+      <button class="boton" id="btn-nueva" style="display:none;padding:6px 12px;font-size:.83rem" data-en="+ Start from scratch">+ Empezar de cero</button>
+      <button class="boton" id="btn-oficial" style="display:none;padding:6px 12px;font-size:.83rem" data-en="<svg class='ico ico-estrella' viewBox='0 0 16 13' fill='currentColor' aria-hidden='true'><path d='M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z'/></svg> Run the thesis"><svg class="ico ico-estrella" viewBox="0 0 16 13" fill="currentColor" aria-hidden="true"><path d="M8 0l2 4.2 4.6.6-3.4 3.2.8 4.6L8 10.4 3.9 12.6l.8-4.6L1.4 4.8 6 4.2z"/></svg> Ejecutar tesis</button>
     </div>
     <div id="mapa-caja"><svg id="mapa" height="150"></svg></div>
     <p class="tenue" style="font-size:.76rem;margin:8px 0 0" id="pista-mapa"></p>
@@ -282,11 +297,11 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
       <div class="num-fase pendiente" id="fase-num">0</div>
       <div style="flex:1;min-width:260px">
         <div class="fila-sup" style="margin-bottom:2px">
-          <h2 id="fase-titulo" style="font-size:1.35rem">Sin ningún paso seleccionado</h2>
+          <h2 id="fase-titulo" style="font-size:1.35rem" data-en="No step selected">Sin ningún paso seleccionado</h2>
           <span class="chip" id="fase-estado"></span>
           <span class="esp"></span>
-          <button class="boton" id="btn-nombrar" style="display:none;padding:5px 11px;font-size:.8rem">Ponerle nombre</button>
-          <button class="boton" id="btn-borrar" style="display:none;padding:5px 11px;font-size:.8rem">Borrar esta rama</button>
+          <button class="boton" id="btn-nombrar" style="display:none;padding:5px 11px;font-size:.8rem" data-en="Give it a name">Ponerle nombre</button>
+          <button class="boton" id="btn-borrar" style="display:none;padding:5px 11px;font-size:.8rem" data-en="Delete this branch">Borrar esta rama</button>
         </div>
         <p class="tenue" id="fase-desc" style="font-size:.93rem;margin:0"></p>
       </div>
@@ -306,15 +321,15 @@ catch (e) { document.documentElement.dataset.tema = 'oscuro'; }
   <!-- ================= formulario ================= -->
   <div class="tarjeta" id="panel-form" style="margin-top:16px">
     <div class="fila-sup">
-      <h3 id="form-titulo">Configurar</h3>
+      <h3 id="form-titulo" data-en="Configure">Configurar</h3>
       <span class="esp"></span>
       <span id="form-modo" class="chip"></span>
     </div>
     <p class="tenue" id="form-desc" style="font-size:.9rem"></p>
     <div class="params-grid" id="formulario"></div>
     <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
-      <button class="boton primario" id="btn-ejecutar">Ejecutar</button>
-      <button class="boton" id="btn-cancelar">Cancelar</button>
+      <button class="boton primario" id="btn-ejecutar" data-en="Run">Ejecutar</button>
+      <button class="boton" id="btn-cancelar" data-en="Cancel">Cancelar</button>
       <span id="estado-ejecucion" class="tenue" style="font-size:.87rem"></span>
     </div>
   </div>

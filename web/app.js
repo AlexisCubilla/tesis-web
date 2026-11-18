@@ -11,6 +11,10 @@
  *     ESTE paso con otros valores (lo que abre una rama). Nunca queda implícito cuál de las dos pasa.
  */
 
+/** El texto en el idioma de la página: `T('Guardado', 'Saved')`. Ver `i18n.js`. Se llama `T` y no
+ *  `t` porque este archivo ya usa `t` como variable local en varios lugares. */
+const T = I18n.t;
+
 const S = {
   defs: [], cadena: [], nodos: [],
   sel: null,          // clave del nodo seleccionado (null = todavía nada, arranca desde cero)
@@ -48,17 +52,17 @@ const api = async (ruta, op) => {
        diferencia entre «se venció» y «nunca hubo» es exactamente `S.usuario`. */
     if (S.usuario) {
       location.href = 'login?destino=' + encodeURIComponent(location.pathname + location.search);
-      throw new Error('Sesión vencida');
+      throw new Error(T('Sesión vencida', 'Session expired'));
     }
-    throw new Error('Hace falta iniciar sesión');
+    throw new Error(T('Hace falta iniciar sesión', 'You need to sign in'));
   }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
   return r.json();
 };
 /** Una línea de qué mirar, y el porqué plegado. Ver `.saber-mas` en taller.html. */
 const pista = (corta, larga) => `<p class="pista">${corta}</p>` + (larga
-  ? `<details class="saber-mas"><summary>Por qué</summary><p>${larga}</p></details>` : '');
-const miles = (v) => typeof v === 'number' ? v.toLocaleString('es') : v;
+  ? `<details class="saber-mas"><summary>${T('Por qué', 'Why')}</summary><p>${larga}</p></details>` : '');
+const miles = (v) => typeof v === 'number' ? v.toLocaleString(I18n.locale) : v;
 /* Texto de una persona metido en una plantilla. Hace falta para el comentario de una
    clasificación: sin esto, uno que contenga `</textarea>` cierra el campo antes de tiempo y parte
    el formulario en dos. Lo escribe alguien con sesión, así que no es una vía de ataque, pero sí
@@ -92,12 +96,15 @@ async function iniciar() {
   S.usuario ? habilitarEscritura() : modoLectura();
   S.oficial = est.config_tesis || {};
   S.muestreo = est.muestreo_segundos || 10.6;
-  $('#sello').textContent = `tesis @ ${est.commit_tesis}`;
-  $('#sello').title = `Paquete de la tesis instalado desde ${est.ruta_tesis}`;
+  $('#sello').textContent = `${T('tesis', 'thesis')} @ ${est.commit_tesis}`;
+  $('#sello').title = T(`Paquete de la tesis instalado desde ${est.ruta_tesis}`,
+                        `Thesis package installed from ${est.ruta_tesis}`);
   if (!est.datos_listos) {
-    $('#alerta-datos').innerHTML = `<div class="aviso" style="margin:16px 0">
-      <strong>Faltan los datos base.</strong> Generalos una vez con
-      <span class="mono">mise run datos</span> y recargá la página.</div>`;
+    $('#alerta-datos').innerHTML = `<div class="aviso" style="margin:16px 0">${T(
+      `<strong>Faltan los datos base.</strong> Generalos una vez con
+      <span class="mono">mise run datos</span> y recargá la página.`,
+      `<strong>The base data is missing.</strong> Generate it once with
+      <span class="mono">mise run datos</span> and reload the page.`)}</div>`;
   }
 
   /* Los <canvas> no heredan las variables CSS: `grafico.js` se repinta solo al cambiar de tema,
@@ -153,7 +160,7 @@ function pintar() { dibujarMapa(); pintarFase(); pintarForm(); }
  * explicar de más o de menos, se muestra el resumen y se deja el resto a un clic. El estado abierto
  * NO se recuerda a propósito: al cambiar de fase se vuelve a plegar, que es lo que mantiene la
  * pantalla corta. */
-function escalonado(resumen, desarrollo, etiqueta = '¿por qué?') {
+function escalonado(resumen, desarrollo, etiqueta = T('¿por qué?', 'why?')) {
   if (!desarrollo || desarrollo === resumen) return `<p class="resumen-txt">${resumen}</p>`;
   return `<div class="escalonado">
     <p class="resumen-txt">${resumen}
@@ -166,7 +173,7 @@ function escalonado(resumen, desarrollo, etiqueta = '¿por qué?') {
 /** La ayuda de un parámetro, escalonada igual que las descripciones de etapa. */
 function ayudaParam(p) {
   if (!p.titular && !p.ayuda) return '';
-  return `<div class="ayuda">${escalonado(p.titular || p.ayuda, p.titular ? p.ayuda : '', 'más')}</div>`;
+  return `<div class="ayuda">${escalonado(p.titular || p.ayuda, p.titular ? p.ayuda : '', T('más', 'more'))}</div>`;
 }
 
 /** Activa los desplegables de `escalonado()` dentro de un contenedor ya pintado. */
@@ -176,8 +183,8 @@ function activarEscalonados(raiz) {
     const abierto = !d.hidden;
     d.hidden = abierto;
     b.setAttribute('aria-expanded', String(!abierto));
-    b.textContent = abierto ? b.dataset.cerrado || '¿por qué?' : 'ocultar';
-    if (!b.dataset.cerrado) b.dataset.cerrado = '¿por qué?';
+    b.textContent = abierto ? b.dataset.cerrado || T('¿por qué?', 'why?') : T('ocultar', 'hide');
+    if (!b.dataset.cerrado) b.dataset.cerrado = T('¿por qué?', 'why?');
   }));
 }
 
@@ -310,12 +317,16 @@ function dibujarMapa() {
     pintar(); cargarVisual();
   }));
 
-  $('#cuenta').textContent = `${S.nodos.length} pasos · ${hojas().length} ramas`;
+  $('#cuenta').textContent = T(`${S.nodos.length} pasos · ${hojas().length} ramas`,
+                               `${S.nodos.length} steps · ${hojas().length} branches`);
   $('#pista-mapa').textContent = S.eligiendo
-    ? 'Elegí en el mapa el otro paso a comparar: están resaltados los que sirven (misma etapa).'
+    ? T('Elegí en el mapa el otro paso a comparar: están resaltados los que sirven (misma etapa).',
+        'Pick the other step to compare on the map: the ones that qualify (same stage) are highlighted.')
     : S.nodos.length
-    ? 'Clic en un círculo para ver ese paso en detalle. El círculo punteado es dónde caería el próximo.'
-    : 'Todavía no hay nada. Empezá de cero o corré la configuración de la tesis.';
+    ? T('Clic en un círculo para ver ese paso en detalle. El círculo punteado es dónde caería el próximo.',
+        'Click a circle to see that step in detail. The dotted circle is where the next one would go.')
+    : T('Todavía no hay nada. Empezá de cero o corré la configuración de la tesis.',
+        'Nothing here yet. Start from scratch or run the thesis configuration.');
 }
 
 const hojas = () => {
@@ -326,14 +337,14 @@ const hojas = () => {
 function etiqueta(n) {
   const p = n.parametros || {};
   return ({
-    datos: () => p.limpiar ? 'limpio' : 'sin limpiar',
-    ventaneo: () => `${p.tamano_ventana}/${p.paso}${p.deduplicar ? ` · ${p.umbral_dedup}` : ' · sin dedup'}`,
-    features: () => `${p.rezagos_autocorr} rezagos`,
+    datos: () => p.limpiar ? T('limpio', 'clean') : T('sin limpiar', 'not cleaned'),
+    ventaneo: () => `${p.tamano_ventana}/${p.paso}${p.deduplicar ? ` · ${p.umbral_dedup}` : T(' · sin dedup', ' · no dedup')}`,
+    features: () => T(`${p.rezagos_autocorr} rezagos`, `${p.rezagos_autocorr} lags`),
     // Con el descarte apagado los umbrales no se aplican, así que mostrarlos en el
     // mapa haría creer que sí. El nodo dice qué hizo, no qué tenía configurado.
-    filtrado: () => (p.descartar === false ? 'sin descartar' : `corr ${p.umbral_correlacion}`),
-    deteccion: () => `${(p.detectores || []).length} métodos`,
-    eventos: () => `${(p.fraccion_candidatos * 100).toFixed(1)}% · tope ${p.max_ventanas_evento || '∞'}`,
+    filtrado: () => (p.descartar === false ? T('sin descartar', 'no discard') : `corr ${p.umbral_correlacion}`),
+    deteccion: () => T(`${(p.detectores || []).length} métodos`, `${(p.detectores || []).length} methods`),
+    eventos: () => `${(p.fraccion_candidatos * 100).toFixed(1)}% · ${T('tope', 'cap')} ${p.max_ventanas_evento || '∞'}`,
   }[n.etapa] || (() => n.etapa))();
 }
 
@@ -358,19 +369,47 @@ const YA_EN_EL_FLUJO = {
   eventos: ['eventos', 'ventanas_candidatas'],
 };
 
+/** El estado de un paso, tal como lo guarda el backend, en el idioma de la página. */
+const ESTADO_NODO = {
+  listo: T('listo', 'done'), error: T('error', 'error'),
+  corriendo: T('corriendo', 'running'), pendiente: T('pendiente', 'pending'),
+};
+
+/** El rótulo de un número del resumen. Las claves las pone el paquete de la tesis en español con
+ *  guiones bajos; en español basta con sacarlos, en inglés hace falta el nombre. Una clave que no
+ *  esté acá sale como en español: se ve, aunque sin traducir. */
+const ROTULOS_RESUMEN_EN = {
+  filas_entrada: 'input rows', filas_salida: 'output rows', hojas: 'sheets', limpieza: 'cleaning',
+  ventanas_generadas: 'windows generated', ventanas_conservadas: 'windows kept',
+  reduccion_pct: 'reduction %', eliminadas_por_dedup: 'removed by dedup',
+  filas: 'rows', features: 'features', rezagos: 'lags',
+  features_entrada: 'input features', features_salida: 'output features', descartadas: 'discarded',
+  detectores: 'detectors', ventanas_puntuadas: 'windows scored',
+  eventos: 'events', ventanas_candidatas: 'candidate windows',
+  filas_descartadas: 'rows discarded', segmentos: 'segments', forma_tensor: 'tensor shape',
+  eventos_una_ventana: 'single-window events', en_el_limite: 'at the limit', alta_prioridad: 'high priority',
+};
+const rotuloResumen = (k) => (I18n.idioma === 'en' && ROTULOS_RESUMEN_EN[k]) || k.replace(/_/g, ' ');
+
 function flujoDe(nodo) {
   const r = nodo.resumen || {};
   return ({
-    datos: () => [`${miles(r.filas_entrada)} mediciones`,
-                  `${miles(r.filas_salida)} mediciones · ${r.hojas} hojas`],
-    ventaneo: () => [`${miles(r.ventanas_generadas)} tramos generados`,
-                     `${miles(r.ventanas_conservadas)} tramos` +
+    datos: () => [T(`${miles(r.filas_entrada)} mediciones`, `${miles(r.filas_entrada)} measurements`),
+                  T(`${miles(r.filas_salida)} mediciones · ${r.hojas} hojas`,
+                    `${miles(r.filas_salida)} measurements · ${r.hojas} sheets`)],
+    ventaneo: () => [T(`${miles(r.ventanas_generadas)} tramos generados`,
+                       `${miles(r.ventanas_generadas)} windows generated`),
+                     T(`${miles(r.ventanas_conservadas)} tramos`, `${miles(r.ventanas_conservadas)} windows`) +
                      (r.eliminadas_por_dedup ? ` (−${r.reduccion_pct} %)` : '')],
-    features: () => [`${miles(r.filas)} tramos`, `${miles(r.filas)} × ${r.features} características`],
-    filtrado: () => [`${r.features_entrada} características`, `${r.features_salida} características`],
-    deteccion: () => [`${miles(r.ventanas_puntuadas)} tramos`,
-                      `${miles(r.ventanas_puntuadas)} × ${(r.detectores || []).length} puntajes`],
-    eventos: () => [`${miles(r.ventanas_candidatas)} tramos sospechosos`, `${r.eventos} eventos`],
+    features: () => [T(`${miles(r.filas)} tramos`, `${miles(r.filas)} windows`),
+                     T(`${miles(r.filas)} × ${r.features} características`, `${miles(r.filas)} × ${r.features} features`)],
+    filtrado: () => [T(`${r.features_entrada} características`, `${r.features_entrada} features`),
+                     T(`${r.features_salida} características`, `${r.features_salida} features`)],
+    deteccion: () => [T(`${miles(r.ventanas_puntuadas)} tramos`, `${miles(r.ventanas_puntuadas)} windows`),
+                      T(`${miles(r.ventanas_puntuadas)} × ${(r.detectores || []).length} puntajes`,
+                        `${miles(r.ventanas_puntuadas)} × ${(r.detectores || []).length} scores`)],
+    eventos: () => [T(`${miles(r.ventanas_candidatas)} tramos sospechosos`, `${miles(r.ventanas_candidatas)} suspicious windows`),
+                    T(`${r.eventos} eventos`, `${r.eventos} events`)],
   }[nodo.etapa] || (() => ['—', '—']))();
 }
 
@@ -380,17 +419,19 @@ function pintarFase() {
     panel.style.display = 'block';
     $('#fase-num').textContent = '0';
     $('#fase-num').className = 'num-fase pendiente';
-    $('#fase-titulo').textContent = 'Sin ningún paso seleccionado';
+    $('#fase-titulo').textContent = T('Sin ningún paso seleccionado', 'No step selected');
     $('#fase-estado').textContent = '';
     $('#fase-desc').textContent = S.nodos.length
-      ? 'Elegí un círculo del mapa para ver qué produjo ese paso, o empezá una rama nueva desde cero.'
-      : 'El pipeline tiene 6 pasos. Arrancá por el primero, o corré de una la configuración con la que la tesis reporta sus resultados.';
+      ? T('Elegí un círculo del mapa para ver qué produjo ese paso, o empezá una rama nueva desde cero.',
+          'Pick a circle on the map to see what that step produced, or start a new branch from scratch.')
+      : T('El pipeline tiene 6 pasos. Arrancá por el primero, o corré de una la configuración con la que la tesis reporta sus resultados.',
+          'The pipeline has 6 steps. Start with the first one, or run straight away the configuration the thesis reports its results with.');
     ['#fase-flujo', '#fase-params', '#fase-resumen', '#fase-visual'].forEach((s) => $(s).innerHTML = '');
     $('#btn-borrar').style.display = 'none';
     $('#btn-nombrar').style.display = 'none';
     $('#fase-acciones').innerHTML = (S.nodos.length || !S.usuario) ? '' :
-      `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} Ejecutar tesis</button>
-       <button class="boton" onclick="document.getElementById('btn-nueva').click()">Configurar el paso 1 a mano</button>`;
+      `<button class="boton primario" onclick="document.getElementById('btn-oficial').click()">${icoEstrella()} ${T('Ejecutar tesis', 'Run the thesis')}</button>
+       <button class="boton" onclick="document.getElementById('btn-nueva').click()">${T('Configurar el paso 1 a mano', 'Configure step 1 by hand')}</button>`;
     return;
   }
 
@@ -404,34 +445,35 @@ function pintarFase() {
     ? `${def.titulo} <span class="nombre-rama">${n.etiqueta}</span>` : def.titulo;
   $('#fase-estado').className = `chip ${n.estado}`;
   $('#fase-estado').textContent = n.estado === 'listo'
-    ? `paso ${i + 1} de 6 · ${n.duracion_s ?? 0}s` : n.estado;
+    ? T(`paso ${i + 1} de 6 · ${n.duracion_s ?? 0}s`, `step ${i + 1} of 6 · ${n.duracion_s ?? 0}s`)
+    : (ESTADO_NODO[n.estado] || n.estado);
   $('#fase-desc').innerHTML = escalonado(def.resumen || def.descripcion, def.descripcion);
   activarEscalonados($('#fase-desc'));
   const escribe = S.usuario ? 'inline-flex' : 'none';
   $('#btn-borrar').style.display = escribe;
   $('#btn-nombrar').style.display = escribe;
-  $('#btn-nombrar').textContent = n.etiqueta ? 'Cambiar el nombre' : 'Ponerle nombre';
+  $('#btn-nombrar').textContent = n.etiqueta ? T('Cambiar el nombre', 'Rename') : T('Ponerle nombre', 'Give it a name');
 
   if (n.estado === 'listo') {
     const [entra, sale] = flujoDe(n);
     $('#fase-flujo').innerHTML = `
-      <div class="caja-f"><div class="et">entra</div><div class="vl">${entra}</div></div>
+      <div class="caja-f"><div class="et">${T('entra', 'in')}</div><div class="vl">${entra}</div></div>
       ${icoFlecha()}
-      <div class="caja-f sale"><div class="et">sale</div><div class="vl">${sale}</div></div>`;
+      <div class="caja-f sale"><div class="et">${T('sale', 'out')}</div><div class="vl">${sale}</div></div>`;
   } else $('#fase-flujo').innerHTML = '';
 
   $('#fase-params').innerHTML = def.parametros.map((p) => {
     const v = n.parametros[p.nombre];
     return `<span class="par" title="${p.ayuda.slice(0, 180)}">${p.etiqueta}
-      <b>${Array.isArray(v) ? `${v.length}` : (v === true ? 'sí' : v === false ? 'no' : v)}</b></span>`;
+      <b>${Array.isArray(v) ? `${v.length}` : (v === true ? T('sí', 'yes') : v === false ? 'no' : v)}</b></span>`;
   }).join('');
 
   $('#fase-resumen').innerHTML = Object.entries(n.resumen || {})
     .filter(([k]) => !(YA_EN_EL_FLUJO[n.etapa] || []).includes(k))
     .filter(([, v]) => typeof v !== 'object' || Array.isArray(v))
     .map(([k, v]) => `<div class="celda"><div class="v">${Array.isArray(v) ? v.length
-      : miles(v === true ? 'sí' : v === false ? 'no' : v)}</div>
-      <div class="r">${k.replace(/_/g, ' ')}</div></div>`).join('');
+      : miles(v === true ? T('sí', 'yes') : v === false ? 'no' : v)}</div>
+      <div class="r">${rotuloResumen(k)}</div></div>`).join('');
 
   if (n.estado === 'error') {
     $('#fase-visual').innerHTML =
@@ -447,15 +489,18 @@ function pintarFase() {
   // y no como una línea de texto en un desplegable.
   const analizable = n.estado === 'listo' && ['deteccion', 'eventos'].includes(n.etapa);
   $('#fase-acciones').innerHTML = `
-    ${sig ? `<button class="boton primario" id="a-seguir">Paso ${i + 2}: ${defSig.titulo} ${icoFlecha()}</button>` : ''}
-    <button class="boton" id="a-ramificar">Repetir este paso con otros valores</button>
+    ${sig ? `<button class="boton primario" id="a-seguir">${T('Paso', 'Step')} ${i + 2}: ${defSig.titulo} ${icoFlecha()}</button>` : ''}
+    <button class="boton" id="a-ramificar">${T('Repetir este paso con otros valores', 'Rerun this step with other values')}</button>
     ${analizable && S.vista !== 'analisis'
-        ? `<button class="boton" id="a-analizar">Analizar esta rama ${icoFlecha()}</button>` : ''}
+        ? `<button class="boton" id="a-analizar">${T('Analizar esta rama', 'Analyze this branch')} ${icoFlecha()}</button>` : ''}
     ${hayComparables() ? `<button class="boton" id="a-comparar">${
-        S.eligiendo ? 'Elegí el otro en el mapa…' : 'Comparar con otra rama'}</button>` : ''}
+        S.eligiendo ? T('Elegí el otro en el mapa…', 'Pick the other one on the map…')
+                    : T('Comparar con otra rama', 'Compare with another branch')}</button>` : ''}
     <span class="tenue" style="font-size:.82rem">
-      ${sig ? (yaHecho ? 'Ya hay pasos más adelante; si cambiás algo, se abre una rama.'
-                       : 'Continúa esta rama.') : 'Este es el último paso del pipeline.'}
+      ${sig ? (yaHecho ? T('Ya hay pasos más adelante; si cambiás algo, se abre una rama.',
+                           'There are later steps already; if you change something, a branch opens.')
+                       : T('Continúa esta rama.', 'Continues this branch.'))
+            : T('Este es el último paso del pipeline.', 'This is the last step of the pipeline.')}
     </span>`;
   if (sig) $('#a-seguir').addEventListener('click', () => abrirForm(sig, S.sel, 'seguir'));
   $('#a-ramificar').addEventListener('click', () => abrirForm(n.etapa, n.padre, 'rama'));
@@ -493,9 +538,12 @@ function modoLectura() {
     p.id = 'aviso-lectura';
     p.className = 'aviso info';
     p.style.cssText = 'margin:0 0 14px';
-    p.innerHTML = '<strong>Modo lectura.</strong> Los resultados, los gráficos y los entregables '
-                + 'están todos acá. Para ejecutar el pipeline, tocar las ramas o clasificar '
-                + 'eventos hace falta <a href="login">ingresar</a>.';
+    p.innerHTML = T('<strong>Modo lectura.</strong> Los resultados, los gráficos y los entregables '
+                    + 'están todos acá. Para ejecutar el pipeline, tocar las ramas o clasificar '
+                    + 'eventos hace falta <a href="login">ingresar</a>.',
+                    '<strong>Read-only mode.</strong> The results, charts and deliverables are all '
+                    + 'here. To run the pipeline, change branches or classify events you need to '
+                    + '<a href="login">sign in</a>.');
     tarjeta.parentElement.insertBefore(p, tarjeta);
   }
 }
@@ -504,7 +552,8 @@ function modoLectura() {
 async function nombrarSeleccion() {
   const n = nodoDe(S.sel);
   if (!n) return;
-  const nombre = prompt('Nombre para esta rama (vacío lo saca):', n.etiqueta || '');
+  const nombre = prompt(T('Nombre para esta rama (vacío lo saca):', 'Name for this branch (empty removes it):'),
+                        n.etiqueta || '');
   if (nombre === null) return;
   await api(`api/nodo/${S.sel}/etiqueta`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -517,8 +566,10 @@ async function borrarSeleccion() {
   const n = nodoDe(S.sel);
   const cuantos = 1 + S.nodos.filter((x) => cadenaDe(x.clave).some((y) => y.clave === S.sel)
                                             && x.clave !== S.sel).length;
-  if (!confirm(`Se borran ${cuantos} paso(s) desde acá en adelante, con sus resultados en disco.\n` +
-               `¿Seguir?`)) return;
+  if (!confirm(T(`Se borran ${cuantos} paso(s) desde acá en adelante, con sus resultados en disco.\n` +
+                 `¿Seguir?`,
+                 `${cuantos} step(s) from here onward will be deleted, with their results on disk.\n` +
+                 `Continue?`))) return;
 
   let r = await borrar(S.sel, false);
 
@@ -542,23 +593,30 @@ async function borrarSeleccion() {
     const partes = [];
     if (docs.length) {
       partes.push(
-        `${docs.length} documento(s) con comentarios del experto:\n` +
-        docs.map((d) => `  · ${d.nombre} (v${d.version}, por ${d.ultimo_autor || 'el experto'})`)
+        T(`${docs.length} documento(s) con comentarios del experto:\n`,
+          `${docs.length} document(s) with expert comments:\n`) +
+        docs.map((d) => T(`  · ${d.nombre} (v${d.version}, por ${d.ultimo_autor || 'el experto'})`,
+                          `  · ${d.nombre} (v${d.version}, by ${d.ultimo_autor || 'the expert'})`))
           .join('\n'));
     }
     if (clas) {
-      partes.push(`${clas} clasificación(es) de eventos.` +
+      partes.push(T(`${clas} clasificación(es) de eventos.`, `${clas} event classification(s).`) +
         (S.usuario && S.usuario.rol === 'admin'
-          ? `\n  Si querés verlas antes de decidir, están en el Catálogo.` : ''));
+          ? T(`\n  Si querés verlas antes de decidir, están en el Catálogo.`,
+              `\n  If you want to see them before deciding, they are in the Catalog.`) : ''));
     }
-    const seguir = confirm(
+    const seguir = confirm(T(
       `Esta rama tiene trabajo que NO SE PUEDE RECALCULAR ni recuperar después:\n\n` +
       `${partes.join('\n\n')}\n\n` +
       `Todo eso se borra junto con la rama. Los pasos se pueden volver a correr; esto no.\n\n` +
-      `¿Borrar igual?`);
+      `¿Borrar igual?`,
+      `This branch has work that CANNOT BE RECOMPUTED or recovered afterwards:\n\n` +
+      `${partes.join('\n\n')}\n\n` +
+      `All of it is deleted along with the branch. The steps can be run again; this cannot.\n\n` +
+      `Delete anyway?`));
     if (!seguir) return;
     r = await borrar(S.sel, true);
-    if (r.bloqueado) { alert('No se pudo borrar.'); return; }
+    if (r.bloqueado) { alert(T('No se pudo borrar.', 'Could not delete.')); return; }
   }
 
   S.sel = n.padre;
@@ -567,11 +625,14 @@ async function borrarSeleccion() {
   // Y al terminar, qué se llevó de trabajo humano. Se dice aunque sea cero: lo que se acaba de
   // perder no debería quedar solo en el diálogo que ya se cerró.
   const extra = [
-    r.documentos_borrados ? `${r.documentos_borrados} documento(s) del experto` : '',
-    r.clasificaciones_borradas ? `${r.clasificaciones_borradas} clasificación(es)` : '',
-  ].filter(Boolean).map((t) => ` · ${t} borradas`).join('');
+    r.documentos_borrados ? T(`${r.documentos_borrados} documento(s) del experto`,
+                              `${r.documentos_borrados} expert document(s)`) : '',
+    r.clasificaciones_borradas ? T(`${r.clasificaciones_borradas} clasificación(es)`,
+                                   `${r.clasificaciones_borradas} classification(s)`) : '',
+  ].filter(Boolean).map((t) => T(` · ${t} borradas`, ` · ${t} deleted`)).join('');
   $('#estado-ejecucion').textContent =
-    `Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados${extra}`;
+    T(`Borrados ${r.borrados} pasos · ${(r.bytes_liberados / 1e6).toFixed(1)} MB liberados${extra}`,
+      `Deleted ${r.borrados} steps · ${(r.bytes_liberados / 1e6).toFixed(1)} MB freed${extra}`);
 }
 
 /** DELETE de un nodo, distinguiendo el 409 del guardia de cualquier otro error. */
@@ -603,14 +664,14 @@ function pintarForm() {
   const { etapa, padre, modo } = S.form;
   const def = S.defs.find((d) => d.nombre === etapa);
   const i = S.cadena.indexOf(etapa);
-  $('#form-titulo').textContent = `Paso ${i + 1}: ${def.titulo}`;
+  $('#form-titulo').textContent = `${T('Paso', 'Step')} ${i + 1}: ${def.titulo}`;
   $('#form-desc').innerHTML = escalonado(def.resumen || def.descripcion, def.descripcion);
   activarEscalonados($('#form-desc'));
 
   const modos = {
-    nueva: ['chip pendiente', 'arranca una rama desde cero'],
-    seguir: ['chip corriendo', 'continúa la rama actual'],
-    rama: ['chip oficial', 'si cambiás algo, se abre una rama nueva'],
+    nueva: ['chip pendiente', T('arranca una rama desde cero', 'starts a branch from scratch')],
+    seguir: ['chip corriendo', T('continúa la rama actual', 'continues the current branch')],
+    rama: ['chip oficial', T('si cambiás algo, se abre una rama nueva', 'if you change anything, a new branch opens')],
   }[modo];
   $('#form-modo').className = modos[0];
   $('#form-modo').textContent = modos[1];
@@ -666,14 +727,14 @@ const ejecutarForm = () => lanzar(S.form.etapa, S.form.padre, leerForm());
 // ============================================================================ ejecución
 async function lanzar(etapa, padre, parametros) {
   $('#btn-ejecutar').disabled = true;
-  $('#estado-ejecucion').textContent = 'Encolando…';
+  $('#estado-ejecucion').textContent = T('Encolando…', 'Queuing…');
   try {
     const r = await api('api/ejecutar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ etapa, padre, parametros }),
     });
     if (r.reutilizado) {
-      $('#estado-ejecucion').textContent = '✓ Ya estaba calculado — se reutilizó';
+      $('#estado-ejecucion').textContent = T('✓ Ya estaba calculado — se reutilizó', '✓ Already computed — reused');
       S.sel = r.clave; S.form = null;
       await recargar(); cargarVisual();
       $('#btn-ejecutar').disabled = false;
@@ -693,7 +754,7 @@ function sondear(clave) {
     const t0 = Date.now();
     S.sondeo = setInterval(async () => {
       const n = await api(`api/nodo/${clave}`);
-      $('#estado-ejecucion').textContent = `${n.estado}… ${((Date.now() - t0) / 1000).toFixed(0)}s`;
+      $('#estado-ejecucion').textContent = `${ESTADO_NODO[n.estado] || n.estado}… ${((Date.now() - t0) / 1000).toFixed(0)}s`;
       S.sel = clave;
       await recargar();
       if (n.estado !== 'listo' && n.estado !== 'error') return;
@@ -702,10 +763,10 @@ function sondear(clave) {
       S.form = null;
       await recargar();
       if (n.estado === 'error') {
-        $('#estado-ejecucion').innerHTML = '<span style="color:var(--peligro)">Falló</span>';
+        $('#estado-ejecucion').innerHTML = `<span style="color:var(--peligro)">${T('Falló', 'Failed')}</span>`;
         return mal(new Error('falló'));
       }
-      $('#estado-ejecucion').textContent = `✓ Listo en ${n.duracion_s}s`;
+      $('#estado-ejecucion').textContent = T(`✓ Listo en ${n.duracion_s}s`, `✓ Done in ${n.duracion_s}s`);
       cargarVisual(); ok(clave);
     }, 800);
   });
@@ -720,10 +781,10 @@ async function correrOficial() {
       const def = S.defs.find((d) => d.nombre === etapa);
       const params = { ...Object.fromEntries(def.parametros.map((p) => [p.nombre, p.defecto])),
                        ...(S.oficial[etapa] || {}) };
-      $('#estado-ejecucion').textContent = `Ejecutando ${etapa}…`;
+      $('#estado-ejecucion').textContent = T(`Ejecutando ${def.titulo}…`, `Running ${def.titulo}…`);
       padre = await lanzar(etapa, padre, params);
     }
-    $('#estado-ejecucion').textContent = '✓ Configuración de la tesis completa';
+    $('#estado-ejecucion').textContent = T('✓ Configuración de la tesis completa', '✓ Thesis configuration complete');
   } catch { /* ya se muestra */ }
   $('#btn-oficial').disabled = false;
 }
@@ -746,7 +807,7 @@ const hayComparables = () => S.nodos.some((n) => comparable(n.clave));
 /** Valor legible de una métrica del resumen (los objetos se resuelven aparte). */
 function valorMetrica(v) {
   if (Array.isArray(v)) return v.length;
-  if (v === true) return 'sí';
+  if (v === true) return T('sí', 'yes');
   if (v === false) return 'no';
   return v;
 }
@@ -784,7 +845,7 @@ function pintarComparacion() {
       const v = (a.resumen || {})[k];
       return typeof v !== 'object' || Array.isArray(v);
     });
-  const metricas = claves.map((k) => filaComp(k, (a.resumen || {})[k], (b.resumen || {})[k])).join('');
+  const metricas = claves.map((k) => filaComp(rotuloResumen(k), (a.resumen || {})[k], (b.resumen || {})[k])).join('');
 
   // Distribución por prioridad: la comparación más útil de la última etapa. Cuántos eventos tienen
   // el acuerdo de 5, 4, 3… métodos es justamente lo que decide si una configuración sirve.
@@ -792,26 +853,26 @@ function pintarComparacion() {
   let prioridad = '';
   if (pa && pb) {
     const ks = [...new Set([...Object.keys(pa), ...Object.keys(pb)])].sort((x, y) => y - x);
-    prioridad = `<h4>Eventos por cantidad de métodos que coinciden</h4>
-      <table class="comp"><thead><tr><th>métodos</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th></th></tr></thead>
+    prioridad = `<h4>${T('Eventos por cantidad de métodos que coinciden', 'Events by number of agreeing methods')}</h4>
+      <table class="comp"><thead><tr><th>${T('métodos', 'methods')}</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th></th></tr></thead>
       <tbody>${ks.map((k) => filaComp(`${k}/5`, pa[k] || 0, pb[k] || 0)).join('')}</tbody></table>`;
   }
 
   cont.innerHTML = `
     <div class="fila-sup">
-      <h3 style="font-size:1rem">Comparando dos ${def.titulo.toLowerCase()}</h3>
+      <h3 style="font-size:1rem">${T(`Comparando dos ${def.titulo.toLowerCase()}`,
+                                       `Comparing two runs of «${def.titulo}»`)}</h3>
       <span class="esp"></span>
-      <button class="boton" id="c-salir" style="padding:5px 11px;font-size:.8rem">Salir de la comparación</button>
+      <button class="boton" id="c-salir" style="padding:5px 11px;font-size:.8rem">${T('Salir de la comparación', 'Leave the comparison')}</button>
     </div>
-    <p class="tenue" style="font-size:.84rem">Se resaltan sólo las filas que cambian. Todo lo demás
-    es idéntico en las dos ramas, que es lo que hace que la diferencia sea atribuible.</p>
-
-    <h4>Configuración</h4>
-    <table class="comp"><thead><tr><th>parámetro</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th></th></tr></thead>
+    <p class="tenue" style="font-size:.84rem">${T(`Se resaltan sólo las filas que cambian. Todo lo demás
+    es idéntico en las dos ramas, que es lo que hace que la diferencia sea atribuible.`, `Only the rows that change are
+    highlighted. Everything else is identical in both branches, which is what makes the difference attributable.`)}</p>
+    <h4>${T('Configuración', 'Configuration')}</h4>
+    <table class="comp"><thead><tr><th>${T('parámetro', 'parameter')}</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th></th></tr></thead>
       <tbody>${params}</tbody></table>
-
-    <h4>Resultado</h4>
-    <table class="comp"><thead><tr><th>métrica</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th>dif.</th></tr></thead>
+    <h4>${T('Resultado', 'Result')}</h4>
+    <table class="comp"><thead><tr><th>${T('métrica', 'metric')}</th><th>${etiqueta(a)}</th><th>${etiqueta(b)}</th><th>${T('dif.', 'diff.')}</th></tr></thead>
       <tbody>${metricas}</tbody></table>
 
     ${prioridad}`;
@@ -831,7 +892,7 @@ function pintarPestanas(analizable) {
     return;
   }
   cont.hidden = false;
-  const tabs = [['paso', 'Este paso'], ['analisis', 'Análisis de la rama']];
+  const tabs = [['paso', T('Este paso', 'This step')], ['analisis', T('Análisis de la rama', 'Branch analysis')]];
   cont.innerHTML = tabs.map(([id, t]) =>
     `<button role="tab" data-vista="${id}" aria-selected="${S.vista === id}">${t}</button>`).join('');
   cont.querySelectorAll('button').forEach((b) =>
@@ -860,7 +921,7 @@ async function cargarVisual() {
   // hacia arriba. Reservar la altura mantiene el largo del documento hasta que entra el contenido
   // nuevo, así el lector no pierde dónde estaba leyendo.
   vis.style.minHeight = `${Math.round(vis.getBoundingClientRect().height)}px`;
-  vis.innerHTML = '<p class="tenue" style="font-size:.85rem">Cargando datos…</p>';
+  vis.innerHTML = `<p class="tenue" style="font-size:.85rem">${T('Cargando datos…', 'Loading data…')}</p>`;
   try {
     if (S.vista === 'analisis') {
       const url = `api/nodo/${n.clave}/analisis` + (S.detector ? `?detector=${encodeURIComponent(S.detector)}` : '');
@@ -877,7 +938,7 @@ async function cargarVisual() {
     ({ serie: verSerie, ventanas: verVentanas, features: verFeatures, filtrado: verFiltrado,
        scores: verScores, eventos: verEventos }[d.tipo] || (() => {}))(d);
   } catch (e) {
-    vis.innerHTML = `<p class="tenue" style="font-size:.85rem">Sin vista para este paso (${e.message})</p>`;
+    vis.innerHTML = `<p class="tenue" style="font-size:.85rem">${T('Sin vista para este paso', 'No view for this step')} (${e.message})</p>`;
   } finally {
     // Se libera recién cuando el contenido nuevo ya midió, y en `finally` porque la rama de
     // análisis sale con un `return` temprano.
@@ -886,79 +947,93 @@ async function cargarVisual() {
 }
 
 function verSerie(d) {
-  $('#fase-visual').innerHTML = `<div class="fila-sup"><h4 style="font-size:.92rem">Telemetría de una hoja</h4>
+  $('#fase-visual').innerHTML = `<div class="fila-sup"><h4 style="font-size:.92rem">${T('Telemetría de una hoja', 'Telemetry of one sheet')}</h4>
     <span class="esp"></span><select id="sel-hoja">${d.hojas.map((h) =>
       `<option ${h === d.hoja ? 'selected' : ''}>${h}</option>`).join('')}</select></div>
     <div id="caja-serie"></div>
-    ${pista('Un panel por señal, con su escala y su unidad. El eje horizontal es común a los tres.',
-      'Las tres señales tienen unidades distintas —volts, miliamperios, grados—, así que superponerlas ' +
-      'obliga a escalar cada una a su propio rango y las alturas dejan de significar algo. En paneles ' +
-      'separados se comparan las formas y además se lee el valor.')}
-    <h4 style="font-size:.88rem;margin:18px 0 6px">Mediciones por hoja</h4><div id="caja-hojas"></div>`;
+    ${pista(T('Un panel por señal, con su escala y su unidad. El eje horizontal es común a los tres.',
+              'One panel per signal, with its own scale and unit. The horizontal axis is shared by all three.'),
+      T('Las tres señales tienen unidades distintas —volts, miliamperios, grados—, así que superponerlas ' +
+        'obliga a escalar cada una a su propio rango y las alturas dejan de significar algo. En paneles ' +
+        'separados se comparan las formas y además se lee el valor.',
+        'The three signals have different units —volts, milliamps, degrees—, so overlaying them forces ' +
+        'each one onto its own range and the heights stop meaning anything. In separate panels you compare ' +
+        'the shapes and can also read the value.'))}
+    <h4 style="font-size:.88rem;margin:18px 0 6px">${T('Mediciones por hoja', 'Measurements per sheet')}</h4><div id="caja-hojas"></div>`;
   const dibujar = (dd) => {
     const caja = $('#caja-serie');
     Grafico.limpiar(caja);
     caja.innerHTML = '';
     Grafico.lineas(caja, {
-      titulo: `${dd.hoja} · ${dd.valores.length} mediciones`,
+      titulo: T(`${dd.hoja} · ${dd.valores.length} mediciones`, `${dd.hoja} · ${dd.valores.length} measurements`),
       paneles: dd.senales.map((s, i) => ({ nombre: s, valores: dd.valores.map((f) => f[i]) })),
-      xNombre: 'medición',
-      sustantivo: 'mediciones',
+      xNombre: T('medición', 'measurement'),
+      sustantivo: T('mediciones', 'measurements'),
     });
   };
   dibujar(d);
   Grafico.barras($('#caja-hojas'), {
     datos: Object.entries(d.por_hoja).map(([etiqueta, valor]) => ({ etiqueta, valor })),
-    nota: 'Las 20 hojas con más mediciones.',
+    nota: T('Las 20 hojas con más mediciones.', 'The 20 sheets with the most measurements.'),
   });
   $('#sel-hoja').addEventListener('change', async (e) =>
     dibujar(await api(`api/nodo/${S.sel}/datos?hoja=${encodeURIComponent(e.target.value)}`)));
 }
 
 function verVentanas(d) {
-  $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo quedó un tramo</h4>
-    ${pista(`Cuatro tramos de ${d.tamano} mediciones (~${Math.round(d.tamano * S.muestreo / 60)} min), ` +
-      'tomados de distintas partes del registro.',
-      'Una falla no es un valor suelto sino un comportamiento a lo largo del tiempo, así que la unidad ' +
-      'de análisis no es la fila sino el tramo. Cada uno de estos es lo que los detectores van a puntuar.')}
+  $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">${T('Cómo quedó un tramo', 'What a window looks like')}</h4>
+    ${pista(T(`Cuatro tramos de ${d.tamano} mediciones (~${Math.round(d.tamano * S.muestreo / 60)} min), ` +
+        'tomados de distintas partes del registro.',
+        `Four windows of ${d.tamano} measurements (~${Math.round(d.tamano * S.muestreo / 60)} min), ` +
+        'taken from different parts of the record.'),
+      T('Una falla no es un valor suelto sino un comportamiento a lo largo del tiempo, así que la unidad ' +
+        'de análisis no es la fila sino el tramo. Cada uno de estos es lo que los detectores van a puntuar.',
+        'A fault is not a single value but a behavior over time, so the unit of analysis is not the row ' +
+        'but the window. Each of these is what the detectors will score.'))}
     <div class="mini" id="caja-mini"></div>
-    <h4 style="font-size:.88rem;margin:18px 0 6px">Tramos por hoja</h4><div id="caja-hojas"></div>`;
+    <h4 style="font-size:.88rem;margin:18px 0 6px">${T('Tramos por hoja', 'Windows per sheet')}</h4><div id="caja-hojas"></div>`;
   d.ejemplos.forEach((ej) => {
     const caja = document.createElement('div');
     caja.className = 'caja';
     const t = document.createElement('h5');
-    t.textContent = `${ej.hoja} · desde la medición ${ej.inicio}`;
+    t.textContent = T(`${ej.hoja} · desde la medición ${ej.inicio}`, `${ej.hoja} · from measurement ${ej.inicio}`);
     caja.appendChild(t);
     $('#caja-mini').appendChild(caja);
     Grafico.lineas(caja, {
       compacto: true,
       altoPanel: 52,
-      titulo: `${ej.hoja} · desde la medición ${ej.inicio}`,
-      xNombre: 'posición',
-      sustantivo: 'mediciones del tramo',
+      titulo: T(`${ej.hoja} · desde la medición ${ej.inicio}`, `${ej.hoja} · from measurement ${ej.inicio}`),
+      xNombre: T('posición', 'position'),
+      sustantivo: T('mediciones del tramo', 'measurements in the window'),
       paneles: d.senales.map((s, i) => ({ nombre: s, valores: ej.valores.map((f) => f[i]) })),
     });
   });
   Grafico.barras($('#caja-hojas'), {
     datos: Object.entries(d.por_hoja).map(([etiqueta, valor]) => ({ etiqueta, valor })),
-    nota: 'Las 20 hojas con más tramos.',
+    nota: T('Las 20 hojas con más tramos.', 'The 20 sheets with the most windows.'),
   });
 }
 
 function verFeatures(d) {
-  $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem">Lo que se calculó para cada tramo
-    (${d.total} números)</h4>
-    <p class="tenue" style="font-size:.8rem">Las mismas ${Object.values(d.por_senal)[0]?.length ?? 0}
-    medidas se calculan por separado para cada una de las tres señales.</p>
+  const nMedidas = Object.values(d.por_senal)[0]?.length ?? 0;
+  $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem">${T(`Lo que se calculó para cada tramo
+    (${d.total} números)`, `What was computed for each window (${d.total} numbers)`)}</h4>
+    <p class="tenue" style="font-size:.8rem">${T(`Las mismas ${nMedidas}
+    medidas se calculan por separado para cada una de las tres señales.`,
+    `The same ${nMedidas} measures are computed separately for each of the three signals.`)}</p>
     ${Object.entries(d.por_senal).map(([senal, fs]) => `
       <div style="margin-top:12px"><div class="mono tenue" style="font-size:.8rem;margin-bottom:6px">
         ${senal} <span style="color:var(--acento-2)">${fs.length}</span></div>
       <div class="pildoras">${fs.map((f) => `<span class="pildora">${f}</span>`).join('')}</div></div>`).join('')}
-    <h4 style="font-size:.88rem;margin:20px 0 4px">Y cómo se reparten esos números</h4>
-    ${pista('Las de <b>cola larga</b> son las que sirven para encontrar tramos raros.',
-      'Cada caja abarca la mitad central de los tramos y la línea de adentro es la mediana. El eje va ' +
-      'en desvíos estándar porque en sus unidades originales no se pueden poner juntas: una está en ' +
-      'volts, otra en miliamperios y otra es una energía de seis cifras.')}
+    <h4 style="font-size:.88rem;margin:20px 0 4px">${T('Y cómo se reparten esos números', 'And how those numbers are spread')}</h4>
+    ${pista(T('Las de <b>cola larga</b> son las que sirven para encontrar tramos raros.',
+              'The <b>long-tailed</b> ones are the ones that help find unusual windows.'),
+      T('Cada caja abarca la mitad central de los tramos y la línea de adentro es la mediana. El eje va ' +
+        'en desvíos estándar porque en sus unidades originales no se pueden poner juntas: una está en ' +
+        'volts, otra en miliamperios y otra es una energía de seis cifras.',
+        'Each box spans the middle half of the windows and the line inside is the median. The axis is in ' +
+        'standard deviations because in their original units they cannot be put together: one is in volts, ' +
+        'another in milliamps and another is a six-figure energy.'))}
     <div id="caja-feats"></div>`;
   cajasDeFeatures($('#caja-feats'), d.cajas);
 }
@@ -970,7 +1045,7 @@ function cajasDeFeatures(destino, cajas) {
   const corto = (n) => n.replace('__', ' · ');
   const alto = cajas.length * 15 + 70;
   Grafico.medida(destino, {
-    titulo: 'Distribución de cada característica',
+    titulo: T('Distribución de cada característica', 'Distribution of each feature'),
     alto,
     opcion: (c) => ({
       animation: false,
@@ -981,11 +1056,13 @@ function cajasDeFeatures(destino, cajas) {
         formatter: (p) => {
           const k = cajas[p.dataIndex];
           return `<b>${corto(k.nombre)}</b><br>` +
-            `<span style="color:${c.tenue}">mediana ${k.caja[2]} · cuartiles ${k.caja[1]} a ${k.caja[3]}` +
-            `<br>${k.atipicos} tramos fuera de los bigotes</span>`;
+            `<span style="color:${c.tenue}">` + T(
+              `mediana ${k.caja[2]} · cuartiles ${k.caja[1]} a ${k.caja[3]}<br>${k.atipicos} tramos fuera de los bigotes`,
+              `median ${k.caja[2]} · quartiles ${k.caja[1]} to ${k.caja[3]}<br>${k.atipicos} windows outside the whiskers`) +
+            '</span>';
         },
       }),
-      xAxis: Object.assign({}, c.eje, { type: 'value', name: 'desvíos estándar',
+      xAxis: Object.assign({}, c.eje, { type: 'value', name: T('desvíos estándar', 'standard deviations'),
         nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: c.tenue } }),
       yAxis: Object.assign({}, c.eje, { type: 'category', data: cajas.map((k) => corto(k.nombre)),
         inverse: true, axisTick: { show: false }, splitLine: { show: false },
@@ -1002,36 +1079,55 @@ function cajasDeFeatures(destino, cajas) {
         })),
       }],
     }),
-    pie: `${cajas.length} características, una por fila y coloreadas por señal (` +
-         senales.map((sn, i) => `${sn}`).join(' · ') +
-         '). Los bigotes llegan hasta 1,5 veces el rango intercuartílico; lo que queda afuera son ' +
-         'los tramos extremos, que es justamente lo que se busca.',
+    pie: T(`${cajas.length} características, una por fila y coloreadas por señal (` +
+           senales.map((sn, i) => `${sn}`).join(' · ') +
+           '). Los bigotes llegan hasta 1,5 veces el rango intercuartílico; lo que queda afuera son ' +
+           'los tramos extremos, que es justamente lo que se busca.',
+           `${cajas.length} features, one per row and colored by signal (` +
+           senales.map((sn, i) => `${sn}`).join(' · ') +
+           '). The whiskers reach 1.5 times the interquartile range; what lies outside are the ' +
+           'extreme windows, which is exactly what is being looked for.'),
   });
 }
 
 function verFiltrado(d) {
   const cuenta = (m) => d.motivo.filter((x) => x === m).length;
   $('#fase-visual').innerHTML = `<div class="resumen-grid" style="margin-top:0">
-      <div class="celda"><div class="v">${cuenta('poca variación')}</div><div class="r">se van por poca variación</div></div>
-      <div class="celda"><div class="v">${cuenta('repite a otra')}</div><div class="r">se van por repetir a otra</div></div>
+      <div class="celda"><div class="v">${cuenta('poca variación')}</div><div class="r">${T('se van por poca variación', 'dropped for low variation')}</div></div>
+      <div class="celda"><div class="v">${cuenta('repite a otra')}</div><div class="r">${T('se van por repetir a otra', 'dropped for repeating another')}</div></div>
     </div>
-    <h4 style="font-size:.88rem;margin:20px 0 4px">Por qué se cae cada una</h4>
-    ${pista(`A la izquierda de la línea punteada, lo que se descarta por moverse poco (percentil ${d.percentil}).`,
-      'El filtro mira el rango intercuartílico: cuánto se mueve la característica entre el tramo típico ' +
-      'bajo y el típico alto. Las que casi no se mueven no distinguen un tramo de otro. Los dos filtros ' +
-      'van en cadena, así que lo que se cae acá ni siquiera llega a compararse con las demás.')}
+    <h4 style="font-size:.88rem;margin:20px 0 4px">${T('Por qué se cae cada una', 'Why each one is dropped')}</h4>
+    ${pista(T(`A la izquierda de la línea punteada, lo que se descarta por moverse poco (percentil ${d.percentil}).`,
+              `Left of the dashed line, what is discarded for moving too little (percentile ${d.percentil}).`),
+      T('El filtro mira el rango intercuartílico: cuánto se mueve la característica entre el tramo típico ' +
+        'bajo y el típico alto. Las que casi no se mueven no distinguen un tramo de otro. Los dos filtros ' +
+        'van en cadena, así que lo que se cae acá ni siquiera llega a compararse con las demás.',
+        'The filter looks at the interquartile range: how much the feature moves between the typical low ' +
+        'window and the typical high one. Those that barely move do not tell one window from another. The two ' +
+        'filters are chained, so what is dropped here never even gets compared with the others.'))}
     <div id="caja-iqr"></div>
-    <h4 style="font-size:.88rem;margin:22px 0 4px">Y cuáles repiten a otra</h4>
-    ${pista('Los <b>bloques intensos fuera de la diagonal</b> son familias que repiten información: ' +
-      'de cada una sobrevive una.',
-      `Cada celda es cuánto se mueven juntas dos características. Con correlación ${d.umbral_correlacion} ` +
-      'o más se considera que dicen lo mismo. Los rótulos en negrita son las conservadas.')}
+    <h4 style="font-size:.88rem;margin:22px 0 4px">${T('Y cuáles repiten a otra', 'And which ones repeat another')}</h4>
+    ${pista(T('Los <b>bloques intensos fuera de la diagonal</b> son familias que repiten información: ' +
+              'de cada una sobrevive una.',
+              'The <b>intense blocks off the diagonal</b> are families that repeat information: ' +
+              'one of each survives.'),
+      T(`Cada celda es cuánto se mueven juntas dos características. Con correlación ${d.umbral_correlacion} ` +
+        'o más se considera que dicen lo mismo. Los rótulos en negrita son las conservadas.',
+        `Each cell is how much two features move together. With correlation ${d.umbral_correlacion} ` +
+        'or more they are considered to say the same thing. The labels in bold are the ones kept.'))}
     <div id="caja-corr"></div>`;
   iqrDeFeatures($('#caja-iqr'), d);
   correlacionDeFeatures($('#caja-corr'), d);
 }
 
 const COLOR_MOTIVO = { 'conservada': 0, 'poca variación': 4, 'repite a otra': 2 };
+/** El motivo como se muestra. Las claves vienen así del backend y se comparan en el código, así
+ *  que no cambian: solo se traduce lo que se ve (leyenda y tooltip). */
+const TEXTO_MOTIVO = {
+  'conservada': T('conservada', 'kept'),
+  'poca variación': T('poca variación', 'low variation'),
+  'repite a otra': T('repite a otra', 'repeats another'),
+};
 
 /** Rango intercuartílico por característica, ordenado, con el corte real marcado. */
 function iqrDeFeatures(destino, d) {
@@ -1041,7 +1137,7 @@ function iqrDeFeatures(destino, d) {
   const nombres = orden.map((i) => corto(d.features[i]));
   const alto = orden.length * 15 + 98;   // +18 por la leyenda
   Grafico.medida(destino, {
-    titulo: 'Cuánto se mueve cada característica',
+    titulo: T('Cuánto se mueve cada característica', 'How much each feature moves'),
     alto,
     opcion: (c) => ({
       animation: false,
@@ -1053,12 +1149,12 @@ function iqrDeFeatures(destino, d) {
         // la fila del eje. Cada punto lleva su índice como segunda coordenada.
         formatter: (p) => {
           const i = orden[p.value[1]];
-          return `<b>${Grafico.paleta.fmt(d.iqr[i], 5)}</b> de rango intercuartílico<br>` +
-                 `<span style="color:${c.tenue}">${corto(d.features[i])} · ${d.motivo[i]}</span>`;
+          return `<b>${Grafico.paleta.fmt(d.iqr[i], 5)}</b> ${T('de rango intercuartílico', 'interquartile range')}<br>` +
+                 `<span style="color:${c.tenue}">${corto(d.features[i])} · ${TEXTO_MOTIVO[d.motivo[i]] || d.motivo[i]}</span>`;
         } }),
       // Escala logarítmica: los rangos van de milésimas a millones y en lineal se aplastan todos
       // contra el cero, que es donde justamente hay que mirar.
-      xAxis: Object.assign({}, c.eje, { type: 'log', name: 'rango intercuartílico (escala log)',
+      xAxis: Object.assign({}, c.eje, { type: 'log', name: T('rango intercuartílico (escala log)', 'interquartile range (log scale)'),
         nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: c.tenue } }),
       yAxis: Object.assign({}, c.eje, { type: 'category', data: nombres, inverse: true,
         axisTick: { show: false },
@@ -1081,7 +1177,7 @@ function iqrDeFeatures(destino, d) {
       legend: { top: 0, right: 0, textStyle: { color: c.tenue, fontSize: 10 },
                 icon: 'circle', itemHeight: 8, itemGap: 14 },
       series: Object.keys(COLOR_MOTIVO).map((motivo) => ({
-        name: motivo,
+        name: TEXTO_MOTIVO[motivo],
         type: 'scatter', symbolSize: 9,
         itemStyle: { color: Grafico.paleta.serie(COLOR_MOTIVO[motivo]) },
         // `[valor, índice]` y no solo el valor: al partir en tres series cada una
@@ -1095,7 +1191,7 @@ function iqrDeFeatures(destino, d) {
           // el «final» de la línea es el pie y ahí la etiqueta se encima con el
           // nombre del eje. Con `start` sube al tope. Probé `end` primero y la
           // captura lo desmintió — es el tipo de cosa que no se deduce leyendo.
-          label: { formatter: `corte · percentil ${d.percentil}`, color: c.tenue, fontSize: 10,
+          label: { formatter: T(`corte · percentil ${d.percentil}`, `cutoff · percentile ${d.percentil}`), color: c.tenue, fontSize: 10,
                    position: 'start', distance: 5 },
           lineStyle: { color: c.tenue, type: 'dashed' },
           data: [{ xAxis: d.corte_percentil }],
@@ -1118,7 +1214,7 @@ function correlacionDeFeatures(destino, d) {
       textStyle: c.textStyle,
       grid: { left: 200, right: 18, top: 34, bottom: 12 },
       tooltip: Object.assign({}, c.tooltip, {
-        formatter: (p) => `<b>${Grafico.paleta.fmt(p.data[2], 2)}</b> de correlación<br>` +
+        formatter: (p) => `<b>${Grafico.paleta.fmt(p.data[2], 2)}</b> ${T('de correlación', 'correlation')}<br>` +
           `<span style="color:${c.tenue}">${corto(f[p.data[1]])}<br>${corto(f[p.data[0]])}</span>`,
       }),
       // Divergente: dos matices con un neutro en el cero, porque la correlación
@@ -1145,11 +1241,14 @@ function correlacionDeFeatures(destino, d) {
 }
 
 function verScores(d) {
-  $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">Cómo se reparten los puntajes</h4>
-    ${pista('Los puntajes <b>no se comparan entre métodos</b>: cada uno tiene su escala.',
-      'Cada método ordena los tramos del menos al más raro según su propia idea de «raro». Cómo los ' +
-      'reparte cada uno, y dónde cae el corte de candidatos, está en la pestaña Análisis de la rama.')}
-    <h4 style="font-size:.88rem;margin:18px 0 8px">Los tramos más extremos según cada método</h4>
+  $('#fase-visual').innerHTML = `<h4 style="font-size:.92rem;margin:0 0 4px">${T('Cómo se reparten los puntajes', 'How the scores are spread')}</h4>
+    ${pista(T('Los puntajes <b>no se comparan entre métodos</b>: cada uno tiene su escala.',
+              'Scores <b>are not compared across methods</b>: each has its own scale.'),
+      T('Cada método ordena los tramos del menos al más raro según su propia idea de «raro». Cómo los ' +
+        'reparte cada uno, y dónde cae el corte de candidatos, está en la pestaña Análisis de la rama.',
+        'Each method ranks the windows from least to most unusual by its own idea of «unusual». How each one ' +
+        'spreads them, and where the candidate cutoff falls, is in the Branch analysis tab.'))}
+    <h4 style="font-size:.88rem;margin:18px 0 8px">${T('Los tramos más extremos según cada método', 'The most extreme windows according to each method')}</h4>
     <div class="mini">${d.detectores.map((det, i) => `
       <div class="caja"><h5 style="color:var(--serie-${(i % 5) + 1})">${det}</h5>
       <table style="font-size:.76rem"><tbody>${d.top[det].slice(0, 6).map((t) =>
@@ -1316,8 +1415,9 @@ function cabeceraOrdenable(campo, rotulo) {
   return `<th data-campo="${campo}" class="ordenable${num}${activa ? ' ordenando' : ''}"
     aria-sort="${activa ? (asc ? 'ascending' : 'descending') : 'none'}">
     <button type="button" title="${activa
-      ? `Ordenado por ${rotulo}, ${asc ? 'de menor a mayor' : 'de mayor a menor'}. Volvé a tocar para invertir.`
-      : `Ordenar por ${rotulo}`}">${rotulo}<span class="flecha" aria-hidden="true">${
+      ? T(`Ordenado por ${rotulo}, ${asc ? 'de menor a mayor' : 'de mayor a menor'}. Volvé a tocar para invertir.`,
+          `Sorted by ${rotulo}, ${asc ? 'ascending' : 'descending'}. Click again to reverse.`)
+      : T(`Ordenar por ${rotulo}`, `Sort by ${rotulo}`)}">${rotulo}<span class="flecha" aria-hidden="true">${
       activa ? (asc ? '▲' : '▼') : ''}</span></button></th>`;
 }
 
@@ -1329,39 +1429,45 @@ function verEventos(d) {
   for (const p of (d.pistas || [])) if (p.fecha) FECHAS.set(p.hoja, p.fecha);
 
   const filas = [...d.filas].sort(comparadorDeTabla());
-  const rot = { n_detectores: 'métodos', n_ventanas: 'tramos', SheetName: 'hoja', event_id: 'id',
-                start: 'desde', end: 'hasta', features_top: 'qué se desvió' };
+  const rot = { n_detectores: T('métodos', 'methods'), n_ventanas: T('tramos', 'windows'),
+                SheetName: T('hoja', 'sheet'), event_id: 'id', start: T('desde', 'from'),
+                end: T('hasta', 'to'), features_top: T('qué se desvió', 'what deviated') };
   $('#fase-visual').innerHTML = `
-    <div class="aviso info" style="font-size:.82rem;margin-bottom:12px">
+    <div class="aviso info" style="font-size:.82rem;margin-bottom:12px">${T(`
       <strong>Cómo leer «métodos».</strong> «4/5» quiere decir que cuatro de los cinco marcaron
       <em>al menos un tramo</em> dentro del evento — no que coincidieran en el mismo. Un evento largo
       tiene más chances de juntar métodos distintos. En «qué se desvió», el número está en desvíos
-      respecto de lo normal: +9 es muchísimo, +2 es notorio pero no extremo.</div>
+      respecto de lo normal: +9 es muchísimo, +2 es notorio pero no extremo.`, `
+      <strong>How to read «methods».</strong> «4/5» means four of the five flagged
+      <em>at least one window</em> inside the event — not that they agreed on the same one. A long event
+      has better odds of gathering different methods. In «what deviated», the number is in deviations
+      from normal: +9 is a lot, +2 is noticeable but not extreme.`)}</div>
     <div class="descargas">
       <div>
-        <h4 style="font-size:.92rem;margin:0 0 2px">Llevarse el entregable</h4>
-        <p class="pista" style="margin:0">Los mismos Excel del pipeline, con <b>la configuración de esta
-        rama</b>. Cada uno abre con una hoja que dice de dónde salió.</p>
+        <h4 style="font-size:.92rem;margin:0 0 2px">${T('Llevarse el entregable', 'Take the deliverable')}</h4>
+        <p class="pista" style="margin:0">${T(`Los mismos Excel del pipeline, con <b>la configuración de esta
+        rama</b>. Cada uno abre con una hoja que dice de dónde salió.`, `The same Excel files as the pipeline, with
+        <b>this branch's configuration</b>. Each one opens with a sheet saying where it came from.`)}</p>
       </div>
       <span class="esp"></span>
       <a class="boton" download href="api/nodo/${S.sel}/excel/experto"
-         title="Candidatos consolidados, con el porqué de cada evento">Para el experto</a>
+         title="${T('Candidatos consolidados, con el porqué de cada evento', 'Consolidated candidates, with the reason for each event')}">${T('Para el experto', 'For the expert')}</a>
       <a class="boton" download href="api/nodo/${S.sel}/excel/presentable"
-         title="Versión con formato, tiempo real y gráficos">Presentable</a>
+         title="${T('Versión con formato, tiempo real y gráficos', 'Formatted version, with real time and charts')}">${T('Presentable', 'Presentable')}</a>
       <a class="boton" download href="api/nodo/${S.sel}/excel/normales"
-         title="Ventanas normales, para contrastar contra las candidatas">Contraste normal</a>
+         title="${T('Ventanas normales, para contrastar contra las candidatas', 'Normal windows, to contrast with the candidates')}">${T('Contraste normal', 'Normal contrast')}</a>
     </div>
     <div id="caja-revision"></div>
-    <div class="fila-sup"><h4 style="font-size:.92rem">Eventos candidatos (${filas.length})</h4>
+    <div class="fila-sup"><h4 style="font-size:.92rem">${T('Eventos candidatos', 'Candidate events')} (${filas.length})</h4>
       <span class="esp"></span>
       <span class="tenue" style="font-size:.78rem" id="avance-clas"></span>
       <span class="tenue" style="font-size:.78rem">${S.usuario
-        ? 'clic en una fila = ver y clasificar'
-        : 'clic en una fila = ver las señales'}</span></div>
+        ? T('clic en una fila = ver y clasificar', 'click a row = view and classify')
+        : T('clic en una fila = ver las señales', 'click a row = view the signals')}</span></div>
     <div id="caja-linea" style="margin-bottom:18px"></div>
     <div class="tabla-scroll"><table><thead><tr>${cols.map((c) =>
       cabeceraOrdenable(c, rot[c] || c)).join('')}${
-      S.usuario ? cabeceraOrdenable('juicio', 'mi decisión') : ''}</tr></thead>
+      S.usuario ? cabeceraOrdenable('juicio', T('mi decisión', 'my decision')) : ''}</tr></thead>
     <tbody>${filas.map((f) => `<tr data-ev="${f.event_id}" style="cursor:pointer"${
       atributoTono(f.event_id)}>${cols.map((c) => {
       const v = f[c];
@@ -1419,15 +1525,15 @@ function marcaClasificacion(id) {
   // Las secciones van como agregado y no como un cuarto estado: no responden la pregunta del
   // evento entero, así que no cambian si está clasificado o no.
   const n = misSecciones(id).length;
-  const secc = n ? ` <span class="tenue" title="Secciones marcadas dentro del evento">· ${n} ${
-    n === 1 ? 'sección' : 'secciones'}</span>` : '';
+  const secc = n ? ` <span class="tenue" title="${T('Secciones marcadas dentro del evento', 'Sections marked inside the event')}">· ${n} ${
+    n === 1 ? T('sección', 'section') : T('secciones', 'sections')}</span>` : '';
   if (mia && mia.respuesta) {
-    return `<span class="marca-clas si" title="${mia.comentario ? 'Con comentario' : 'Sin comentario'}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>${secc}`;
+    return `<span class="marca-clas si" title="${mia.comentario ? T('Con comentario', 'With comment') : T('Sin comentario', 'No comment')}">${etiquetaEscala(mia.respuesta)}${mia.comentario ? ' ✎' : ''}</span>${secc}`;
   }
   if (mia && mia.comentario) {
-    return `<span class="marca-clas pendiente" title="Con una nota, sin decisión">sin clasificar ✎</span>${secc}`;
+    return `<span class="marca-clas pendiente" title="${T('Con una nota, sin decisión', 'With a note, no decision')}">${T('sin clasificar', 'unclassified')} ✎</span>${secc}`;
   }
-  return `<span class="marca-clas pendiente">sin clasificar</span>${secc}`;
+  return `<span class="marca-clas pendiente">${T('sin clasificar', 'unclassified')}</span>${secc}`;
 }
 
 /** «12 de 40 clasificados» arriba de la tabla: lo primero que hace falta al volver a una sesión. */
@@ -1440,8 +1546,8 @@ function pintarAvanceClasificacion(total) {
   const hechos = mias.filter((m) => m.respuesta).length;
   const notas = mias.length - hechos;
   const partes = [];
-  if (hechos) partes.push(`${hechos} de ${total} clasificados por vos`);
-  if (notas) partes.push(`${notas} con nota sin decidir`);
+  if (hechos) partes.push(T(`${hechos} de ${total} clasificados por vos`, `${hechos} of ${total} classified by you`));
+  if (notas) partes.push(T(`${notas} con nota sin decidir`, `${notas} with an undecided note`));
   caja.textContent = partes.length ? `${partes.join(' · ')} ·` : '';
 }
 
@@ -1479,9 +1585,9 @@ function refrescarMarca(id) {
  */
 //: Los tres entregables, con el nombre corto que ya usan los botones de descarga de arriba.
 const TIPOS_REVISION = [
-  ['experto', 'Para el experto'],
-  ['presentable', 'Presentable'],
-  ['normales', 'Contraste normal'],
+  ['experto', T('Para el experto', 'For the expert')],
+  ['presentable', T('Presentable', 'Presentable')],
+  ['normales', T('Contraste normal', 'Normal contrast')],
 ];
 
 async function bloqueDeRevision(clave) {
@@ -1511,17 +1617,19 @@ async function bloqueDeRevision(clave) {
   // Cada entregable dice en qué estado está, porque no es lo mismo uno sin abrir que uno ya
   // comentado: el segundo es trabajo que no se recalcula.
   const estado = (doc) => {
-    if (!doc) return 'sin abrir';
-    if (!doc.editado) return 'abierto, sin comentarios';
-    return `<span style="color:var(--acento-2)">v${doc.version}</span> · ${doc.ultimo_autor || 'el experto'}`;
+    if (!doc) return T('sin abrir', 'not opened');
+    if (!doc.editado) return T('abierto, sin comentarios', 'opened, no comments');
+    return `<span style="color:var(--acento-2)">v${doc.version}</span> · ${doc.ultimo_autor || T('el experto', 'the expert')}`;
   };
 
   caja.innerHTML = `
     <div class="descargas" style="margin-top:10px;align-items:flex-start">
       <div>
-        <h4 style="font-size:.92rem;margin:0 0 2px">Revisión del experto</h4>
-        <p class="pista" style="margin:0">Los mismos tres entregables, abiertos en el navegador para
-        comentarlos. Cada uno guarda su historial acá — <b>no se mandan por correo ni se duplican</b>.</p>
+        <h4 style="font-size:.92rem;margin:0 0 2px">${T('Revisión del experto', 'Expert review')}</h4>
+        <p class="pista" style="margin:0">${T(`Los mismos tres entregables, abiertos en el navegador para
+        comentarlos. Cada uno guarda su historial acá — <b>no se mandan por correo ni se duplican</b>.`,
+        `The same three deliverables, opened in the browser to comment on them. Each keeps its history
+        here — <b>they are not emailed or duplicated</b>.`)}</p>
       </div>
       <span class="esp"></span>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch">
@@ -1544,7 +1652,7 @@ async function abrirRevision(clave, tipo, boton) {
   const antes = boton.innerHTML;
   boton.disabled = true;
   // El presentable son 44 hojas con 80 gráficos: generarlo la primera vez no es instantáneo.
-  boton.innerHTML = '<span>Preparando…</span>';
+  boton.innerHTML = `<span>${T('Preparando…', 'Preparing…')}</span>`;
   try {
     const r = await fetch(`api/nodo/${encodeURIComponent(clave)}/revision/${tipo}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
@@ -1555,7 +1663,7 @@ async function abrirRevision(clave, tipo, boton) {
   } catch (e) {
     boton.disabled = false;
     boton.innerHTML = antes;
-    alert(`No se pudo abrir ese entregable.\n\n${e.message}`);
+    alert(T(`No se pudo abrir ese entregable.\n\n${e.message}`, `Could not open that deliverable.\n\n${e.message}`));
   }
 }
 
@@ -1649,7 +1757,7 @@ function lineaDeEventos(destino, d, filas) {
   const alto = renglones.length * 26 + 76;
 
   Grafico.medida(destino, {
-    titulo: 'Dónde cae cada evento',
+    titulo: T('Dónde cae cada evento', 'Where each event falls'),
     alto,
     /* El `event_id` va en la posición 4 del dato de la serie de eventos (ver `data` más abajo).
        La pista gris es la serie 0 y es `silent`, así que nunca llega acá. */
@@ -1749,12 +1857,13 @@ function lineaDeEventos(destino, d, filas) {
         grid: { left: 130, right: 26, top: 12, bottom: 46 },
         tooltip: Object.assign({}, c.tooltip, {
           formatter: (p) => (p.seriesIndex === 0 ? null
-            : `<b>Evento ${p.value[4]}</b> · ${p.value[3]} de 5 métodos<br>` +
-              `<span style="color:${c.tenue}">${renglones[p.value[0]].hoja} · mediciones ` +
+            : T(`<b>Evento ${p.value[4]}</b> · ${p.value[3]} de 5 métodos<br>`,
+                `<b>Event ${p.value[4]}</b> · ${p.value[3]} of 5 methods<br>`) +
+              `<span style="color:${c.tenue}">${renglones[p.value[0]].hoja} · ${T('mediciones', 'measurements')} ` +
               `${p.value[1]}–${p.value[2]}</span>`),
         }),
         xAxis: Object.assign({}, c.eje, { type: 'value', min: 0,
-          name: 'medición dentro de la hoja', nameLocation: 'middle', nameGap: 26,
+          name: T('medición dentro de la hoja', 'measurement within the sheet'), nameLocation: 'middle', nameGap: 26,
           nameTextStyle: { color: c.tenue } }),
         /* Las categorías van con una clave `hoja#carril` y NO con el rótulo: dos renglones de la
            misma hoja tendrían el mismo nombre —o los dos vacíos— y un eje de categorías las
@@ -1778,23 +1887,33 @@ function lineaDeEventos(destino, d, filas) {
         ],
       };
     },
-    pie: `${filas.length} eventos repartidos en ${usadas.length} hojas` +
-         (vacias ? `; las otras ${vacias} hojas no tienen ninguno.` : '.') +
-         (partidas ? ` ${partidas} ${partidas === 1 ? 'hoja ocupa' : 'hojas ocupan'} más de un` +
-           ' renglón: son eventos que se pisan y van en carriles separados para poder abrir cada' +
-           ' uno.' : '') +
-         ' Los renglones van en orden cronológico, del 28 de marzo de 2021 al 24 de enero de 2022.' +
-         ' Cuanto más intenso el bloque, más métodos coinciden.' +
+    pie: T(`${filas.length} eventos repartidos en ${usadas.length} hojas` +
+           (vacias ? `; las otras ${vacias} hojas no tienen ninguno.` : '.') +
+           (partidas ? ` ${partidas} ${partidas === 1 ? 'hoja ocupa' : 'hojas ocupan'} más de un` +
+             ' renglón: son eventos que se pisan y van en carriles separados para poder abrir cada' +
+             ' uno.' : '') +
+           ' Los renglones van en orden cronológico, del 28 de marzo de 2021 al 24 de enero de 2022.' +
+           ' Cuanto más intenso el bloque, más métodos coinciden.',
+           `${filas.length} events spread over ${usadas.length} sheets` +
+           (vacias ? `; the other ${vacias} sheets have none.` : '.') +
+           (partidas ? ` ${partidas} ${partidas === 1 ? 'sheet takes' : 'sheets take'} more than one` +
+             ' row: they are overlapping events placed in separate lanes so each one can be opened.' : '') +
+           ' Rows are in chronological order, from March 28, 2021 to January 24, 2022.' +
+           ' The more intense the block, the more methods agree.') +
          /* Las dos frases sobre la encuesta solo valen con sesión. Sin ella no hay contornos que
             describir —`C.mias` viene vacía— y el doble clic no engancha nada, así que prometerlo
             era mandar a alguien a hacer clic dos veces sobre algo que no iba a pasar. Es el mismo
             criterio que el resto del modo lectura: no ofrecer lo que no se puede hacer. */
          (S.usuario
-           ? ' El contorno es tu respuesta: verde de trazo largo si lo marcaste como anomalía,' +
-             ' rojo de trazo corto si dijiste que no lo es, gris punteado si quedó neutral.' +
-             ' Si respondiste por secciones, el contorno va solo sobre cada sección.' +
-             ' Clic sobre un evento para verlo y clasificarlo.'
-           : ' Clic sobre un evento para ver sus señales.'),
+           ? T(' El contorno es tu respuesta: verde de trazo largo si lo marcaste como anomalía,' +
+               ' rojo de trazo corto si dijiste que no lo es, gris punteado si quedó neutral.' +
+               ' Si respondiste por secciones, el contorno va solo sobre cada sección.' +
+               ' Clic sobre un evento para verlo y clasificarlo.',
+               ' The outline is your answer: long-dash green if you marked it as an anomaly,' +
+               ' short-dash red if you said it is not, dotted gray if you stayed neutral.' +
+               ' If you answered by sections, the outline goes only over each section.' +
+               ' Click an event to view and classify it.')
+           : T(' Clic sobre un evento para ver sus señales.', ' Click an event to view its signals.')),
   });
 }
 
@@ -1828,7 +1947,8 @@ let _dlgEvento = null;
  *
  *  `RECORRIDOS` solo pone nombre a cada uno, para que el contador pueda decir en qué orden va.
  */
-const RECORRIDOS = { tabla: 'el orden de la tabla', cronologico: 'orden cronológico' };
+const RECORRIDOS = { tabla: T('el orden de la tabla', 'table order'),
+                     cronologico: T('orden cronológico', 'chronological order') };
 
 
 /** Lo tipeado y todavía sin guardar, por evento.
@@ -1855,7 +1975,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
 
   const dlg = document.createElement('dialog');
   dlg.className = 'dlg-evento';
-  dlg.innerHTML = '<div class="cuerpo"><p class="tenue" style="font-size:.85rem">Cargando…</p></div>';
+  dlg.innerHTML = `<div class="cuerpo"><p class="tenue" style="font-size:.85rem">${T('Cargando…', 'Loading…')}</p></div>`;
   document.body.appendChild(dlg);
   _dlgEvento = dlg;
 
@@ -1944,7 +2064,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
     asegurado = false;   // el evento siguiente tiene su propia salida que asegurar
     Grafico.limpiar(dlg);
     dlg.querySelector('.cuerpo').innerHTML =
-      '<p class="tenue" style="font-size:.85rem">Cargando…</p>';
+      `<p class="tenue" style="font-size:.85rem">${T('Cargando…', 'Loading…')}</p>`;
     actual = otro;
     await pintar(otro);
   }
@@ -1990,49 +2110,55 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
 
     dlg.querySelector('.cuerpo').innerHTML = `
       <div class="cab">
-        <h4>Evento ${id} · ${ev.SheetName}</h4>
-        <span class="chip ${ev.n_detectores >= 4 ? 'listo' : 'pendiente'}">${ev.n_detectores}/5 métodos</span>
+        <h4>${T('Evento', 'Event')} ${id} · ${ev.SheetName}</h4>
+        <span class="chip ${ev.n_detectores >= 4 ? 'listo' : 'pendiente'}">${ev.n_detectores}/5 ${T('métodos', 'methods')}</span>
         <span class="esp"></span>
-        <span class="meta">mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos</span>
+        <span class="meta">${T(`mediciones ${ev.start}–${ev.end} · ${ev.n_ventanas} tramos`,
+                               `measurements ${ev.start}–${ev.end} · ${ev.n_ventanas} windows`)}</span>
         ${i >= 0 ? `<div class="nav-ev">
           <button class="paso" id="ev-anterior" ${anterior === null ? 'disabled' : ''}
-                  title="Evento anterior (←)" aria-label="Evento anterior">‹</button>
-          <span class="cuantos" title="${i + 1} de ${orden.length}, en ${nombreOrden}">${
-            i + 1} de ${orden.length}</span>
+                  title="${T('Evento anterior (←)', 'Previous event (←)')}" aria-label="${T('Evento anterior', 'Previous event')}">‹</button>
+          <span class="cuantos" title="${T(`${i + 1} de ${orden.length}, en ${nombreOrden}`, `${i + 1} of ${orden.length}, in ${nombreOrden}`)}">${
+            i + 1} ${T('de', 'of')} ${orden.length}</span>
           <button class="paso" id="ev-siguiente" ${siguiente === null ? 'disabled' : ''}
-                  title="Evento siguiente (→)" aria-label="Evento siguiente">›</button>
+                  title="${T('Evento siguiente (→)', 'Next event (→)')}" aria-label="${T('Evento siguiente', 'Next event')}">›</button>
         </div>` : ''}
-        <button class="boton plano" id="cerrar-dlg" title="Cerrar (Esc)">✕</button>
+        <button class="boton plano" id="cerrar-dlg" title="${T('Cerrar (Esc)', 'Close (Esc)')}">✕</button>
       </div>
       <div id="caja-dlg-ev"></div>
       ${leyendaContexto(d)}
       <p class="porque">${ev.features_top || ''}</p>
 
       ${!S.usuario ? `
-        <p class="pista" style="margin-top:14px">Para clasificar este evento hace falta
-          <a href="login?destino=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}">iniciar sesión</a>.
-          El juicio se guarda con el nombre de quien lo emite, así que sin cuenta no hay a quién
-          atribuirlo.</p>` : `
+        <p class="pista" style="margin-top:14px">${T('Para clasificar este evento hace falta', 'To classify this event you need to')}
+          <a href="login?destino=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}">${T('iniciar sesión', 'sign in')}</a>.
+          ${T(`El juicio se guarda con el nombre de quien lo emite, así que sin cuenta no hay a quién
+          atribuirlo.`, `The judgment is saved under the name of whoever makes it, so without an account there
+          is no one to attribute it to.`)}</p>` : `
       <form class="encuesta" id="form-clas">
         <!-- Un fieldset para poder bloquear la pregunta del evento entera de una vez: ver
              bloquearConjunto. -->
         <fieldset id="conjunto">
-          <p class="pregunta">${C.pregunta || '¿Este evento representa un comportamiento anómalo?'}</p>
+          <p class="pregunta">${C.pregunta || T('¿Este evento representa un comportamiento anómalo?', 'Does this event represent anomalous behavior?')}</p>
           <div class="escala">${C.escala.map((o) => `
             <label><input type="radio" name="respuesta" value="${o.codigo}"
               ${puesta === o.codigo ? 'checked' : ''}>${o.etiqueta}</label>`).join('')}</div>
-          <textarea id="comentario" placeholder="Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar."
+          <textarea id="comentario" placeholder="${T('Comentarios (opcional): qué viste, con qué lo compararías, qué te haría dudar.',
+            'Comments (optional): what you saw, what you would compare it with, what would make you doubt.')}"
             maxlength="4000">${esc(comentario)}</textarea>
         </fieldset>
         <p class="aviso info" id="aviso-conjunto" hidden></p>
         <!-- SECCIONES: si la anomalía ocupa solo una parte del evento, cada parte con su respuesta.
              Mientras alguna tenga respuesta, mandan ellas y la pregunta de arriba queda bloqueada. -->
         <div class="secciones">
-          <p class="pregunta-secc">Secciones <span class="tenue">· opcional</span></p>
-          <p class="pista" style="margin:0 0 8px">Si lo anómalo es solo una parte del evento,
+          <p class="pregunta-secc">${T('Secciones', 'Sections')} <span class="tenue">· ${T('opcional', 'optional')}</span></p>
+          <p class="pista" style="margin:0 0 8px">${T(`Si lo anómalo es solo una parte del evento,
             arrastrá sobre las señales para marcarla, dentro de la zona sombreada. Cada sección
             lleva su propia respuesta. <b>En cuanto respondas una, lo que quede fuera de tus
-            secciones cuenta como «No»</b>, y la pregunta de arriba deja de usarse.</p>
+            secciones cuenta como «No»</b>, y la pregunta de arriba deja de usarse.`, `If only part of the
+            event is anomalous, drag over the signals to mark it, inside the shaded area. Each section
+            gets its own answer. <b>As soon as you answer one, whatever lies outside your sections
+            counts as «No»</b>, and the question above is no longer used.`)}</p>
           <div id="lista-secc"></div>
           <span class="tenue" style="font-size:.78rem" id="estado-secc"></span>
         </div>
@@ -2045,11 +2171,11 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
              dice qué pasó y cuándo. -->
         <div class="pie">
           <span class="tenue" style="font-size:.78rem" id="estado-clas">${
-            borrador ? 'Sin guardar'
+            borrador ? T('Sin guardar', 'Not saved')
             /* «Respondido» solo si hay respuesta. Una nota sin decisión no es una respuesta, y
                decirle así haría creer que el evento ya quedó juzgado. */
-            : mia ? `${mia.respuesta ? 'Respondido' : 'Nota guardada'} el ${
-                      new Date(mia.actualizado_en).toLocaleString('es',
+            : mia ? `${mia.respuesta ? T('Respondido', 'Answered') : T('Nota guardada', 'Note saved')} ${T('el', 'on')} ${
+                      new Date(mia.actualizado_en).toLocaleString(I18n.locale,
                       { dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
         </div>
       </form>`}`;
@@ -2105,12 +2231,12 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         // Sin nada guardado no hay a qué mandar un DELETE: el evento nunca se contestó y el clic
         // solo deshizo una marca que todavía no había salido del navegador.
         if (!miRespuesta(id)) {
-          if (estado) estado.textContent = 'Sin marcar.';
+          if (estado) estado.textContent = T('Sin marcar.', 'Unmarked.');
           return;
         }
         if (retirando) return;
         retirando = true;
-        if (estado) estado.textContent = 'Retirando…';
+        if (estado) estado.textContent = T('Retirando…', 'Withdrawing…');
         try {
           await api(`api/nodo/${clave}/evento/${id}/clasificacion`, { method: 'DELETE' });
           delete C.mias[String(id)];
@@ -2121,8 +2247,8 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
           const nota = dlg.querySelector('#comentario').value.trim();
           if (estado) {
             estado.textContent = nota
-              ? 'Decisión retirada. El comentario queda como nota.'
-              : 'Retirada: el evento quedó sin clasificar.';
+              ? T('Decisión retirada. El comentario queda como nota.', 'Decision withdrawn. The comment stays as a note.')
+              : T('Retirada: el evento quedó sin clasificar.', 'Withdrawn: the event is now unclassified.');
           }
           if (nota) await guardar({ silencioso: true });
         } catch (err) {
@@ -2130,7 +2256,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
           // la base sigue habiendo una.
           radio.checked = true;
           marcado = radio.value;
-          if (estado) estado.textContent = `No se pudo retirar: ${err.message}`;
+          if (estado) estado.textContent = T(`No se pudo retirar: ${err.message}`, `Could not withdraw: ${err.message}`);
         } finally {
           retirando = false;
         }
@@ -2157,9 +2283,9 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       // renglones más abajo sería la misma frase dos veces. Pero al agrandarlo el gráfico sale de
       // ese contexto y necesita nombrarse — de eso se ocupa `tituloAgrandado`.
       titulo: null,
-      tituloAgrandado: `Señales del evento ${id} · ${ev.SheetName}`,
-      xNombre: 'medición',
-      sustantivo: 'mediciones',
+      tituloAgrandado: T(`Señales del evento ${id} · ${ev.SheetName}`, `Signals of event ${id} · ${ev.SheetName}`),
+      xNombre: T('medición', 'measurement'),
+      sustantivo: T('mediciones', 'measurements'),
       paneles: d.senales.map((s, k) => ({ nombre: s, valores: d.valores.map((f) => f[k]) })),
       ...conContexto(d),
       secciones: aDibujo(),
@@ -2200,7 +2326,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       if (ya && (ya.respuesta || null) === respuesta && (ya.comentario || '') === texto) {
         return true;    // nada cambió: no se molesta al servidor ni se parpadea el estado
       }
-      if (!silencioso && estado) estado.textContent = 'Guardando…';
+      if (!silencioso && estado) estado.textContent = T('Guardando…', 'Saving…');
       try {
         const guardada = await api(`api/nodo/${clave}/evento/${id}/clasificacion`, {
           method: 'PUT',
@@ -2212,15 +2338,15 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         refrescarMarca(id);
         pintarAvanceClasificacion((_tablaEventos && _tablaEventos.filas || []).length);
         if (!silencioso && estado) {
-          estado.textContent = `Guardado ${new Date(guardada.actualizado_en)
-            .toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`;
+          estado.textContent = `${T('Guardado', 'Saved')} ${new Date(guardada.actualizado_en)
+            .toLocaleTimeString(I18n.locale, { hour: '2-digit', minute: '2-digit' })}`;
         }
         return true;
       } catch (err) {
         /* Falló: el texto se queda en BORRADORES —lo puso `guardarBorrador`— así que al volver al
            evento reaparece con «Sin guardar». Es la red que hace tolerable que no haya botón. */
         guardarBorrador();
-        if (estado) estado.textContent = `No se pudo guardar: ${err.message}`;
+        if (estado) estado.textContent = T(`No se pudo guardar: ${err.message}`, `Could not save: ${err.message}`);
         return false;
       }
     }
@@ -2249,7 +2375,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       caja.addEventListener('input', () => {
         const estado = dlg.querySelector('#estado-clas');
         clearTimeout(reloj);
-        if (estado) estado.textContent = 'Sin guardar…';
+        if (estado) estado.textContent = T('Sin guardar…', 'Not saved…');
         reloj = setTimeout(guardar, 1000);
       });
       caja.addEventListener('blur', () => { clearTimeout(reloj); guardar(); });
@@ -2295,10 +2421,14 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       const n = misSecciones(id).filter((s) => s.respuesta).length;
       campo.disabled = n > 0;
       aviso.hidden = n === 0;
-      aviso.textContent = n === 0 ? '' : `Respondiste ${n === 1 ? 'una sección' : `${n} secciones`}: `
+      aviso.textContent = n === 0 ? '' : T(`Respondiste ${n === 1 ? 'una sección' : `${n} secciones`}: `
         + 'mandan ellas, y lo que queda fuera cuenta como «No». La pregunta del evento queda '
         + 'bloqueada' + (miRespuesta(id) ? ', con lo que ya habías puesto guardado como opinión '
-        + 'general' : '') + '. Para volver a usarla, dejá las secciones sin decisión o quitalas.';
+        + 'general' : '') + '. Para volver a usarla, dejá las secciones sin decisión o quitalas.',
+        `You answered ${n === 1 ? 'one section' : `${n} sections`}: `
+        + 'they take precedence, and whatever lies outside counts as «No». The event question is '
+        + 'locked' + (miRespuesta(id) ? ', with what you had already answered kept as an overall '
+        + 'opinion' : '') + '. To use it again, leave the sections undecided or remove them.');
     }
 
     /** Rehace la lista y el sombreado. Solo al agregar, quitar o mover una: rehacer la lista
@@ -2316,19 +2446,19 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       // Enfocable sin entrar al orden del Tab: así un clic en el fondo de la fila también la elige.
       f.tabIndex = -1;
       f.innerHTML = `
-        <button type="button" class="num" title="Ver la sección #${k + 1} en el gráfico"
-                aria-label="Ver la sección #${k + 1} en el gráfico">#${k + 1}</button>
-        <label title="Primera medición de la sección">de <input type="number" class="s-desde" step="1"></label>
-        <label title="La medición «hasta» no se incluye, igual que en el rango del evento">hasta
+        <button type="button" class="num" title="${T(`Ver la sección #${k + 1} en el gráfico`, `Show section #${k + 1} on the chart`)}"
+                aria-label="${T(`Ver la sección #${k + 1} en el gráfico`, `Show section #${k + 1} on the chart`)}">#${k + 1}</button>
+        <label title="${T('Primera medición de la sección', 'First measurement of the section')}">${T('de', 'from')} <input type="number" class="s-desde" step="1"></label>
+        <label title="${T('La medición «hasta» no se incluye, igual que en el rango del evento', 'The «to» measurement is not included, same as in the event range')}">${T('hasta', 'to')}
           <input type="number" class="s-hasta" step="1"></label>
-        <select class="s-resp" aria-label="Respuesta para la sección #${k + 1}">
-          <option value="">— sin decisión —</option>
+        <select class="s-resp" aria-label="${T(`Respuesta para la sección #${k + 1}`, `Answer for section #${k + 1}`)}">
+          <option value="">${T('— sin decisión —', '— no decision —')}</option>
           ${C.escala.map((o) => `<option value="${o.codigo}">${esc(o.etiqueta)}</option>`).join('')}
         </select>
-        <input type="text" class="s-com" maxlength="4000" placeholder="Comentario (opcional)"
-               aria-label="Comentario de la sección #${k + 1}">
-        <button type="button" class="boton plano s-quitar" title="Quitar la sección"
-                aria-label="Quitar la sección #${k + 1}">✕</button>`;
+        <input type="text" class="s-com" maxlength="4000" placeholder="${T('Comentario (opcional)', 'Comment (optional)')}"
+               aria-label="${T(`Comentario de la sección #${k + 1}`, `Comment for section #${k + 1}`)}">
+        <button type="button" class="boton plano s-quitar" title="${T('Quitar la sección', 'Remove the section')}"
+                aria-label="${T(`Quitar la sección #${k + 1}`, `Remove section #${k + 1}`)}">✕</button>`;
       // Los valores van por propiedad y no en el HTML: un comentario con comillas rompería el atributo.
       const [iD, iH] = [f.querySelector('.s-desde'), f.querySelector('.s-hasta')];
       for (const i of [iD, iH]) { i.min = ev.start; i.max = ev.end; }
@@ -2343,7 +2473,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
       const com = f.querySelector('.s-com');
       com.addEventListener('input', () => {
         clearTimeout((pendientes.get(s.id) || {}).reloj);
-        estadoSecc('Sin guardar…');
+        estadoSecc(T('Sin guardar…', 'Not saved…'));
         pendientes.set(s.id, { reloj: setTimeout(() => guardarSeccion(s.id), 1000) });
       });
       com.addEventListener('blur', () => guardarSeccion(s.id));
@@ -2375,11 +2505,12 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
 
     async function agregarSeccion(r) {
       if (r.vacia) {
-        estadoSecc('Una sección tiene que caer dentro de la zona sombreada: es el rango que '
-                   + 'marcaron los métodos.');
+        estadoSecc(T('Una sección tiene que caer dentro de la zona sombreada: es el rango que '
+                     + 'marcaron los métodos.',
+                     'A section has to fall inside the shaded area: it is the range the methods flagged.'));
         return;
       }
-      estadoSecc('Guardando la sección…');
+      estadoSecc(T('Guardando la sección…', 'Saving the section…'));
       try {
         const nueva = await api(`api/nodo/${clave}/evento/${id}/seccion`, {
           method: 'POST',
@@ -2390,12 +2521,14 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         activa = nueva.id;
         pintarSecciones();
         const k = misSecciones(id).findIndex((s) => s.id === nueva.id);
-        estadoSecc(`Sección #${k + 1} marcada: mediciones ${nueva.desde}–${nueva.hasta}`
-                   + `${r.recortada ? ', recortada al borde del evento' : ''}. Falta su respuesta.`);
+        estadoSecc(T(`Sección #${k + 1} marcada: mediciones ${nueva.desde}–${nueva.hasta}`
+                     + `${r.recortada ? ', recortada al borde del evento' : ''}. Falta su respuesta.`,
+                     `Section #${k + 1} marked: measurements ${nueva.desde}–${nueva.hasta}`
+                     + `${r.recortada ? ', trimmed to the edge of the event' : ''}. It still needs an answer.`));
         const sel = lista.querySelector(`[data-sid="${nueva.id}"] .s-resp`);
         if (sel) sel.focus();
       } catch (e) {
-        estadoSecc(`No se pudo marcar: ${e.message}`);
+        estadoSecc(T(`No se pudo marcar: ${e.message}`, `Could not mark it: ${e.message}`));
       }
     }
 
@@ -2417,7 +2550,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
           && pedido.respuesta === (ya.respuesta || null)
           && pedido.comentario === (ya.comentario || '')) return true;
       const movida = pedido.desde !== ya.desde || pedido.hasta !== ya.hasta;
-      estadoSecc('Guardando…');
+      estadoSecc(T('Guardando…', 'Saving…'));
       try {
         const hecha = await api(`api/nodo/${clave}/evento/${id}/seccion/${sid}`, {
           method: 'PUT',
@@ -2426,8 +2559,8 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         });
         ponerSecciones(misSecciones(id).map((s) => (s.id === sid ? hecha : s)));
         if (movida) pintarSecciones();
-        estadoSecc(`Guardado ${new Date(hecha.actualizado_en)
-          .toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`);
+        estadoSecc(`${T('Guardado', 'Saved')} ${new Date(hecha.actualizado_en)
+          .toLocaleTimeString(I18n.locale, { hour: '2-digit', minute: '2-digit' })}`);
         return true;
       } catch (e) {
         /* El rango vuelve a lo guardado: un rango rechazado —encimado, fuera del evento— no puede
@@ -2435,7 +2568,7 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
            para no tirar lo escrito; se reintentan al próximo cambio o al salir. */
         f.querySelector('.s-desde').value = ya.desde;
         f.querySelector('.s-hasta').value = ya.hasta;
-        estadoSecc(`No se pudo guardar: ${e.message}`);
+        estadoSecc(T(`No se pudo guardar: ${e.message}`, `Could not save: ${e.message}`));
         return false;
       }
     }
@@ -2456,7 +2589,8 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
          arrastrarlo y el comentario volver a escribirlo. */
       const f = lista.querySelector(`[data-sid="${sid}"]`);
       const conAlgo = s.respuesta || s.comentario || (f && f.querySelector('.s-com').value.trim());
-      if (conAlgo && !confirm(`¿Quitar la sección #${k + 1}? Se pierden su respuesta y su comentario.`)) return;
+      if (conAlgo && !confirm(T(`¿Quitar la sección #${k + 1}? Se pierden su respuesta y su comentario.`,
+                                `Remove section #${k + 1}? Its answer and comment will be lost.`))) return;
       clearTimeout((pendientes.get(sid) || {}).reloj);
       pendientes.delete(sid);
       try {
@@ -2464,9 +2598,9 @@ async function abrirDialogoEvento(id, recorrido, comoSeLlama = 'tabla') {
         if (activa === sid) activa = null;
         ponerSecciones(misSecciones(id).filter((x) => x.id !== sid));
         pintarSecciones();
-        estadoSecc(`Sección #${k + 1} quitada.`);
+        estadoSecc(T(`Sección #${k + 1} quitada.`, `Section #${k + 1} removed.`));
       } catch (e) {
-        estadoSecc(`No se pudo quitar: ${e.message}`);
+        estadoSecc(T(`No se pudo quitar: ${e.message}`, `Could not remove it: ${e.message}`));
       }
     }
 
@@ -2503,11 +2637,15 @@ function leyendaContexto(d) {
   if (!c || c.sin_contexto) return '';
   const antes = c.evento_desde;
   const despues = (c.hasta - c.desde) - c.evento_hasta;
-  return `<p class="pista" style="margin:6px 0 0">La <b>zona sombreada</b> es el tramo que marcaron `
+  return `<p class="pista" style="margin:6px 0 0">` + T(
+    `La <b>zona sombreada</b> es el tramo que marcaron `
        + `los métodos. A los lados hay ${antes} y ${despues} mediciones de contexto: son señal del `
        + `mismo tramo continuo que nadie marcó, para poder comparar contra lo que el pipeline `
-       + `considera normal.</p>`;
+       + `considera normal.`,
+    `The <b>shaded area</b> is the range the methods flagged. On either side there are ${antes} and `
+       + `${despues} measurements of context: signal from the same continuous stretch that nobody flagged, `
+       + `to compare against what the pipeline considers normal.`) + '</p>';
 }
 
 iniciar().catch((e) => document.querySelector('.envoltorio').insertAdjacentHTML('afterbegin',
-  `<div class="aviso" style="margin:20px 0"><strong>No se pudo iniciar:</strong> ${e.message}</div>`));
+  `<div class="aviso" style="margin:20px 0"><strong>${T('No se pudo iniciar:', 'Could not start:')}</strong> ${e.message}</div>`));

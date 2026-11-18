@@ -15,7 +15,7 @@ window.Analisis = (function () {
   'use strict';
 
   const V = Grafico.paleta;
-  const miles = (v) => Number(v).toLocaleString('es');
+  const miles = (v) => Number(v).toLocaleString(I18n.locale);
   const $ = (s, raiz) => (raiz || document).querySelector(s);
 
   /** El texto explicativo de cada corte. Va en el JS porque la pestaña se arma al vuelo.
@@ -27,26 +27,41 @@ window.Analisis = (function () {
    *  antes del gráfico. La interfaz llegó a tener casi 2.000 palabras de prosa. Ahora el título
    *  nombra, la línea dice dónde mirar, y el porqué está para quien lo busque. */
   const secciones = (d) => [
-    ['coincidencia', 'Coincidencia entre métodos',
-     'La diagonal es cuántos marca cada uno solo; fuera de ella, cuántos comparten de a pares.',
-     'Nadie etiquetó estos datos, así que no hay contra qué medir el acierto. Que métodos con ideas ' +
-     'distintas de «raro» señalen el mismo tramo es lo que reemplaza a esa respuesta que no existe.'],
-    ...(d.eventos ? [['acuerdo', 'Acuerdo, o duración',
-     'Si los eventos de más métodos son también los más largos, el acuerdo puede ser un efecto del tamaño.',
-     'Un evento largo abarca muchos tramos vecinos, y cuantos más abarca, más chances tiene de que ' +
-     'algún método haya marcado alguno — sin que dos hayan coincidido nunca en el mismo tramo.']] : []),
-    ['desplazamiento', 'Qué corre en una candidata',
-     'Cuánto se aparta cada característica respecto del resto de los tramos, en desvíos estándar.',
-     'Es lo que va a mirar quien tenga que etiquetar en la Etapa 2: no cuáles son raras, sino en qué ' +
-     'lo son. Lo calcula el paquete de la tesis, con las funciones de su reporte de feature-shift.'],
-    ['puntajes', 'Reparto de puntajes',
-     'La línea punteada es el corte de candidatos: a su derecha, lo que ese método marca.',
-     'Un panel por método porque los puntajes no se comparan entre sí: cada uno tiene su escala. Lo ' +
-     'que sí se compara es la forma — una cola larga y separada distingue mejor que una campana.', true],
-    ['dispersion', 'Los candidatos en el plano',
-     'En el borde de la nube, el método encuentra algo atípico; en el medio, marca por otra cosa.',
-     'La proyección a dos dimensiones es solo para mirar: no alimenta ninguna etapa, no se guarda y ' +
-     'ningún número del trabajo depende de ella.', true],
+    ['coincidencia', I18n.t('Coincidencia entre métodos', 'Agreement between methods'),
+     I18n.t('La diagonal es cuántos marca cada uno solo; fuera de ella, cuántos comparten de a pares.',
+            'The diagonal is how many each one flags on its own; off it, how many they share in pairs.'),
+     I18n.t('Nadie etiquetó estos datos, así que no hay contra qué medir el acierto. Que métodos con ideas ' +
+            'distintas de «raro» señalen el mismo tramo es lo que reemplaza a esa respuesta que no existe.',
+            'Nobody labeled this data, so there is nothing to measure accuracy against. Methods with different ' +
+            'ideas of “unusual” pointing at the same window is what stands in for that missing answer.')],
+    ...(d.eventos ? [['acuerdo', I18n.t('Acuerdo, o duración', 'Agreement, or duration'),
+     I18n.t('Si los eventos de más métodos son también los más largos, el acuerdo puede ser un efecto del tamaño.',
+            'If the events flagged by more methods are also the longest, the agreement may be an effect of size.'),
+     I18n.t('Un evento largo abarca muchos tramos vecinos, y cuantos más abarca, más chances tiene de que ' +
+            'algún método haya marcado alguno — sin que dos hayan coincidido nunca en el mismo tramo.',
+            'A long event spans many neighboring windows, and the more it spans, the more likely it is that ' +
+            'some method flagged one of them — without two methods ever agreeing on the same window.')]] : []),
+    ['desplazamiento', I18n.t('Qué corre en una candidata', 'What shifts in a candidate'),
+     I18n.t('Cuánto se aparta cada característica respecto del resto de los tramos, en desvíos estándar.',
+            'How far each feature departs from the rest of the windows, in standard deviations.'),
+     I18n.t('Es lo que va a mirar quien tenga que etiquetar en la Etapa 2: no cuáles son raras, sino en qué ' +
+            'lo son. Lo calcula el paquete de la tesis, con las funciones de su reporte de feature-shift.',
+            'This is what whoever labels in Stage 2 will look at: not which ones are unusual, but in what ' +
+            'way. The thesis package computes it, with the functions from its feature-shift report.')],
+    ['puntajes', I18n.t('Reparto de puntajes', 'Score distribution'),
+     I18n.t('La línea punteada es el corte de candidatos: a su derecha, lo que ese método marca.',
+            'The dashed line is the candidate cutoff: to its right, what that method flags.'),
+     I18n.t('Un panel por método porque los puntajes no se comparan entre sí: cada uno tiene su escala. Lo ' +
+            'que sí se compara es la forma — una cola larga y separada distingue mejor que una campana.',
+            'One panel per method because scores are not comparable across methods: each has its own scale. ' +
+            'What can be compared is the shape — a long, separate tail discriminates better than a bell.'), true],
+    ['dispersion', I18n.t('Los candidatos en el plano', 'The candidates on the plane'),
+     I18n.t('En el borde de la nube, el método encuentra algo atípico; en el medio, marca por otra cosa.',
+            'At the edge of the cloud, the method finds something atypical; in the middle, it flags for another reason.'),
+     I18n.t('La proyección a dos dimensiones es solo para mirar: no alimenta ninguna etapa, no se guarda y ' +
+            'ningún número del trabajo depende de ella.',
+            'The two-dimensional projection is only for looking: it feeds no stage, is not saved, and ' +
+            'no number in the work depends on it.'), true],
   ];
 
 
@@ -56,10 +71,10 @@ window.Analisis = (function () {
       <div class="corte">
         <h4 style="font-size:.95rem;margin:0 0 4px">${titulo}</h4>
         <p class="pista">${linea}</p>
-        ${porque ? `<details class="saber-mas"><summary>Por qué</summary><p>${porque}</p></details>` : ''}
+        ${porque ? `<details class="saber-mas"><summary>${I18n.t('Por qué', 'Why')}</summary><p>${porque}</p></details>` : ''}
         ${id === 'coincidencia' ? '<div class="resumen-grid" id="cifras" style="margin:0 0 12px"></div>' : ''}
         ${id === 'dispersion' ? `<div class="fila-sup"><span class="esp"></span>
-           <label class="tenue" style="font-size:.8rem" for="sel-det">Método</label>
+           <label class="tenue" style="font-size:.8rem" for="sel-det">${I18n.t('Método', 'Method')}</label>
            <select id="sel-det">${d.detectores.map((x) =>
              `<option ${x === d.detector ? 'selected' : ''}>${x}</option>`).join('')}</select></div>` : ''}
         ${id === 'coincidencia'
@@ -76,7 +91,7 @@ window.Analisis = (function () {
     // sostienen el argumento. Con nueve gráficos del mismo peso no se distingue el que puede
     // refutar la tesis del que está para mirar.
     destino.innerHTML = principales.map(bloque(d)).join('')
-      + (secundarias.length ? `<details class="corte plegado"><summary>Más cortes de esta rama
+      + (secundarias.length ? `<details class="corte plegado"><summary>${I18n.t('Más cortes de esta rama', 'More views of this branch')}
            <span class="tenue">(${secundarias.length})</span></summary>
            ${secundarias.map(bloque(d)).join('')}</details>` : '');
 
@@ -97,10 +112,11 @@ window.Analisis = (function () {
     const acuerdo = Object.entries(d.coincidencia.reparto)
       .filter(([k]) => Number(k) >= 4).reduce((a, [, v]) => a + v, 0);
     const filas = [
-      [miles(d.n_ventanas), 'tramos evaluados'],
-      [miles(d.top_k), `marca cada método (${(d.fraccion_candidatos * 100).toFixed(1)} %)`],
-      [miles(marcados), 'tramos marcados por alguno'],
-      [miles(acuerdo), 'con 4 o 5 métodos de acuerdo'],
+      [miles(d.n_ventanas), I18n.t('tramos evaluados', 'windows evaluated')],
+      [miles(d.top_k), I18n.t(`marca cada método (${(d.fraccion_candidatos * 100).toFixed(1)} %)`,
+                              `flagged by each method (${(d.fraccion_candidatos * 100).toFixed(1)}%)`)],
+      [miles(marcados), I18n.t('tramos marcados por alguno', 'windows flagged by at least one')],
+      [miles(acuerdo), I18n.t('con 4 o 5 métodos de acuerdo', 'with 4 or 5 methods in agreement')],
     ];
     for (const [v, r] of filas) {
       const c = document.createElement('div');
@@ -121,7 +137,7 @@ window.Analisis = (function () {
     const max = Math.max(...celdas.map((c) => c[2]), 1);
 
     Grafico.medida($('#g-coincidencia'), {
-      titulo: 'Tramos que marcan de a pares',
+      titulo: I18n.t('Tramos que marcan de a pares', 'Windows flagged in pairs'),
       alto: 330,
       opcion: (c) => ({
         animation: false,
@@ -129,8 +145,10 @@ window.Analisis = (function () {
         grid: { left: 4, right: 12, top: 8, bottom: 4, containLabel: true },
         tooltip: Object.assign({}, c.tooltip, {
           formatter: (p) => (p.data[0] === p.data[1]
-            ? `<b>${p.data[2]}</b> tramos marca ${n[p.data[0]]}`
-            : `<b>${p.data[2]}</b> tramos marcan los dos<br>${n[p.data[1]]} y ${n[p.data[0]]}`),
+            ? I18n.t(`<b>${p.data[2]}</b> tramos marca ${n[p.data[0]]}`,
+                     `<b>${p.data[2]}</b> window${p.data[2] === 1 ? '' : 's'} flagged by ${n[p.data[0]]}`)
+            : I18n.t(`<b>${p.data[2]}</b> tramos marcan los dos<br>${n[p.data[1]]} y ${n[p.data[0]]}`,
+                     `<b>${p.data[2]}</b> window${p.data[2] === 1 ? '' : 's'} flagged by both<br>${n[p.data[1]]} and ${n[p.data[0]]}`)),
         }),
         xAxis: { type: 'category', data: n, splitArea: { show: true },
                  axisLabel: { color: c.tenue, rotate: 26, fontSize: 10 },
@@ -164,18 +182,20 @@ window.Analisis = (function () {
     const claves = Object.keys(d.coincidencia.reparto).map(Number).sort((a, b) => a - b);
     const total = d.detectores.length;
     Grafico.medida($('#g-reparto'), {
-      titulo: 'Cuántos métodos coinciden en un mismo tramo',
+      titulo: I18n.t('Cuántos métodos coinciden en un mismo tramo', 'How many methods agree on the same window'),
       alto: 330,
       opcion: (c) => ({
         animation: false,
         textStyle: c.textStyle,
         grid: { left: 8, right: 22, top: 8, bottom: 24, containLabel: true },
         tooltip: Object.assign({}, c.tooltip, { trigger: 'item',
-          formatter: (p) => `<b>${p.value}</b> tramos los marca${p.name === '1' ? '' : 'n'} ${p.name} de ${total}` }),
+          formatter: (p) => I18n.t(
+            `<b>${p.value}</b> tramos los marca${p.name === '1' ? '' : 'n'} ${p.name} de ${total}`,
+            `<b>${p.value}</b> window${p.value === 1 ? '' : 's'} flagged by ${p.name} of ${total}`) }),
         xAxis: Object.assign({}, c.eje, { type: 'category', data: claves.map(String),
-          name: 'métodos de acuerdo', nameLocation: 'middle', nameGap: 26,
+          name: I18n.t('métodos de acuerdo', 'methods in agreement'), nameLocation: 'middle', nameGap: 26,
           nameTextStyle: { color: c.tenue }, splitLine: { show: false } }),
-        yAxis: Object.assign({}, c.eje, { type: 'value', name: 'tramos', nameTextStyle: { color: c.tenue } }),
+        yAxis: Object.assign({}, c.eje, { type: 'value', name: I18n.t('tramos', 'windows'), nameTextStyle: { color: c.tenue } }),
         series: [{
           type: 'bar', data: claves.map((k) => d.coincidencia.reparto[k]),
           barMaxWidth: 46,
@@ -193,7 +213,7 @@ window.Analisis = (function () {
     const dets = d.detectores;
     const alto = dets.length * 122 + 64;
     Grafico.medida($('#g-puntajes'), {
-      titulo: 'Distribución de puntajes, un panel por método',
+      titulo: I18n.t('Distribución de puntajes, un panel por método', 'Score distribution, one panel per method'),
       alto,
       opcion: (c, altoReal) => {
         const A = altoReal || alto;
@@ -221,7 +241,7 @@ window.Analisis = (function () {
             barCategoryGap: '12%', itemStyle: { color: V.serie(i) },
             markLine: {
               silent: true, symbol: 'none',
-              label: { formatter: 'corte', color: c.tenue, fontSize: 9, position: 'insideEndTop' },
+              label: { formatter: I18n.t('corte', 'cutoff'), color: c.tenue, fontSize: 9, position: 'insideEndTop' },
               lineStyle: { color: c.tenue, type: 'dashed', width: 1 },
               data: [{ xAxis: iCorte }],
             },
@@ -235,15 +255,18 @@ window.Analisis = (function () {
               const p = ps[0];
               const det = dets[p.seriesIndex];
               const q = d.puntajes[det].caja;
-              return `<b>${p.value}</b> tramos con puntaje ≈ ${p.name}<br>` +
-                     `<span style="color:${c.tenue}">${det} · mediana ${V.fmt(q[2], 3)} · ` +
-                     `cuartiles ${V.fmt(q[1], 3)}–${V.fmt(q[3], 3)}</span>`;
+              return I18n.t(`<b>${p.value}</b> tramos con puntaje ≈ ${p.name}<br>`,
+                            `<b>${p.value}</b> window${p.value === 1 ? '' : 's'} with score ≈ ${p.name}<br>`) +
+                     `<span style="color:${c.tenue}">${det} · ${I18n.t('mediana', 'median')} ${V.fmt(q[2], 3)} · ` +
+                     `${I18n.t('cuartiles', 'quartiles')} ${V.fmt(q[1], 3)}–${V.fmt(q[3], 3)}</span>`;
             },
           }),
         };
       },
-      pie: 'Bigotes a 1,5 veces el rango intercuartílico: ' +
-         dets.map((n) => `${n} ${d.puntajes[n].atipicos}`).join(' · ') + ' tramos fuera.',
+      pie: I18n.t('Bigotes a 1,5 veces el rango intercuartílico: ',
+                  'Whiskers at 1.5 times the interquartile range: ') +
+         dets.map((n) => `${n} ${d.puntajes[n].atipicos}`).join(' · ') +
+         I18n.t(' tramos fuera.', ' windows outside.'),
     });
   }
 
@@ -255,6 +278,9 @@ window.Analisis = (function () {
       (s.candidato[i] ? marcados : normales).push([s.x[i], s.y[i], s.puntaje[i], s.hoja[i]]);
     }
     const ve = s.varianza_explicada;
+    // Los nombres de las series son a la vez la clave que une la leyenda con su serie y el texto
+    // que se ve: se traducen una sola vez, acá, para que las dos puntas digan lo mismo.
+    const RESTO = I18n.t('resto', 'rest'), MARCADOS = I18n.t('marcados', 'flagged');
     Grafico.medida($('#g-dispersion'), {
       alto: 460,
       opcion: (c) => ({
@@ -262,31 +288,38 @@ window.Analisis = (function () {
         textStyle: c.textStyle,
         grid: { left: 52, right: 24, top: 16, bottom: 46 },
         tooltip: Object.assign({}, c.tooltip, {
-          formatter: (p) => `<b>${V.fmt(p.data[2], 4)}</b> de puntaje<br>` +
-                            `<span style="color:${c.tenue}">${p.data[3] || 'sin hoja'}</span>`,
+          formatter: (p) => I18n.t(`<b>${V.fmt(p.data[2], 4)}</b> de puntaje<br>`,
+                                   `score <b>${V.fmt(p.data[2], 4)}</b><br>`) +
+                            `<span style="color:${c.tenue}">${p.data[3] || I18n.t('sin hoja', 'no sheet')}</span>`,
         }),
         xAxis: Object.assign({}, c.eje, { type: 'value', scale: true,
-          name: `componente 1 · ${(ve[0] * 100).toFixed(0)} % de la variación`,
+          name: I18n.t(`componente 1 · ${(ve[0] * 100).toFixed(0)} % de la variación`,
+                       `component 1 · ${(ve[0] * 100).toFixed(0)}% of the variance`),
           nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: c.tenue } }),
         yAxis: Object.assign({}, c.eje, { type: 'value', scale: true,
-          name: `componente 2 · ${(ve[1] * 100).toFixed(0)} %`,
+          name: I18n.t(`componente 2 · ${(ve[1] * 100).toFixed(0)} %`,
+                       `component 2 · ${(ve[1] * 100).toFixed(0)}%`),
           nameTextStyle: { color: c.tenue } }),
         toolbox: V.herramientas(c),
         dataZoom: [{ type: 'inside', xAxisIndex: 0, yAxisIndex: 0, zoomOnMouseWheel: 'ctrl',
                      moveOnMouseWheel: false }],
-        legend: { data: ['resto', 'marcados'], left: 52, top: 0, textStyle: { color: c.tenue },
+        legend: { data: [RESTO, MARCADOS], left: 52, top: 0, textStyle: { color: c.tenue },
                   itemWidth: 12, itemHeight: 8 },
         series: [
-          { name: 'resto', type: 'scatter', data: normales, symbolSize: 4, large: true,
+          { name: RESTO, type: 'scatter', data: normales, symbolSize: 4, large: true,
             itemStyle: { color: c.tenue, opacity: .35 } },
-          { name: 'marcados', type: 'scatter', data: marcados, symbolSize: 9,
+          { name: MARCADOS, type: 'scatter', data: marcados, symbolSize: 9,
             itemStyle: { color: V.serie(3), borderColor: V.varCss('--panel'), borderWidth: 1.5 },
             z: 5 },
         ],
       }),
-      pie: `${miles(normales.length)} tramos sin marcar y ${miles(marcados.length)} marcados por ` +
-           `${d.detector}. Las dos componentes juntas explican el ${((ve[0] + ve[1]) * 100).toFixed(0)} % ` +
-           'de la variación: lo que no entra ahí no se ve en este dibujo.',
+      pie: I18n.t(
+        `${miles(normales.length)} tramos sin marcar y ${miles(marcados.length)} marcados por ` +
+        `${d.detector}. Las dos componentes juntas explican el ${((ve[0] + ve[1]) * 100).toFixed(0)} % ` +
+        'de la variación: lo que no entra ahí no se ve en este dibujo.',
+        `${miles(normales.length)} unflagged window${normales.length === 1 ? '' : 's'} and ` +
+        `${miles(marcados.length)} flagged by ${d.detector}. Together the two components explain ` +
+        `${((ve[0] + ve[1]) * 100).toFixed(0)}% of the variance: whatever falls outside them is not visible in this plot.`),
     });
   }
 
@@ -309,7 +342,7 @@ window.Analisis = (function () {
     }
 
     Grafico.medida($('#g-acuerdo'), {
-      titulo: 'Tamaño del evento contra métodos que lo marcan',
+      titulo: I18n.t('Tamaño del evento contra métodos que lo marcan', 'Event size versus methods that flag it'),
       alto: 340,
       opcion: (c) => ({
         animation: false,
@@ -317,18 +350,23 @@ window.Analisis = (function () {
         grid: { left: 62, right: 26, top: 16, bottom: 52 },
         tooltip: Object.assign({}, c.tooltip, {
           formatter: (p) => (p.seriesIndex === 1
-            ? `mediana de <b>${p.data[1]}</b> tramos con ${p.data[0]} métodos`
-            : `<b>Evento ${p.data[2]}</b> · ${p.data[3]}<br>` +
-              `<span style="color:${c.tenue}">${p.data[1]} tramos · ${Math.round(p.data[0])} métodos</span>`),
+            ? I18n.t(`mediana de <b>${p.data[1]}</b> tramos con ${p.data[0]} métodos`,
+                     `median of <b>${p.data[1]}</b> window${p.data[1] === 1 ? '' : 's'} with ` +
+                     `${p.data[0]} method${p.data[0] === 1 ? '' : 's'}`)
+            : I18n.t(`<b>Evento ${p.data[2]}</b> · ${p.data[3]}<br>`, `<b>Event ${p.data[2]}</b> · ${p.data[3]}<br>`) +
+              `<span style="color:${c.tenue}">` +
+              I18n.t(`${p.data[1]} tramos · ${Math.round(p.data[0])} métodos`,
+                     `${p.data[1]} window${p.data[1] === 1 ? '' : 's'} · ` +
+                     `${Math.round(p.data[0])} method${Math.round(p.data[0]) === 1 ? '' : 's'}`) + '</span>'),
         }),
         // El mínimo tiene que ser entero: ECharts cuenta las marcas desde `min` de a `interval`,
         // así que con 0,5 caían en 0,5 · 1,5 · 2,5… y ningún grupo quedaba rotulado.
         xAxis: Object.assign({}, c.eje, { type: 'value', min: 0, max: grupos.length + 0.6,
-          interval: 1, name: 'métodos que marcan el evento', nameLocation: 'middle', nameGap: 30,
+          interval: 1, name: I18n.t('métodos que marcan el evento', 'methods that flag the event'), nameLocation: 'middle', nameGap: 30,
           nameTextStyle: { color: c.tenue }, splitLine: { show: false },
           axisLabel: { color: c.tenue, formatter: (v) => (d.eventos.por_acuerdo[v]
             ? `${v}\n(${d.eventos.por_acuerdo[v].n})` : '') } }),
-        yAxis: Object.assign({}, c.eje, { type: 'value', name: 'tramos que abarca',
+        yAxis: Object.assign({}, c.eje, { type: 'value', name: I18n.t('tramos que abarca', 'windows it spans'),
           nameTextStyle: { color: c.tenue } }),
         series: [
           { type: 'scatter', symbolSize: 11,
@@ -342,13 +380,16 @@ window.Analisis = (function () {
               itemStyle: { color: V.serie(3), opacity: .07 },
               label: { show: true, position: 'insideTop', color: V.serie(3), fontSize: 11,
                        fontWeight: 600,
-                       formatter: `la mediana salta de ${salto.desde[1]} a ${salto.hasta[1]} tramos` },
+                       formatter: I18n.t(`la mediana salta de ${salto.desde[1]} a ${salto.hasta[1]} tramos`,
+                                         `the median jumps from ${salto.desde[1]} to ${salto.hasta[1]} windows`) },
               data: [[{ xAxis: salto.desde[0] }, { xAxis: grupos[grupos.length - 1] + 0.6 }]],
             } : undefined },
         ],
       }),
-      pie: 'Entre paréntesis, cuántos eventos tiene cada grupo. Los de 4 y 5 métodos son chicos: ' +
-           'su mediana se mueve fácil.',
+      pie: I18n.t('Entre paréntesis, cuántos eventos tiene cada grupo. Los de 4 y 5 métodos son chicos: ' +
+                  'su mediana se mueve fácil.',
+                  'In parentheses, how many events each group has. The 4- and 5-method groups are small: ' +
+                  'their median moves easily.'),
     });
   }
 
@@ -359,7 +400,8 @@ window.Analisis = (function () {
     // De mayor a menor desvío, y con el mayor arriba: se lee de arriba abajo como un ranking.
     const orden = s.features.map((_, i) => i).reverse();
     Grafico.medida($('#g-desplazamiento'), {
-      titulo: `Las ${s.features.length} características que más se corren`,
+      titulo: I18n.t(`Las ${s.features.length} características que más se corren`,
+                     `The ${s.features.length} features that shift the most`),
       alto: Math.max(300, s.features.length * 17 + 70),
       opcion: (c) => ({
         animation: false,
@@ -368,11 +410,14 @@ window.Analisis = (function () {
         tooltip: Object.assign({}, c.tooltip, { trigger: 'item',
           formatter: (p) => {
             const i = orden[p.dataIndex];
-            return `<b>${s.shift[i] > 0 ? '+' : ''}${V.fmt(s.shift[i], 2)}</b> desvíos estándar<br>` +
-                   `<span style="color:${c.tenue}">${corto(s.features[i])} · familia ${s.familia[i]}</span>`;
+            return `<b>${s.shift[i] > 0 ? '+' : ''}${V.fmt(s.shift[i], 2)}</b> ` +
+                   `${I18n.t('desvíos estándar', 'standard deviations')}<br>` +
+                   `<span style="color:${c.tenue}">${corto(s.features[i])} · ` +
+                   `${I18n.t('familia', 'family')} ${s.familia[i]}</span>`;
           } }),
         xAxis: Object.assign({}, c.eje, { type: 'value',
-          name: 'desvíos estándar respecto del resto de los tramos',
+          name: I18n.t('desvíos estándar respecto del resto de los tramos',
+                     'standard deviations from the rest of the windows'),
           nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: c.tenue } }),
         yAxis: Object.assign({}, c.eje, { type: 'category',
           data: orden.map((i) => corto(s.features[i])),
@@ -385,8 +430,12 @@ window.Analisis = (function () {
             itemStyle: { color: s.shift[i] >= 0 ? V.serie(3) : V.serie(0) } })),
         }],
       }),
-      pie: `Calculado sobre las ${miles(s.n_candidatas)} candidatas de ${d.detector}, contra el resto. ` +
-           'Positivo: la candidata tiene ese valor más alto que un tramo normal; negativo, más bajo.',
+      pie: I18n.t(
+        `Calculado sobre las ${miles(s.n_candidatas)} candidatas de ${d.detector}, contra el resto. ` +
+        'Positivo: la candidata tiene ese valor más alto que un tramo normal; negativo, más bajo.',
+        `Computed over the ${miles(s.n_candidatas)} candidate${s.n_candidatas === 1 ? '' : 's'} of ` +
+        `${d.detector}, against the rest. Positive: the candidate has a higher value than a normal ` +
+        'window; negative, lower.'),
     });
   }
 

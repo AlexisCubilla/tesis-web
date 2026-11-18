@@ -32,7 +32,7 @@ window.Grafico = (function () {
   }
 
   const fmt = (v, d = 2) => (v == null || !isFinite(v))
-    ? '—' : Number(v).toLocaleString('es', { maximumFractionDigits: d });
+    ? '—' : Number(v).toLocaleString(I18n.locale, { maximumFractionDigits: d });
 
   /** Lo que toda opción comparte: tipografías, colores de eje y caja del globo, según el tema. */
   function comun() {
@@ -84,8 +84,8 @@ window.Grafico = (function () {
           const x = document.createElement('button');
           x.type = 'button';
           x.className = 'grafico-btn';
-          x.textContent = '⤢ Agrandar';
-          x.title = 'Abrir el gráfico en grande';
+          x.textContent = I18n.t('⤢ Agrandar', '⤢ Enlarge');
+          x.title = I18n.t('Abrir el gráfico en grande', 'Open the chart full size');
           x.addEventListener('click', () => this._agrandar());
           b.appendChild(x);
         }
@@ -117,8 +117,8 @@ window.Grafico = (function () {
         x.type = 'button';
         x.className = 'grafico-btn grafico-lupa';
         x.textContent = '⤢';
-        x.title = 'Abrir el gráfico en grande';
-        x.setAttribute('aria-label', 'Abrir el gráfico en grande');
+        x.title = I18n.t('Abrir el gráfico en grande', 'Open the chart full size');
+        x.setAttribute('aria-label', I18n.t('Abrir el gráfico en grande', 'Open the chart full size'));
         x.addEventListener('click', () => this._agrandar());
         this.caja.appendChild(x);
       }
@@ -166,13 +166,13 @@ window.Grafico = (function () {
       /* `tituloAgrandado` es para el gráfico que NO lleva título arriba porque ya está adentro de
          algo que lo nombra —el diálogo de un evento, por ejemplo—. Sin esto, agrandarlo abría una
          ventana rotulada «Gráfico», sin decir de qué. */
-      t.textContent = this.cfg.titulo || this.cfg.tituloAgrandado || 'Gráfico';
+      t.textContent = this.cfg.titulo || this.cfg.tituloAgrandado || I18n.t('Gráfico', 'Chart');
       const esp = document.createElement('span');
       esp.className = 'esp';
       const cerrar = document.createElement('button');
       cerrar.type = 'button';
       cerrar.className = 'grafico-btn';
-      cerrar.textContent = '✕ Cerrar';
+      cerrar.textContent = I18n.t('✕ Cerrar', '✕ Close');
       cerrar.addEventListener('click', () => dlg.close());
       cab.append(t, esp, cerrar);
 
@@ -207,16 +207,18 @@ window.Grafico = (function () {
       iconStyle: { borderColor: c.tenue },
       emphasis: { iconStyle: { borderColor: varCss('--acento') } },
       feature: {
-        dataZoom: { title: { zoom: 'Acercar un tramo', back: 'Deshacer' }, yAxisIndex: 'none' },
-        restore: { title: 'Ver todo' },
-        dataView: { title: 'Ver los datos', lang: ['Datos', 'Cerrar', 'Actualizar'], readOnly: true,
+        dataZoom: { title: { zoom: I18n.t('Acercar un tramo', 'Zoom into a range'), back: I18n.t('Deshacer', 'Undo') }, yAxisIndex: 'none' },
+        restore: { title: I18n.t('Ver todo', 'Show all') },
+        dataView: { title: I18n.t('Ver los datos', 'View the data'),
+                    lang: [I18n.t('Datos', 'Data'), I18n.t('Cerrar', 'Close'), I18n.t('Actualizar', 'Refresh')],
+                    readOnly: true,
                     backgroundColor: varCss('--panel'), textColor: c.tinta,
                     buttonColor: varCss('--acento-hondo'),
                     // Sin `optionToContent`, ECharts vuelca una serie abajo de la otra y el índice
                     // de medición se repite una vez por señal: 246 líneas para 79 mediciones. Lo
                     // que hace falta es una fila por medición y una columna por señal.
                     optionToContent: tabla },
-        saveAsImage: { title: 'Guardar imagen', name: 'grafico', pixelRatio: 2,
+        saveAsImage: { title: I18n.t('Guardar imagen', 'Save image'), name: I18n.t('grafico', 'chart'), pixelRatio: 2,
                        backgroundColor: varCss('--panel') },
       },
     };
@@ -253,7 +255,9 @@ window.Grafico = (function () {
           '</tr>');
       }
       const aviso = paso > 1
-        ? `<p class="grafico-pie">Se lista 1 de cada ${paso} filas (${filas.length} de ${i1 - i0 + 1}). Acercá el gráfico para verlas todas.</p>`
+        ? '<p class="grafico-pie">' + I18n.t(
+          `Se lista 1 de cada ${paso} filas (${filas.length} de ${i1 - i0 + 1}). Acercá el gráfico para verlas todas.`,
+          `Showing 1 of every ${paso} rows (${filas.length} of ${i1 - i0 + 1}). Zoom into the chart to see them all.`) + '</p>'
         : '';
       return '<div class="grafico-tabla tabla-scroll"><table><thead><tr>'
         + enc.map((h) => '<th>' + escapar(h) + '</th>').join('')
@@ -426,8 +430,11 @@ window.Grafico = (function () {
 
     // El pie y el título se arman siempre: el marco los oculta mientras es miniatura y los
     // muestra al abrirse en grande.
-    const pie = `${n} ${cfg.sustantivo || 'puntos'}. Para acercarte a un tramo: arrastrá los `
-      + 'extremos de la barra de abajo, o usá la lupa de la esquina y encerrá el tramo en un recuadro.';
+    const pie = I18n.t(
+      `${n} ${cfg.sustantivo || 'puntos'}. Para acercarte a un tramo: arrastrá los `
+        + 'extremos de la barra de abajo, o usá la lupa de la esquina y encerrá el tramo en un recuadro.',
+      `${n} ${cfg.sustantivo || (n === 1 ? 'point' : 'points')}. To zoom into a range: drag the `
+        + 'ends of the bar below, or use the magnifier in the corner and draw a box around the range.');
     const seleccionable = typeof cfg.alSeleccionar === 'function' && !compacto;
     const g = new Grafo(destino, {
       titulo: cfg.titulo, tituloAgrandado: cfg.tituloAgrandado, alto, opcion, pie, compacto,
