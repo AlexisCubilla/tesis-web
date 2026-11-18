@@ -594,6 +594,12 @@ html[data-tema="claro"] .ing-dato,
 html[data-tema="claro"] .ing-aro { display: none; }
 
 * { box-sizing: border-box; }
+/* `hidden` OCULTA, SIEMPRE. El `display: none` que le da el navegador pierde contra cualquier
+   `display` de autor —`.boton` es `flex`—, y el atributo deja de hacer nada sin ningún error. Pasó
+   tres veces (`.pestanas`, `.menu-cuenta`, `.velo`) y la tercera dejó a la vista el «Reintentar» de
+   la revisión cuando no hay editor que reintentar. Las reglas puntuales siguen, pero ya no hacen
+   falta: esta las cubre a todas. */
+[hidden] { display: none !important; }
 
 /* ---------------------------------------------------------------------------
    Íconos.
